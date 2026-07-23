@@ -65,3 +65,37 @@ Stage Summary:
 - Agent Browser 验证：模型加载成功（54灯+21空调单元+几何体合并）、UI 完整（75设备/KPI/告警/环形图/楼层信息）、交互正常（点击设备显示12字段详情、照明开关影响运行数）
 - VLM 评价：页面渲染正常、UI齐全、3D场景可见、无错误
 - 可在预览面板直接查看：http://localhost:3000/
+
+---
+Task ID: hdr-theme-rerender
+Agent: Super Z (main)
+Task: 重新调整 GLB 模型渲染方式：统一添加 HDR 环境照亮模型，所有模型给适合主题的颜色，看清细节并带投影
+
+Work Log:
+- 从 Poly Haven 下载免费 HDR 环境贴图 studio_small_03_1k.hdr（1.6MB，Radiance HDR 格式）到 public/studio_small.hdr
+- 引入 RGBELoader（three/addons/loaders/RGBELoader.js）
+- 重写 setupEnvironment：
+  - HDR 环境贴图设为 scene.environment（PBR 反射 + 照明），environmentIntensity=0.8
+  - 主方向光强度 0.6→1.8，shadow map 1024→2048，加 normalBias 减少阴影瑕疵
+  - 新增冷色辅助方向光（fillLight）从对侧补光照亮暗部细节
+  - 删除原程序化渐变环境贴图（createGradientEnvTexture）
+- 新增科技主题材质系统 makeThemeMaterial / applyThemeMaterialToMesh：
+  - 墙体：深青灰 0x2a3a52，微金属，清晰投影
+  - 桌椅：中青蓝 0x1e3a5f，哑光，细节清晰
+  - logo：亮青色 0x3a6a9a，高金属反射
+  - 灯具：青色外壳 0x4a6080 + 暖白发光 0xffe8b0
+  - 空调：冷青蓝金属 0x4a8ab8，干净反光
+  - 默认：通用科技青 0x2a4a6a
+  - 所有材质 envMapIntensity=1.0 接收 HDR 反射
+- 模型加载时统一应用主题材质：合并网格（墙/椅/logo）用主题材质，原始 mesh（灯/空调）用对应主题材质
+- 所有 mesh 启用 castShadow + receiveShadow（看清投影细节）
+- 修改 applyLighting/applyLightingClosure：不再粗暴覆盖 emissive 颜色，只调 emissiveIntensity；新增 environmentIntensity 随照明变化；曝光调高看清细节
+- Bloom 参数调整：strength 0.55→0.45，threshold 0.25→0.6（避免 HDR 照明下整体过曝，只让发光元素辉光）
+- 修复 sRGB 警告：HDR 贴图保持线性空间，不设 colorSpace
+
+Stage Summary:
+- HDR 环境贴图成功加载，照亮模型并产生 PBR 反射光泽
+- 统一科技青蓝色系材质，与 UI 主题呼应
+- 投影清晰（2048 shadow map + 所有物体投射/接收阴影）
+- VLM 评价：照明出色有光泽感、青蓝色系统一高级、细节清晰可辨、投影自然、对比度优秀
+- 交互无回归：点击设备、照明开关均正常

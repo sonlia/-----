@@ -46,3 +46,310 @@ Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allow
 [00:00:16.892] Browser WARN    THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead.
 [00:01:38.504] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
 [00:01:38.504] Browser WARN    THREE.AttributeNode: Vertex attribute "uv" not found on geometry.
+[00:21:59.348] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:21:59.673] Browser WARN    THREE.AttributeNode: Vertex attribute "uv" not found on geometry.
+[00:22:04.082] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:22:04.082] Browser WARN    THREE.AttributeNode: Vertex attribute "uv" not found on geometry.
+[00:38:24.507] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:38:24.507] Browser WARN    THREE.AttributeNode: Vertex attribute "uv" not found on geometry.
+[00:38:24.507] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+ - While validating [TextureDescriptor ""depthBuffer""].
+ - While calling [Device].CreateTexture([TextureDescriptor ""depthBuffer""]).
+
+[00:38:24.507] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "depthBuffer"] is invalid due to a previous error.
+ - While calling [Invalid Texture "depthBuffer"].CreateView([TextureViewDescriptor]).
+
+[00:38:24.507] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:38:24.507] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:38:24.507] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: Could not create a swapchain texture of size 0.
+    at APIInjectError (..\..\third_party\dawn\src\dawn\native\Device.cpp:1928)
+
+[00:38:24.507] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture] is invalid due to a previous error.
+ - While calling [Invalid Texture].CreateView([TextureViewDescriptor]).
+
+[00:38:24.507] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.
+ - While validating colorAttachments[0].
+ - While encoding [CommandEncoder "renderContext_4"].BeginRenderPass([RenderPassDescriptor]).
+ - While finishing [CommandEncoder "renderContext_4"].
+
+[00:38:24.507] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_4"] is invalid due to a previous error.
+ - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder "renderContext_4"]])
+
+[00:39:29.624] Server  LOG      ✓ Compiled in 195ms
+[00:39:31.475] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:39:31.475] Browser WARN    THREE.AttributeNode: Vertex attribute "uv" not found on geometry.
+[00:39:32.489] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+ - While validating [TextureDescriptor ""depthBuffer""].
+ - While calling [Device].CreateTexture([TextureDescriptor ""depthBuffer""]).
+
+[00:39:32.489] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "depthBuffer"] is invalid due to a previous error.
+ - While calling [Invalid Texture "depthBuffer"].CreateView([TextureViewDescriptor]).
+
+[00:39:32.489] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:39:32.489] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:39:32.489] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: Could not create a swapchain texture of size 0.
+    at APIInjectError (..\..\third_party\dawn\src\dawn\native\Device.cpp:1928)
+
+[00:39:32.489] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture] is invalid due to a previous error.
+ - While calling [Invalid Texture].CreateView([TextureViewDescriptor]).
+
+[00:39:32.489] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.
+ - While validating colorAttachments[0].
+ - While encoding [CommandEncoder "renderContext_9"].BeginRenderPass([RenderPassDescriptor]).
+ - While finishing [CommandEncoder "renderContext_9"].
+
+[00:39:32.489] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_9"] is invalid due to a previous error.
+ - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder "renderContext_9"]])
+
+[00:39:52.616] Server  LOG      ✓ Compiled in 1463ms
+[00:39:54.229] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:39:54.475] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:39:54.475] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[00:39:54.475] Browser LOG     HDR 环境贴图加载完成
+[00:39:54.475] Browser WARN    THREE.AttributeNode: Vertex attribute "uv" not found on geometry.
+[00:39:54.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+ - While validating [TextureDescriptor ""depthBuffer""].
+ - While calling [Device].CreateTexture([TextureDescriptor ""depthBuffer""]).
+
+[00:39:54.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "depthBuffer"] is invalid due to a previous error.
+ - While calling [Invalid Texture "depthBuffer"].CreateView([TextureViewDescriptor]).
+
+[00:39:54.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:39:54.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:39:54.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: Could not create a swapchain texture of size 0.
+    at APIInjectError (..\..\third_party\dawn\src\dawn\native\Device.cpp:1928)
+
+[00:39:54.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture] is invalid due to a previous error.
+ - While calling [Invalid Texture].CreateView([TextureViewDescriptor]).
+
+[00:39:54.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.
+ - While validating colorAttachments[0].
+ - While encoding [CommandEncoder "renderContext_14"].BeginRenderPass([RenderPassDescriptor]).
+ - While finishing [CommandEncoder "renderContext_14"].
+
+[00:39:54.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_14"] is invalid due to a previous error.
+ - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder "renderContext_14"]])
+
+[00:40:05.023] Browser WARN    THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead.
+[00:40:05.023] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:40:05.023] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[00:40:05.023] Browser LOG     HDR 环境贴图加载完成
+[00:40:05.023] Browser WARN    THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead.
+[00:40:05.023] Browser WARN    THREE.WebGLTextures: sRGB encoded textures have to use RGBAFormat and UnsignedByteType.
+[00:40:24.473] Server  LOG      ✓ Compiled in 222ms
+[00:40:25.480] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:40:25.480] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[00:40:25.480] Browser LOG     HDR 环境贴图加载完成
+[00:40:25.480] Browser ERROR   模型加载失败: {}
+[00:40:26.483] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+ - While validating [TextureDescriptor ""depthBuffer""].
+ - While calling [Device].CreateTexture([TextureDescriptor ""depthBuffer""]).
+
+[00:40:26.483] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "depthBuffer"] is invalid due to a previous error.
+ - While calling [Invalid Texture "depthBuffer"].CreateView([TextureViewDescriptor]).
+
+[00:40:26.483] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:40:26.483] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:40:26.483] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: Could not create a swapchain texture of size 0.
+    at APIInjectError (..\..\third_party\dawn\src\dawn\native\Device.cpp:1928)
+
+[00:40:26.483] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture] is invalid due to a previous error.
+ - While calling [Invalid Texture].CreateView([TextureViewDescriptor]).
+
+[00:40:26.483] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.
+ - While validating colorAttachments[0].
+ - While encoding [CommandEncoder "renderContext_18"].BeginRenderPass([RenderPassDescriptor]).
+ - While finishing [CommandEncoder "renderContext_18"].
+
+[00:40:26.483] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_18"] is invalid due to a previous error.
+ - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder "renderContext_18"]])
+
+[00:40:38.308] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:40:38.308] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[00:40:38.308] Browser LOG     HDR 环境贴图加载完成
+[00:40:38.308] Browser ERROR   模型加载失败: {}
+[00:40:38.308] Browser WARN    THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead.
+[00:40:38.308] Browser WARN    THREE.WebGLTextures: sRGB encoded textures have to use RGBAFormat and UnsignedByteType.
+[00:40:45.475] Server  LOG      ✓ Compiled in 219ms
+[00:40:46.939] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:40:46.939] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[00:40:46.939] Browser LOG     HDR 环境贴图加载完成
+[00:40:46.939] Browser ERROR   模型加载失败: {}
+[00:40:47.481] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+ - While validating [TextureDescriptor ""depthBuffer""].
+ - While calling [Device].CreateTexture([TextureDescriptor ""depthBuffer""]).
+
+[00:40:47.481] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "depthBuffer"] is invalid due to a previous error.
+ - While calling [Invalid Texture "depthBuffer"].CreateView([TextureViewDescriptor]).
+
+[00:40:47.481] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:40:47.481] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:40:47.481] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: Could not create a swapchain texture of size 0.
+    at APIInjectError (..\..\third_party\dawn\src\dawn\native\Device.cpp:1928)
+
+[00:40:47.481] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture] is invalid due to a previous error.
+ - While calling [Invalid Texture].CreateView([TextureViewDescriptor]).
+
+[00:40:47.481] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.
+ - While validating colorAttachments[0].
+ - While encoding [CommandEncoder "renderContext_22"].BeginRenderPass([RenderPassDescriptor]).
+ - While finishing [CommandEncoder "renderContext_22"].
+
+[00:40:47.481] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_22"] is invalid due to a previous error.
+ - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder "renderContext_22"]])
+
+[00:40:53.916] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:40:53.916] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[00:40:59.910] Browser LOG     HDR 环境贴图加载完成
+[00:40:59.911] Browser ERROR   模型加载失败: {}
+[00:40:59.911] Browser WARN    THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead.
+[00:40:59.911] Browser WARN    THREE.WebGLTextures: sRGB encoded textures have to use RGBAFormat and UnsignedByteType.
+[00:41:10.081] Server  LOG      ✓ Compiled in 636ms
+[00:41:11.487] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:41:11.487] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[00:41:11.487] Browser LOG     HDR 环境贴图加载完成
+[00:41:11.487] Browser WARN    THREE.AttributeNode: Vertex attribute "uv" not found on geometry.
+[00:41:12.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+ - While validating [TextureDescriptor ""depthBuffer""].
+ - While calling [Device].CreateTexture([TextureDescriptor ""depthBuffer""]).
+
+[00:41:12.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "depthBuffer"] is invalid due to a previous error.
+ - While calling [Invalid Texture "depthBuffer"].CreateView([TextureViewDescriptor]).
+
+[00:41:12.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:41:12.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:41:12.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: Could not create a swapchain texture of size 0.
+    at APIInjectError (..\..\third_party\dawn\src\dawn\native\Device.cpp:1928)
+
+[00:41:12.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture] is invalid due to a previous error.
+ - While calling [Invalid Texture].CreateView([TextureViewDescriptor]).
+
+[00:41:12.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.
+ - While validating colorAttachments[0].
+ - While encoding [CommandEncoder "renderContext_27"].BeginRenderPass([RenderPassDescriptor]).
+ - While finishing [CommandEncoder "renderContext_27"].
+
+[00:41:12.475] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_27"] is invalid due to a previous error.
+ - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder "renderContext_27"]])
+
+[00:41:23.576] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:41:23.576] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[00:41:23.576] Browser LOG     HDR 环境贴图加载完成
+[00:41:23.576] Browser WARN    THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead.
+[00:41:23.576] Browser WARN    THREE.WebGLTextures: sRGB encoded textures have to use RGBAFormat and UnsignedByteType.
+[00:42:50.777] Server  LOG      ✓ Compiled in 194ms
+[00:42:51.488] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:42:51.488] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[00:42:52.474] Browser LOG     HDR 环境贴图加载完成
+[00:42:52.474] Browser WARN    THREE.AttributeNode: Vertex attribute "uv" not found on geometry.
+[00:42:53.480] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+ - While validating [TextureDescriptor ""depthBuffer""].
+ - While calling [Device].CreateTexture([TextureDescriptor ""depthBuffer""]).
+
+[00:42:53.480] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "depthBuffer"] is invalid due to a previous error.
+ - While calling [Invalid Texture "depthBuffer"].CreateView([TextureViewDescriptor]).
+
+[00:42:53.480] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:42:53.480] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:42:53.480] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: Could not create a swapchain texture of size 0.
+    at APIInjectError (..\..\third_party\dawn\src\dawn\native\Device.cpp:1928)
+
+[00:42:53.480] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture] is invalid due to a previous error.
+ - While calling [Invalid Texture].CreateView([TextureViewDescriptor]).
+
+[00:42:53.480] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.
+ - While validating colorAttachments[0].
+ - While encoding [CommandEncoder "renderContext_32"].BeginRenderPass([RenderPassDescriptor]).
+ - While finishing [CommandEncoder "renderContext_32"].
+
+[00:42:53.480] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_32"] is invalid due to a previous error.
+ - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder "renderContext_32"]])
+
+[00:43:08.818] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:43:08.818] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[00:43:08.818] Browser LOG     HDR 环境贴图加载完成
+[00:43:08.818] Browser WARN    THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead.
+[00:43:08.818] Browser WARN    THREE.WebGLTextures: sRGB encoded textures have to use RGBAFormat and UnsignedByteType.
+[00:44:05.479] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:44:05.479] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[00:44:05.479] Browser LOG     HDR 环境贴图加载完成
+[00:44:05.479] Browser WARN    THREE.AttributeNode: Vertex attribute "uv" not found on geometry.
+[00:44:06.478] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+ - While validating [TextureDescriptor ""depthBuffer""].
+ - While calling [Device].CreateTexture([TextureDescriptor ""depthBuffer""]).
+
+[00:44:06.478] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "depthBuffer"] is invalid due to a previous error.
+ - While calling [Invalid Texture "depthBuffer"].CreateView([TextureViewDescriptor]).
+
+[00:44:06.478] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:44:06.478] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:44:06.478] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: Could not create a swapchain texture of size 0.
+    at APIInjectError (..\..\third_party\dawn\src\dawn\native\Device.cpp:1928)
+
+[00:44:06.478] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture] is invalid due to a previous error.
+ - While calling [Invalid Texture].CreateView([TextureViewDescriptor]).
+
+[00:44:06.478] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.
+ - While validating colorAttachments[0].
+ - While encoding [CommandEncoder "renderContext_4"].BeginRenderPass([RenderPassDescriptor]).
+ - While finishing [CommandEncoder "renderContext_4"].
+
+[00:44:06.478] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_4"] is invalid due to a previous error.
+ - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder "renderContext_4"]])
+
+[01:03:13.275] Server  LOG      ✓ Compiled in 232ms
+[01:03:19.059] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[01:03:19.059] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[01:03:24.745] Server  LOG      ✓ Compiled in 140ms
+[01:03:25.999] Browser LOG     HDR 环境贴图加载完成
+[01:03:25.999] Browser WARN    THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead.
+[01:03:25.999] Browser WARN    THREE.WebGLTextures: sRGB encoded textures have to use RGBAFormat and UnsignedByteType.
+[01:03:31.551] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[01:03:31.551] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[01:03:38.480] Browser LOG     HDR 环境贴图加载完成
+[01:03:38.480] Browser WARN    THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead.
+[01:03:38.480] Browser WARN    THREE.WebGLTextures: sRGB encoded textures have to use RGBAFormat and UnsignedByteType.
+[01:03:39.146] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:03:46.064] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[01:03:46.064] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[01:03:46.064] Browser LOG     HDR 环境贴图加载完成
+[01:03:46.064] Browser WARN    THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead.
+[01:03:46.064] Browser WARN    THREE.WebGLTextures: sRGB encoded textures have to use RGBAFormat and UnsignedByteType.
+[01:04:04.328] Server  LOG      ✓ Compiled in 1206ms
+[01:04:10.107] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:04:17.025] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[01:04:17.025] Browser WARN    RGBELoader has been deprecated. Please use HDRLoader instead.
+[01:04:17.025] Browser LOG     HDR 环境贴图加载完成
+[01:04:17.025] Browser WARN    THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead.

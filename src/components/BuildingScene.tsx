@@ -10,6 +10,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 
 // ===== 设备信息数据库 =====
 const deviceDB: any = {
@@ -112,7 +113,8 @@ export default function BuildingScene() {
       if (renderModeRef.current !== 'WebGPU') {
         T.composer = new EffectComposer(T.renderer);
         T.composer.addPass(new RenderPass(T.scene, T.camera));
-        T.composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.6, 0.25));
+        // Bloom 阈值调高，避免 HDR 照明下整体过曝，只让发光元素辉光
+        T.composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.45, 0.5, 0.6));
         T.composer.addPass(new OutputPass());
       }
 
@@ -142,47 +144,52 @@ export default function BuildingScene() {
       animate();
     };
 
-    // ===== 环境 =====
+    // ===== 环境（HDR 环境贴图照亮 + 方向光投影） =====
     function setupEnvironment(T: any) {
-      const ambient = new THREE.AmbientLight(0x6688aa, 0.35);
+      // 环境光（基础填充，HDR 提供主要照明）
+      const ambient = new THREE.AmbientLight(0x88aacc, 0.25);
       ambient.name = '__ambient';
       T.scene.add(ambient);
 
-      const dirLight = new THREE.DirectionalLight(0xb0c4de, 0.6);
-      dirLight.position.set(40, 60, 30);
+      // 主方向光（投射清晰阴影，增强细节立体感）
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
+      dirLight.position.set(35, 50, 25);
       dirLight.castShadow = true;
-      dirLight.shadow.mapSize.set(1024, 1024);
+      dirLight.shadow.mapSize.set(2048, 2048);
       dirLight.shadow.camera.near = 1;
-      dirLight.shadow.camera.far = 120;
-      dirLight.shadow.camera.left = -45;
-      dirLight.shadow.camera.right = 45;
-      dirLight.shadow.camera.top = 45;
-      dirLight.shadow.camera.bottom = -45;
-      dirLight.shadow.bias = -0.0005;
+      dirLight.shadow.camera.far = 150;
+      dirLight.shadow.camera.left = -50;
+      dirLight.shadow.camera.right = 50;
+      dirLight.shadow.camera.top = 50;
+      dirLight.shadow.camera.bottom = -50;
+      dirLight.shadow.bias = -0.0003;
+      dirLight.shadow.normalBias = 0.02;
       dirLight.name = '__directional';
       T.scene.add(dirLight);
 
-      const hemi = new THREE.HemisphereLight(0x88aaff, 0x443322, 0.25);
+      // 辅助方向光（冷色补光，从对侧照亮暗部细节）
+      const fillLight = new THREE.DirectionalLight(0x4488cc, 0.5);
+      fillLight.position.set(-30, 20, -25);
+      fillLight.name = '__fill';
+      T.scene.add(fillLight);
+
+      const hemi = new THREE.HemisphereLight(0x88aaff, 0x223344, 0.3);
       hemi.name = '__hemi';
       T.scene.add(hemi);
 
-      T.scene.environment = createGradientEnvTexture();
-    }
-
-    function createGradientEnvTexture() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 256; canvas.height = 256;
-      const ctx = canvas.getContext('2d')!;
-      const grad = ctx.createLinearGradient(0, 0, 0, 256);
-      grad.addColorStop(0, '#1a2550');
-      grad.addColorStop(0.5, '#0a1030');
-      grad.addColorStop(1, '#050818');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 256, 256);
-      const tex = new THREE.CanvasTexture(canvas);
-      tex.mapping = THREE.EquirectangularReflectionMapping;
-      tex.colorSpace = THREE.SRGBColorSpace;
-      return tex;
+      // 加载 HDR 环境贴图（用于 PBR 反射 + 背景照明）
+      setLoaderText('加载 HDR 环境贴图...');
+      const rgbeLoader = new RGBELoader();
+      rgbeLoader.load('/studio_small.hdr', (envTexture: any) => {
+        envTexture.mapping = THREE.EquirectangularReflectionMapping;
+        // HDR 用于 PBR 反射/照明，保持线性空间（不设 colorSpace，避免 sRGB 警告）
+        T.scene.environment = envTexture;
+        T.scene.environmentIntensity = 0.8;
+        T.envTexture = envTexture;
+        console.log('HDR 环境贴图加载完成');
+      }, undefined, (err: any) => {
+        console.warn('HDR 加载失败，使用程序化环境:', err);
+      });
     }
 
     // ===== 加载模型 =====
@@ -209,7 +216,7 @@ export default function BuildingScene() {
           if (groups.wall) {
             const merged = mergeGroupGeometries(groups.wall, T.modelRoot);
             if (merged) {
-              const m = new THREE.Mesh(merged.geometry, merged.material);
+              const m = new THREE.Mesh(merged.geometry, makeThemeMaterial('wall'));
               m.name = 'merged_wall';
               m.castShadow = true; m.receiveShadow = true;
               m.userData.deviceType = 'wall';
@@ -223,9 +230,9 @@ export default function BuildingScene() {
           if (groups.furniture) {
             const merged = mergeGroupGeometries(groups.furniture, T.modelRoot);
             if (merged) {
-              const m = new THREE.Mesh(merged.geometry, merged.material);
+              const m = new THREE.Mesh(merged.geometry, makeThemeMaterial('furniture'));
               m.name = 'merged_furniture';
-              m.castShadow = false; m.receiveShadow = false;
+              m.castShadow = true; m.receiveShadow = true;
               m.userData.deviceType = 'furniture';
               m.userData.deviceInfo = makeDeviceInfo(m, 'furniture', 0);
               T.modelRoot.remove(groups.furniture);
@@ -237,19 +244,25 @@ export default function BuildingScene() {
           groups.logos.forEach((lg: any) => {
             const merged = mergeGroupGeometries(lg, T.modelRoot);
             if (merged) {
-              const m = new THREE.Mesh(merged.geometry, merged.material);
+              const m = new THREE.Mesh(merged.geometry, makeThemeMaterial('logo'));
               m.name = 'merged_' + lg.name;
+              m.castShadow = true; m.receiveShadow = true;
               T.modelRoot.remove(lg);
               T.modelRoot.add(m);
             }
           });
 
-          // 设置 mesh 属性
+          // 为所有 mesh 统一应用主题材质 + 阴影设置
           T.modelRoot.traverse((child: any) => {
             if (child.isMesh && child.geometry) {
+              child.castShadow = true;
               child.receiveShadow = true;
-              child.castShadow = false;
               ensureUV(child.geometry);
+              // 非交互 mesh 统一主题材质；灯具/空调保留独立处理
+              if (child.userData.deviceType !== 'light' && child.userData.deviceType !== 'ac' && !child.userData.themeApplied) {
+                applyThemeMaterialToMesh(child, 'default');
+                child.userData.themeApplied = true;
+              }
               if (child.material) {
                 child.userData.origEmissive = child.material.emissive ? child.material.emissive.clone() : new THREE.Color(0, 0, 0);
                 child.userData.origEmissiveIntensity = child.material.emissiveIntensity || 0;
@@ -257,7 +270,7 @@ export default function BuildingScene() {
             }
           });
 
-          // 识别灯具
+          // 识别灯具（外壳科技色 + 灯罩暖白发光）
           T.lightFixtures = [];
           if (groups.light) {
             let idx = 0;
@@ -265,17 +278,15 @@ export default function BuildingScene() {
               if (child.isMesh) {
                 child.userData.deviceType = 'light';
                 child.userData.deviceInfo = makeDeviceInfo(child, 'light', idx);
-                if (child.material) {
-                  child.material.emissive = new THREE.Color(0xffe8b0);
-                  child.material.emissiveIntensity = 0.6;
-                }
+                applyThemeMaterialToMesh(child, 'light');
+                child.userData.themeApplied = true;
                 T.lightFixtures.push(child);
                 T.selectableObjects.push(child);
                 idx++;
               }
             });
           }
-          // 识别空调（聚类）
+          // 识别空调（聚类）— 冷青蓝金属外壳
           T.acUnits = [];
           if (groups.ac) {
             const meshes: any[] = [];
@@ -299,6 +310,8 @@ export default function BuildingScene() {
                 m.userData.deviceType = 'ac';
                 m.userData.deviceInfo = acInfo;
                 m.userData.acIndex = idx;
+                applyThemeMaterialToMesh(m, 'ac');
+                m.userData.themeApplied = true;
                 T.acUnits.push(m);
                 T.selectableObjects.push(m);
               });
@@ -372,6 +385,39 @@ export default function BuildingScene() {
         const cnt = geo.attributes.position.count;
         geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(cnt * 2), 2));
       }
+    }
+
+    // ===== 科技主题材质（统一配色，保留细节） =====
+    // 配色：深青蓝主体 + 金属质感，与 UI 青色主题呼应
+    function makeThemeMaterial(type: 'wall' | 'furniture' | 'logo' | 'light' | 'ac' | 'default') {
+      const presets: Record<string, any> = {
+        // 墙体：深青灰，微金属，清晰投影
+        wall: { color: 0x2a3a52, metalness: 0.15, roughness: 0.75, emissive: 0x0a1428, emissiveIntensity: 0.1 },
+        // 桌椅：中青蓝，哑光，细节清晰
+        furniture: { color: 0x1e3a5f, metalness: 0.25, roughness: 0.55, emissive: 0x0a1830, emissiveIntensity: 0.08 },
+        // logo 装饰：亮青色，高金属反射
+        logo: { color: 0x3a6a9a, metalness: 0.6, roughness: 0.3, emissive: 0x00d4ff, emissiveIntensity: 0.15 },
+        // 灯具：暖白发光灯罩 + 青色外壳
+        light: { color: 0x4a6080, metalness: 0.5, roughness: 0.35, emissive: 0xffe8b0, emissiveIntensity: 0.8 },
+        // 空调：冷青蓝金属，干净反光
+        ac: { color: 0x4a8ab8, metalness: 0.7, roughness: 0.25, emissive: 0x103040, emissiveIntensity: 0.05 },
+        // 默认：通用科技青
+        default: { color: 0x2a4a6a, metalness: 0.3, roughness: 0.6, emissive: 0x081830, emissiveIntensity: 0.08 },
+      };
+      const p = presets[type] || presets.default;
+      return new THREE.MeshStandardMaterial({
+        color: p.color,
+        metalness: p.metalness,
+        roughness: p.roughness,
+        emissive: p.emissive,
+        emissiveIntensity: p.emissiveIntensity,
+        envMapIntensity: 1.0, // HDR 环境贴图反射强度
+      });
+    }
+
+    // 为已存在的 mesh 应用主题材质（保留几何体）
+    function applyThemeMaterialToMesh(mesh: any, type: 'wall' | 'furniture' | 'logo' | 'light' | 'ac' | 'default') {
+      mesh.material = makeThemeMaterial(type);
     }
 
     function makeDeviceInfo(obj: any, type: string, index = 0) {
@@ -642,18 +688,25 @@ export default function BuildingScene() {
     function applyLighting(T: any) {
       const s = stateRef.current.lighting;
       const b = s.brightness;
-      T.pointLights.forEach((light: any) => { light.intensity = s.enabled ? b * 18 : 0; });
+      // 点光源强度随亮度调节
+      T.pointLights.forEach((light: any) => { light.intensity = s.enabled ? b * 22 : 0; });
+      // 灯具发光强度随开关/亮度变化（保留主题色，只调强度）
       T.lightFixtures.forEach((mesh: any) => {
         if (mesh.material && !mesh.userData._hlEmissive) {
-          mesh.material.emissive = new THREE.Color(s.enabled ? 0xffe8b0 : 0x000000);
-          mesh.material.emissiveIntensity = s.enabled ? 0.4 + b * 0.8 : 0;
+          mesh.material.emissiveIntensity = s.enabled ? 0.5 + b * 1.2 : 0.05;
         }
       });
+      // 环境光与半球光随照明变化
       const ambient = T.scene.getObjectByName('__ambient');
-      if (ambient) ambient.intensity = s.enabled ? 0.35 + b * 0.25 : 0.08;
+      if (ambient) ambient.intensity = s.enabled ? 0.25 + b * 0.2 : 0.1;
       const hemi = T.scene.getObjectByName('__hemi');
-      if (hemi) hemi.intensity = s.enabled ? 0.25 : 0.06;
-      T.renderer.toneMappingExposure = s.enabled ? 0.85 + b * 0.35 : 0.4;
+      if (hemi) hemi.intensity = s.enabled ? 0.3 : 0.1;
+      // HDR 环境贴图强度随照明变化
+      if (T.scene.environmentIntensity !== undefined) {
+        T.scene.environmentIntensity = s.enabled ? 0.6 + b * 0.4 : 0.3;
+      }
+      // 曝光（HDR 照明下适当提高以看清细节）
+      T.renderer.toneMappingExposure = s.enabled ? 0.9 + b * 0.3 : 0.5;
       updateStatus(T);
     }
 
@@ -940,19 +993,20 @@ export default function BuildingScene() {
   function applyLightingClosure(T: any, enabled: boolean, b: number) {
     stateRef.current.lighting.enabled = enabled;
     stateRef.current.lighting.brightness = b;
-    T.pointLights.forEach((light: any) => { light.intensity = enabled ? b * 18 : 0; });
+    T.pointLights.forEach((light: any) => { light.intensity = enabled ? b * 22 : 0; });
     T.lightFixtures.forEach((mesh: any) => {
       if (mesh.material && !mesh.userData._hlEmissive) {
-        mesh.material.emissive = new THREE.Color(enabled ? 0xffe8b0 : 0x000000);
-        mesh.material.emissiveIntensity = enabled ? 0.4 + b * 0.8 : 0;
+        mesh.material.emissiveIntensity = enabled ? 0.5 + b * 1.2 : 0.05;
       }
     });
     const ambient = T.scene.getObjectByName('__ambient');
-    if (ambient) ambient.intensity = enabled ? 0.35 + b * 0.25 : 0.08;
+    if (ambient) ambient.intensity = enabled ? 0.25 + b * 0.2 : 0.1;
     const hemi = T.scene.getObjectByName('__hemi');
-    if (hemi) hemi.intensity = enabled ? 0.25 : 0.06;
-    T.renderer.toneMappingExposure = enabled ? 0.85 + b * 0.35 : 0.4;
-    // 重新构建列表 meta（温度/功率）
+    if (hemi) hemi.intensity = enabled ? 0.3 : 0.1;
+    if (T.scene.environmentIntensity !== undefined) {
+      T.scene.environmentIntensity = enabled ? 0.6 + b * 0.4 : 0.3;
+    }
+    T.renderer.toneMappingExposure = enabled ? 0.9 + b * 0.3 : 0.5;
     setDeviceList((prev) => prev.map((it) => it.type === 'light' ? { ...it, meta: `${deviceDB.light.power}W · ${deviceDB.light.colorTemp}` } : it));
     updateStatusClosure(T);
   }
