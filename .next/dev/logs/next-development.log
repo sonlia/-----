@@ -1,0 +1,48 @@
+[00:00:00.510] Server  LOG     
+[00:00:00.510] Server  LOG        We detected TypeScript in your project and reconfigured your tsconfig.json file for you. Strict-mode is set to false by default.
+[00:00:00.510] Server  LOG        The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+[00:00:00.510] Server  LOG        	- include was updated to add '.next/dev/types/**/*.ts'
+[00:00:00.510] Server  LOG     
+[00:00:00.510] Server  LOG        The following mandatory changes were made to your tsconfig.json:
+
+[00:00:00.510] Server  LOG        	- jsx was set to react-jsx (next.js uses the React automatic runtime)
+[00:00:00.510] Server  LOG     
+[00:00:00.582] Server  LOG      ✓ Ready in 377ms
+[00:00:03.609] Server  LOG      ○ Compiling / ...
+[00:00:07.508] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:00:07.508] Browser WARN    THREE.AttributeNode: Vertex attribute "uv" not found on geometry.
+[00:00:07.968] Server  WARN     ⚠ Cross origin request detected from preview-chat-bf534fbf-554b-4630-a937-d4d6a6db9588.space-z.ai to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+[00:00:08.504] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+ - While validating [TextureDescriptor ""depthBuffer""].
+ - While calling [Device].CreateTexture([TextureDescriptor ""depthBuffer""]).
+
+[00:00:08.504] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "depthBuffer"] is invalid due to a previous error.
+ - While calling [Invalid Texture "depthBuffer"].CreateView([TextureViewDescriptor]).
+
+[00:00:08.504] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:00:08.504] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture size ([Extent3D width:0, height:0, depthOrArrayLayers:1]) or mipLevelCount (1) is empty.
+    at ValidateTextureDescriptor (..\..\third_party\dawn\src\dawn\native\Texture.cpp:848)
+
+[00:00:08.504] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: Could not create a swapchain texture of size 0.
+    at APIInjectError (..\..\third_party\dawn\src\dawn\native\Device.cpp:1928)
+
+[00:00:08.504] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture] is invalid due to a previous error.
+ - While calling [Invalid Texture].CreateView([TextureViewDescriptor]).
+
+[00:00:08.504] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.
+ - While validating colorAttachments[0].
+ - While encoding [CommandEncoder "renderContext_4"].BeginRenderPass([RenderPassDescriptor]).
+ - While finishing [CommandEncoder "renderContext_4"].
+
+[00:00:08.504] Browser ERROR   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_4"] is invalid due to a previous error.
+ - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder "renderContext_4"]])
+
+[00:00:12.986] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:13.382] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:00:16.892] Browser WARN    THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead.
+[00:01:38.504] Browser WARN    THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.
+[00:01:38.504] Browser WARN    THREE.AttributeNode: Vertex attribute "uv" not found on geometry.

@@ -1,28 +1,31 @@
-$ vite --host 0.0.0.0 --port 5173
+$ next dev -p 3000
+   ▲ Next.js 16.0.0 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://21.0.6.216:3000
+   - Environments: .env
 
-  VITE v5.4.21  ready in 213 ms
+ ✓ Starting...
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
 
-  ➜  Local:   http://localhost:5173/
-  ➜  Network: http://21.0.6.216:5173/
-6:32:42 AM [vite] page reload main.js
-6:36:32 AM [vite] page reload main.js
-6:45:00 AM [vite] page reload index.html
-6:45:49 AM [vite] page reload main.js
-6:46:16 AM [vite] page reload main.js
-6:46:16 AM [vite] page reload main.js
-6:46:16 AM [vite] page reload main.js
-6:46:16 AM [vite] page reload main.js
-6:47:08 AM [vite] page reload main.js
-6:47:08 AM [vite] page reload main.js
-6:47:16 AM [vite] page reload main.js
-6:47:19 AM [vite] ✨ new dependencies optimized: three/addons/postprocessing/EffectComposer.js, three/addons/postprocessing/RenderPass.js, three/addons/postprocessing/UnrealBloomPass.js, three/addons/postprocessing/OutputPass.js
-6:47:19 AM [vite] ✨ optimized dependencies changed. reloading
-6:47:23 AM [vite] page reload main.js
-6:47:30 AM [vite] page reload main.js
-6:47:35 AM [vite] page reload main.js
-6:47:35 AM [vite] page reload main.js
-6:47:39 AM [vite] page reload main.js
-6:49:33 AM [vite] page reload main.js
-6:49:39 AM [vite] page reload main.js
-6:50:02 AM [vite] page reload main.js
-6:50:13 AM [vite] page reload main.js
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+
+   We detected TypeScript in your project and reconfigured your tsconfig.json file for you. Strict-mode is set to false by default.
+   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+   	- include was updated to add '.next/dev/types/**/*.ts'
+
+   The following mandatory changes were made to your tsconfig.json:
+
+   	- jsx was set to react-jsx (next.js uses the React automatic runtime)
+
+ ✓ Ready in 377ms
+ ○ Compiling / ...
+ GET / 200 in 4.4s (compile: 4.1s, render: 287ms)
+ ⚠ Cross origin request detected from preview-chat-bf534fbf-554b-4630-a937-d4d6a6db9588.space-z.ai to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+ GET / 200 in 47ms (compile: 4ms, render: 44ms)
+ GET / 200 in 122ms (compile: 4ms, render: 118ms)
+ GET / 200 in 119ms (compile: 4ms, render: 116ms)

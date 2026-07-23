@@ -38,3 +38,30 @@ Stage Summary:
 - 功能验证（Agent Browser）：设备点击✓、照明开关✓（75→21台）、空调开关✓、告警推送✓、视角重置✓、数字滚动✓、环形图✓、折线图✓
 - VLM 视觉评价：科技感 8.5/10，信息密度高，赛博朋克风格强烈
 - 待用户在真实GPU环境验证 WebGPU 模式与流畅度
+
+---
+Task ID: migrate-nextjs
+Agent: Super Z (main)
+Task: 将 Vite 项目迁移到 Next.js，方便在预览面板查看
+
+Work Log:
+- 备份原 Vite 文件（index.html/main.js/vite.config.js/dist）到 _vite_backup/
+- 创建 Next.js 16 项目结构：package.json（next 16 / react 19 / three 0.185）、next.config.mjs（COOP/COEP headers for WebGPU）、tsconfig.json
+- 创建 src/app/layout.tsx（根布局，引用 Orbitron/Rajdhani 字体在 globals.css）、src/app/page.tsx（加载 BuildingScene）
+- 迁移全部 CSS 到 src/app/globals.css
+- 创建 src/components/BuildingScene.tsx（约 900 行）：
+  - 'use client' 客户端组件
+  - Three.js 逻辑放在 useEffect（WebGPURenderer/WebGLRenderer 回退、OrbitControls、GLB 加载、几何体合并、点光源、气流粒子、地面网格、设备脉冲标记、Bloom 后期处理、raycaster 交互）
+  - UI 用 JSX + useState/useRef（loading、renderMode、fps、clock、lightingOn、brightness、acOn、temperature、deviceList、selectedDevice、alerts、onlinePeople、kpiPower 等）
+  - 用 stateRef 同步 React state 到 Three.js 闭包，避免闭包陷阱
+  - 事件处理：照明/空调开关、亮度/温度滑块、自动旋转、重置/俯视视角、设备列表点击、关闭信息面板
+  - 告警流、在线人数、能耗折线图等模拟模块用独立 useEffect
+- 模型复制到 public/scene.glb
+- bun install 安装依赖，bun run dev 启动（端口 3000）
+
+Stage Summary:
+- 成功迁移到 Next.js 16 + React 19 + TypeScript + Three.js 0.185
+- 页面编译通过（4.1s），运行无错误
+- Agent Browser 验证：模型加载成功（54灯+21空调单元+几何体合并）、UI 完整（75设备/KPI/告警/环形图/楼层信息）、交互正常（点击设备显示12字段详情、照明开关影响运行数）
+- VLM 评价：页面渲染正常、UI齐全、3D场景可见、无错误
+- 可在预览面板直接查看：http://localhost:3000/
