@@ -99,3 +99,24 @@ Stage Summary:
 - 投影清晰（2048 shadow map + 所有物体投射/接收阴影）
 - VLM 评价：照明出色有光泽感、青蓝色系统一高级、细节清晰可辨、投影自然、对比度优秀
 - 交互无回归：点击设备、照明开关均正常
+
+---
+Task ID: shadow-diffuse-wall
+Agent: Super Z (main)
+Task: 修复投影未生效、墙体改为纯漫反射
+
+Work Log:
+- 用 token 拉取仓库确认模型未更新（md5 一致）
+- 诊断投影问题：shadow camera frustum 过大（±50）、Bloom 冲淡阴影
+- 修复投影：方向光强度 1.8→2.2、斜射角度(30,45,18)、收紧 frustum 到模型实际范围(±28,±22)、shadow.bias 优化、normalBias 0.02→0.015、添加 dirLight.target
+- 墙体改为纯漫反射：metalness 0.15→0、roughness 0.75→1.0、envMapIntensity 1.0→0.0（无反射）
+- 其他材质 envMapIntensity 分级：桌椅0.6、logo1.0、空调1.0、灯具0.8
+- 修复 bug：合并 mesh（wall/furniture/logo）被 traverse 用 default 材质覆盖 → 合并时标记 themeApplied=true
+- Bloom strength 0.45→0.35、threshold 0.6→0.7（避免冲淡阴影）
+- 暴露 window.__three 用于调试
+
+Stage Summary:
+- 投影已确认生效：shadowMap enabled、2048 mapSize、frustum 收紧、所有物体 cast+receive shadow
+- 墙体验证：metalness=0, roughness=1, envMapIntensity=0（纯漫反射）
+- VLM 评价：投影柔和可见、墙体哑光无高光、HDR 光影层次丰富、真实感良好
+- 交互无回归：点击设备、照明开关正常

@@ -168,7 +168,7 @@ function BuildingScene() {
                 T.composer = new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$three$2f$examples$2f$jsm$2f$postprocessing$2f$EffectComposer$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["EffectComposer"](T.renderer);
                 T.composer.addPass(new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$three$2f$examples$2f$jsm$2f$postprocessing$2f$RenderPass$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["RenderPass"](T.scene, T.camera));
                 // Bloom 阈值调高，避免 HDR 照明下整体过曝，只让发光元素辉光
-                T.composer.addPass(new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$three$2f$examples$2f$jsm$2f$postprocessing$2f$UnrealBloomPass$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["UnrealBloomPass"](new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$three$2f$build$2f$three$2e$core$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Vector2"](window.innerWidth, window.innerHeight), 0.45, 0.5, 0.6));
+                T.composer.addPass(new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$three$2f$examples$2f$jsm$2f$postprocessing$2f$UnrealBloomPass$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["UnrealBloomPass"](new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$three$2f$build$2f$three$2e$core$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Vector2"](window.innerWidth, window.innerHeight), 0.35, 0.4, 0.7));
                 T.composer.addPass(new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$three$2f$examples$2f$jsm$2f$postprocessing$2f$OutputPass$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["OutputPass"]());
             }
             // 控制器
@@ -193,6 +193,8 @@ function BuildingScene() {
             T.renderer.domElement.addEventListener('pointermove', onPointerMove);
             T.renderer.domElement.addEventListener('click', onPointerClick);
             T.renderer.domElement.addEventListener('dblclick', onDoubleClick);
+            // 暴露调试对象
+            window.__three = T;
             animate();
         };
         // ===== 环境（HDR 环境贴图照亮 + 方向光投影） =====
@@ -202,20 +204,24 @@ function BuildingScene() {
             ambient.name = '__ambient';
             T.scene.add(ambient);
             // 主方向光（投射清晰阴影，增强细节立体感）
-            const dirLight = new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$three$2f$build$2f$three$2e$core$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["DirectionalLight"](0xffffff, 1.8);
-            dirLight.position.set(35, 50, 25);
+            // 斜射角度让阴影明显投射到地面侧面
+            const dirLight = new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$three$2f$build$2f$three$2e$core$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["DirectionalLight"](0xffffff, 2.2);
+            dirLight.position.set(30, 45, 18);
+            dirLight.target.position.set(0, 0, 0);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.set(2048, 2048);
             dirLight.shadow.camera.near = 1;
-            dirLight.shadow.camera.far = 150;
-            dirLight.shadow.camera.left = -50;
-            dirLight.shadow.camera.right = 50;
-            dirLight.shadow.camera.top = 50;
-            dirLight.shadow.camera.bottom = -50;
-            dirLight.shadow.bias = -0.0003;
-            dirLight.shadow.normalBias = 0.02;
-            dirLight.name = '__directional';
+            dirLight.shadow.camera.far = 120;
+            // 收紧 frustum 到模型实际范围（模型归一化后约 40×2.3×26），提高阴影分辨率
+            dirLight.shadow.camera.left = -28;
+            dirLight.shadow.camera.right = 28;
+            dirLight.shadow.camera.top = 22;
+            dirLight.shadow.camera.bottom = -22;
+            dirLight.shadow.bias = -0.0002;
+            dirLight.shadow.normalBias = 0.015;
             T.scene.add(dirLight);
+            T.scene.add(dirLight.target);
+            dirLight.name = '__directional';
             // 辅助方向光（冷色补光，从对侧照亮暗部细节）
             const fillLight = new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$three$2f$build$2f$three$2e$core$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["DirectionalLight"](0x4488cc, 0.5);
             fillLight.position.set(-30, 20, -25);
@@ -270,6 +276,7 @@ function BuildingScene() {
                             m.castShadow = true;
                             m.receiveShadow = true;
                             m.userData.deviceType = 'wall';
+                            m.userData.themeApplied = true; // 标记已应用主题材质，避免被 traverse 覆盖
                             m.userData.deviceInfo = makeDeviceInfo(m, 'wall', 0);
                             T.modelRoot.remove(groups.wall);
                             T.modelRoot.add(m);
@@ -285,6 +292,7 @@ function BuildingScene() {
                             m.castShadow = true;
                             m.receiveShadow = true;
                             m.userData.deviceType = 'furniture';
+                            m.userData.themeApplied = true;
                             m.userData.deviceInfo = makeDeviceInfo(m, 'furniture', 0);
                             T.modelRoot.remove(groups.furniture);
                             T.modelRoot.add(m);
@@ -299,6 +307,7 @@ function BuildingScene() {
                             m.name = 'merged_' + lg.name;
                             m.castShadow = true;
                             m.receiveShadow = true;
+                            m.userData.themeApplied = true;
                             T.modelRoot.remove(lg);
                             T.modelRoot.add(m);
                         }
@@ -459,13 +468,14 @@ function BuildingScene() {
         // 配色：深青蓝主体 + 金属质感，与 UI 青色主题呼应
         function makeThemeMaterial(type) {
             const presets = {
-                // 墙体：深青灰，微金属，清晰投影
+                // 墙体：纯漫反射，无反射，清晰投影
                 wall: {
                     color: 0x2a3a52,
-                    metalness: 0.15,
-                    roughness: 0.75,
+                    metalness: 0.0,
+                    roughness: 1.0,
                     emissive: 0x0a1428,
-                    emissiveIntensity: 0.1
+                    emissiveIntensity: 0.1,
+                    envMapIntensity: 0.0
                 },
                 // 桌椅：中青蓝，哑光，细节清晰
                 furniture: {
@@ -473,7 +483,8 @@ function BuildingScene() {
                     metalness: 0.25,
                     roughness: 0.55,
                     emissive: 0x0a1830,
-                    emissiveIntensity: 0.08
+                    emissiveIntensity: 0.08,
+                    envMapIntensity: 0.6
                 },
                 // logo 装饰：亮青色，高金属反射
                 logo: {
@@ -481,7 +492,8 @@ function BuildingScene() {
                     metalness: 0.6,
                     roughness: 0.3,
                     emissive: 0x00d4ff,
-                    emissiveIntensity: 0.15
+                    emissiveIntensity: 0.15,
+                    envMapIntensity: 1.0
                 },
                 // 灯具：暖白发光灯罩 + 青色外壳
                 light: {
@@ -489,7 +501,8 @@ function BuildingScene() {
                     metalness: 0.5,
                     roughness: 0.35,
                     emissive: 0xffe8b0,
-                    emissiveIntensity: 0.8
+                    emissiveIntensity: 0.8,
+                    envMapIntensity: 0.8
                 },
                 // 空调：冷青蓝金属，干净反光
                 ac: {
@@ -497,7 +510,8 @@ function BuildingScene() {
                     metalness: 0.7,
                     roughness: 0.25,
                     emissive: 0x103040,
-                    emissiveIntensity: 0.05
+                    emissiveIntensity: 0.05,
+                    envMapIntensity: 1.0
                 },
                 // 默认：通用科技青
                 default: {
@@ -505,7 +519,8 @@ function BuildingScene() {
                     metalness: 0.3,
                     roughness: 0.6,
                     emissive: 0x081830,
-                    emissiveIntensity: 0.08
+                    emissiveIntensity: 0.08,
+                    envMapIntensity: 0.6
                 }
             };
             const p = presets[type] || presets.default;
@@ -515,7 +530,7 @@ function BuildingScene() {
                 roughness: p.roughness,
                 emissive: p.emissive,
                 emissiveIntensity: p.emissiveIntensity,
-                envMapIntensity: 1.0
+                envMapIntensity: p.envMapIntensity
             });
         }
         // 为已存在的 mesh 应用主题材质（保留几何体）
@@ -1619,7 +1634,7 @@ function BuildingScene() {
                         className: "loader-ring"
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1143,
+                        lineNumber: 1153,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1627,7 +1642,7 @@ function BuildingScene() {
                         children: loaderText
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1144,
+                        lineNumber: 1154,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1639,18 +1654,18 @@ function BuildingScene() {
                             }
                         }, void 0, false, {
                             fileName: "[project]/src/components/BuildingScene.tsx",
-                            lineNumber: 1145,
+                            lineNumber: 1155,
                             columnNumber: 44
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1145,
+                        lineNumber: 1155,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/BuildingScene.tsx",
-                lineNumber: 1142,
+                lineNumber: 1152,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1658,7 +1673,7 @@ function BuildingScene() {
                 ref: containerRef
             }, void 0, false, {
                 fileName: "[project]/src/components/BuildingScene.tsx",
-                lineNumber: 1150,
+                lineNumber: 1160,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1673,12 +1688,12 @@ function BuildingScene() {
                                     className: "logo-inner"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/BuildingScene.tsx",
-                                    lineNumber: 1155,
+                                    lineNumber: 1165,
                                     columnNumber: 38
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1155,
+                                lineNumber: 1165,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1688,7 +1703,7 @@ function BuildingScene() {
                                         children: "智能楼宇数字孪生系统"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1157,
+                                        lineNumber: 1167,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1700,26 +1715,26 @@ function BuildingScene() {
                                                 children: "DIGITAL TWIN"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1158,
+                                                lineNumber: 1168,
                                                 columnNumber: 54
                                             }, this),
                                             " · WebGPU 3D VISUALIZATION"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1158,
+                                        lineNumber: 1168,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1156,
+                                lineNumber: 1166,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1154,
+                        lineNumber: 1164,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1732,20 +1747,20 @@ function BuildingScene() {
                                         className: "dot"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1163,
+                                        lineNumber: 1173,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         children: renderMode
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1164,
+                                        lineNumber: 1174,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1162,
+                                lineNumber: 1172,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1756,7 +1771,7 @@ function BuildingScene() {
                                         children: "FPS"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1167,
+                                        lineNumber: 1177,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1764,13 +1779,13 @@ function BuildingScene() {
                                         children: fps || '--'
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1168,
+                                        lineNumber: 1178,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1166,
+                                lineNumber: 1176,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1781,7 +1796,7 @@ function BuildingScene() {
                                         children: "SYS TIME"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1171,
+                                        lineNumber: 1181,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1789,13 +1804,13 @@ function BuildingScene() {
                                         children: clock
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1172,
+                                        lineNumber: 1182,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1170,
+                                lineNumber: 1180,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1806,7 +1821,7 @@ function BuildingScene() {
                                         children: "DATE"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1175,
+                                        lineNumber: 1185,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1817,25 +1832,25 @@ function BuildingScene() {
                                         children: date
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1176,
+                                        lineNumber: 1186,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1174,
+                                lineNumber: 1184,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1161,
+                        lineNumber: 1171,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/BuildingScene.tsx",
-                lineNumber: 1153,
+                lineNumber: 1163,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1848,14 +1863,14 @@ function BuildingScene() {
                                 children: "L-DRAG"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1183,
+                                lineNumber: 1193,
                                 columnNumber: 15
                             }, this),
                             " 旋转"
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1183,
+                        lineNumber: 1193,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1865,14 +1880,14 @@ function BuildingScene() {
                                 children: "R-DRAG"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1184,
+                                lineNumber: 1194,
                                 columnNumber: 15
                             }, this),
                             " 平移"
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1184,
+                        lineNumber: 1194,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1882,14 +1897,14 @@ function BuildingScene() {
                                 children: "WHEEL"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1185,
+                                lineNumber: 1195,
                                 columnNumber: 15
                             }, this),
                             " 缩放"
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1185,
+                        lineNumber: 1195,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1899,14 +1914,14 @@ function BuildingScene() {
                                 children: "CLICK"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1186,
+                                lineNumber: 1196,
                                 columnNumber: 15
                             }, this),
                             " 设备详情"
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1186,
+                        lineNumber: 1196,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1916,20 +1931,20 @@ function BuildingScene() {
                                 children: "DBL-CLICK"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1187,
+                                lineNumber: 1197,
                                 columnNumber: 15
                             }, this),
                             " 聚焦"
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1187,
+                        lineNumber: 1197,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/BuildingScene.tsx",
-                lineNumber: 1182,
+                lineNumber: 1192,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1939,14 +1954,14 @@ function BuildingScene() {
                         className: "panel-corner-tr"
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1192,
+                        lineNumber: 1202,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         className: "panel-corner-bl"
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1192,
+                        lineNumber: 1202,
                         columnNumber: 50
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1958,13 +1973,13 @@ function BuildingScene() {
                                 children: "CTRL CENTER"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1193,
+                                lineNumber: 1203,
                                 columnNumber: 44
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1193,
+                        lineNumber: 1203,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1983,13 +1998,13 @@ function BuildingScene() {
                                         children: energyTag
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1198,
+                                        lineNumber: 1208,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1196,
+                                lineNumber: 1206,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1999,7 +2014,7 @@ function BuildingScene() {
                                         children: kpiPower
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1201,
+                                        lineNumber: 1211,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2007,13 +2022,13 @@ function BuildingScene() {
                                         children: "kWh"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1202,
+                                        lineNumber: 1212,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1200,
+                                lineNumber: 1210,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2023,14 +2038,14 @@ function BuildingScene() {
                                         children: kpiTrend.up ? '▲' : '▼'
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1205,
+                                        lineNumber: 1215,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         children: kpiTrend.val
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1205,
+                                        lineNumber: 1215,
                                         columnNumber: 51
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2041,13 +2056,13 @@ function BuildingScene() {
                                         children: "较昨日"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1206,
+                                        lineNumber: 1216,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1204,
+                                lineNumber: 1214,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("canvas", {
@@ -2057,13 +2072,13 @@ function BuildingScene() {
                                 height: 36
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1208,
+                                lineNumber: 1218,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1195,
+                        lineNumber: 1205,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2084,19 +2099,19 @@ function BuildingScene() {
                                                     d: "M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/BuildingScene.tsx",
-                                                    lineNumber: 1214,
+                                                    lineNumber: 1224,
                                                     columnNumber: 90
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1214,
+                                                lineNumber: 1224,
                                                 columnNumber: 15
                                             }, this),
                                             "照明系统 / LIGHTING"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1213,
+                                        lineNumber: 1223,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2104,13 +2119,13 @@ function BuildingScene() {
                                         children: lightingOn ? 'ONLINE' : 'OFFLINE'
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1217,
+                                        lineNumber: 1227,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1212,
+                                lineNumber: 1222,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -2120,12 +2135,12 @@ function BuildingScene() {
                                     children: lightingOn ? '照明已开启' : '照明已关闭'
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/BuildingScene.tsx",
-                                    lineNumber: 1220,
+                                    lineNumber: 1230,
                                     columnNumber: 13
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1219,
+                                lineNumber: 1229,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2138,7 +2153,7 @@ function BuildingScene() {
                                                 children: "亮度调节 · BRIGHTNESS"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1224,
+                                                lineNumber: 1234,
                                                 columnNumber: 15
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2149,13 +2164,13 @@ function BuildingScene() {
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1225,
+                                                lineNumber: 1235,
                                                 columnNumber: 15
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1223,
+                                        lineNumber: 1233,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -2169,19 +2184,19 @@ function BuildingScene() {
                                         }
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1227,
+                                        lineNumber: 1237,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1222,
+                                lineNumber: 1232,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1211,
+                        lineNumber: 1221,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2202,19 +2217,19 @@ function BuildingScene() {
                                                     d: "M12 2v20M2 12h20M5 5l14 14M19 5L5 19"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/BuildingScene.tsx",
-                                                    lineNumber: 1234,
+                                                    lineNumber: 1244,
                                                     columnNumber: 90
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1234,
+                                                lineNumber: 1244,
                                                 columnNumber: 15
                                             }, this),
                                             "空调系统 / HVAC"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1233,
+                                        lineNumber: 1243,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2222,13 +2237,13 @@ function BuildingScene() {
                                         children: acOn ? 'ONLINE' : 'OFFLINE'
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1237,
+                                        lineNumber: 1247,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1232,
+                                lineNumber: 1242,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -2238,12 +2253,12 @@ function BuildingScene() {
                                     children: acOn ? '空调已开启' : '空调已关闭'
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/BuildingScene.tsx",
-                                    lineNumber: 1240,
+                                    lineNumber: 1250,
                                     columnNumber: 13
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1239,
+                                lineNumber: 1249,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2256,7 +2271,7 @@ function BuildingScene() {
                                                 children: "温度设定 · TEMPERATURE"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1244,
+                                                lineNumber: 1254,
                                                 columnNumber: 15
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2267,13 +2282,13 @@ function BuildingScene() {
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1245,
+                                                lineNumber: 1255,
                                                 columnNumber: 15
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1243,
+                                        lineNumber: 1253,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -2287,19 +2302,19 @@ function BuildingScene() {
                                         }
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1247,
+                                        lineNumber: 1257,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1242,
+                                lineNumber: 1252,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1231,
+                        lineNumber: 1241,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2322,32 +2337,32 @@ function BuildingScene() {
                                                     r: "3"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/BuildingScene.tsx",
-                                                    lineNumber: 1254,
+                                                    lineNumber: 1264,
                                                     columnNumber: 90
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
                                                     d: "M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/BuildingScene.tsx",
-                                                    lineNumber: 1254,
+                                                    lineNumber: 1264,
                                                     columnNumber: 121
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/BuildingScene.tsx",
-                                            lineNumber: 1254,
+                                            lineNumber: 1264,
                                             columnNumber: 15
                                         }, this),
                                         "视图控制 / VIEW"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/BuildingScene.tsx",
-                                    lineNumber: 1253,
+                                    lineNumber: 1263,
                                     columnNumber: 13
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1252,
+                                lineNumber: 1262,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2359,7 +2374,7 @@ function BuildingScene() {
                                         children: "自动旋转"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1259,
+                                        lineNumber: 1269,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -2368,7 +2383,7 @@ function BuildingScene() {
                                         children: "重置视角"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1260,
+                                        lineNumber: 1270,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -2377,7 +2392,7 @@ function BuildingScene() {
                                         children: "俯视视角"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1261,
+                                        lineNumber: 1271,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -2386,25 +2401,25 @@ function BuildingScene() {
                                         children: "设备列表"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1262,
+                                        lineNumber: 1272,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1258,
+                                lineNumber: 1268,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1251,
+                        lineNumber: 1261,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/BuildingScene.tsx",
-                lineNumber: 1191,
+                lineNumber: 1201,
                 columnNumber: 7
             }, this),
             showList && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2414,14 +2429,14 @@ function BuildingScene() {
                         className: "panel-corner-tr"
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1270,
+                        lineNumber: 1280,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         className: "panel-corner-bl"
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1270,
+                        lineNumber: 1280,
                         columnNumber: 52
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2436,13 +2451,13 @@ function BuildingScene() {
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1271,
+                                lineNumber: 1281,
                                 columnNumber: 46
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1271,
+                        lineNumber: 1281,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2463,7 +2478,7 @@ function BuildingScene() {
                                                 strokeWidth: "8"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1275,
+                                                lineNumber: 1285,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("circle", {
@@ -2480,7 +2495,7 @@ function BuildingScene() {
                                                 }
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1276,
+                                                lineNumber: 1286,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("circle", {
@@ -2498,13 +2513,13 @@ function BuildingScene() {
                                                 }
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1277,
+                                                lineNumber: 1287,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1274,
+                                        lineNumber: 1284,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2515,7 +2530,7 @@ function BuildingScene() {
                                                 children: ringTotal
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1280,
+                                                lineNumber: 1290,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2523,19 +2538,19 @@ function BuildingScene() {
                                                 children: "TOTAL"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1281,
+                                                lineNumber: 1291,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1279,
+                                        lineNumber: 1289,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1273,
+                                lineNumber: 1283,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2552,14 +2567,14 @@ function BuildingScene() {
                                                 }
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1285,
+                                                lineNumber: 1295,
                                                 columnNumber: 41
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 children: "照明灯具"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1285,
+                                                lineNumber: 1295,
                                                 columnNumber: 124
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2567,13 +2582,13 @@ function BuildingScene() {
                                                 children: lightCount
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1285,
+                                                lineNumber: 1295,
                                                 columnNumber: 141
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1285,
+                                        lineNumber: 1295,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2587,14 +2602,14 @@ function BuildingScene() {
                                                 }
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1286,
+                                                lineNumber: 1296,
                                                 columnNumber: 41
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 children: "空调设备"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1286,
+                                                lineNumber: 1296,
                                                 columnNumber: 124
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2602,13 +2617,13 @@ function BuildingScene() {
                                                 children: acCount
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1286,
+                                                lineNumber: 1296,
                                                 columnNumber: 141
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1286,
+                                        lineNumber: 1296,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2622,14 +2637,14 @@ function BuildingScene() {
                                                 }
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1287,
+                                                lineNumber: 1297,
                                                 columnNumber: 41
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 children: "在线"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1287,
+                                                lineNumber: 1297,
                                                 columnNumber: 138
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2637,25 +2652,25 @@ function BuildingScene() {
                                                 children: activeDevices
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1287,
+                                                lineNumber: 1297,
                                                 columnNumber: 153
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1287,
+                                        lineNumber: 1297,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1284,
+                                lineNumber: 1294,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1272,
+                        lineNumber: 1282,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2669,7 +2684,7 @@ function BuildingScene() {
                                         children: item.type === 'light' ? 'L' : 'A'
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1293,
+                                        lineNumber: 1303,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2680,7 +2695,7 @@ function BuildingScene() {
                                                 children: item.name
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1295,
+                                                lineNumber: 1305,
                                                 columnNumber: 19
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2688,37 +2703,37 @@ function BuildingScene() {
                                                 children: item.meta
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1296,
+                                                lineNumber: 1306,
                                                 columnNumber: 19
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1294,
+                                        lineNumber: 1304,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                         className: 'device-status-dot' + ((item.type === 'light' ? lightingOn : acOn) ? '' : ' off')
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1298,
+                                        lineNumber: 1308,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, i, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1292,
+                                lineNumber: 1302,
                                 columnNumber: 15
                             }, this))
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1290,
+                        lineNumber: 1300,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/BuildingScene.tsx",
-                lineNumber: 1269,
+                lineNumber: 1279,
                 columnNumber: 9
             }, this),
             selectedDevice && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2728,14 +2743,14 @@ function BuildingScene() {
                         className: "panel-corner-tr"
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1308,
+                        lineNumber: 1318,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         className: "panel-corner-bl"
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1308,
+                        lineNumber: 1318,
                         columnNumber: 52
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2747,7 +2762,7 @@ function BuildingScene() {
                                 children: selectedDevice.info.typeName
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1311,
+                                lineNumber: 1321,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -2756,13 +2771,13 @@ function BuildingScene() {
                                 children: "×"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1312,
+                                lineNumber: 1322,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1309,
+                        lineNumber: 1319,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2772,7 +2787,7 @@ function BuildingScene() {
                                 children: selectedDevice.info.name
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1315,
+                                lineNumber: 1325,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2780,13 +2795,13 @@ function BuildingScene() {
                                 children: selectedDevice.info.status || '运行中'
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1316,
+                                lineNumber: 1326,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1314,
+                        lineNumber: 1324,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2799,7 +2814,7 @@ function BuildingScene() {
                                         children: f.label
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1321,
+                                        lineNumber: 1331,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2807,24 +2822,24 @@ function BuildingScene() {
                                         children: f.value
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1322,
+                                        lineNumber: 1332,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, i, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1320,
+                                lineNumber: 1330,
                                 columnNumber: 15
                             }, this))
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1318,
+                        lineNumber: 1328,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/BuildingScene.tsx",
-                lineNumber: 1307,
+                lineNumber: 1317,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2834,14 +2849,14 @@ function BuildingScene() {
                         className: "panel-corner-tr"
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1331,
+                        lineNumber: 1341,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         className: "panel-corner-bl"
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1331,
+                        lineNumber: 1341,
                         columnNumber: 50
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2856,13 +2871,13 @@ function BuildingScene() {
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1332,
+                                lineNumber: 1342,
                                 columnNumber: 42
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1332,
+                        lineNumber: 1342,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2875,7 +2890,7 @@ function BuildingScene() {
                                         children: a.type === 'warning' ? '▲' : a.type === 'danger' ? '●' : '◆'
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1336,
+                                        lineNumber: 1346,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2886,7 +2901,7 @@ function BuildingScene() {
                                                 children: a.msg
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1338,
+                                                lineNumber: 1348,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2894,30 +2909,30 @@ function BuildingScene() {
                                                 children: a.time
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1339,
+                                                lineNumber: 1349,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1337,
+                                        lineNumber: 1347,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, i, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1335,
+                                lineNumber: 1345,
                                 columnNumber: 13
                             }, this))
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1333,
+                        lineNumber: 1343,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/BuildingScene.tsx",
-                lineNumber: 1330,
+                lineNumber: 1340,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2927,14 +2942,14 @@ function BuildingScene() {
                         className: "panel-corner-tr"
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1348,
+                        lineNumber: 1358,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         className: "panel-corner-bl"
                     }, void 0, false, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1348,
+                        lineNumber: 1358,
                         columnNumber: 50
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2946,13 +2961,13 @@ function BuildingScene() {
                                 children: "FLOOR INFO"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1349,
+                                lineNumber: 1359,
                                 columnNumber: 42
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1349,
+                        lineNumber: 1359,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2966,7 +2981,7 @@ function BuildingScene() {
                                         children: "建筑面积"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1351,
+                                        lineNumber: 1361,
                                         columnNumber: 36
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2978,19 +2993,19 @@ function BuildingScene() {
                                                 children: "m²"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1351,
+                                                lineNumber: 1361,
                                                 columnNumber: 103
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1351,
+                                        lineNumber: 1361,
                                         columnNumber: 72
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1351,
+                                lineNumber: 1361,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3001,7 +3016,7 @@ function BuildingScene() {
                                         children: "楼层"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1352,
+                                        lineNumber: 1362,
                                         columnNumber: 36
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3013,19 +3028,19 @@ function BuildingScene() {
                                                 children: "/1F"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1352,
+                                                lineNumber: 1362,
                                                 columnNumber: 98
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1352,
+                                        lineNumber: 1362,
                                         columnNumber: 70
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1352,
+                                lineNumber: 1362,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3036,7 +3051,7 @@ function BuildingScene() {
                                         children: "工位数量"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1353,
+                                        lineNumber: 1363,
                                         columnNumber: 36
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3048,19 +3063,19 @@ function BuildingScene() {
                                                 children: "个"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1353,
+                                                lineNumber: 1363,
                                                 columnNumber: 100
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1353,
+                                        lineNumber: 1363,
                                         columnNumber: 72
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1353,
+                                lineNumber: 1363,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3071,7 +3086,7 @@ function BuildingScene() {
                                         children: "在线人数"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1354,
+                                        lineNumber: 1364,
                                         columnNumber: 36
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3083,19 +3098,19 @@ function BuildingScene() {
                                                 children: "人"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1354,
+                                                lineNumber: 1364,
                                                 columnNumber: 112
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1354,
+                                        lineNumber: 1364,
                                         columnNumber: 72
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1354,
+                                lineNumber: 1364,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3106,7 +3121,7 @@ function BuildingScene() {
                                         children: "CO₂ 浓度"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1355,
+                                        lineNumber: 1365,
                                         columnNumber: 36
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3118,19 +3133,19 @@ function BuildingScene() {
                                                 children: "ppm"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1355,
+                                                lineNumber: 1365,
                                                 columnNumber: 103
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1355,
+                                        lineNumber: 1365,
                                         columnNumber: 74
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1355,
+                                lineNumber: 1365,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3141,7 +3156,7 @@ function BuildingScene() {
                                         children: "空气湿度"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1356,
+                                        lineNumber: 1366,
                                         columnNumber: 36
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3153,31 +3168,31 @@ function BuildingScene() {
                                                 children: "%"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                                lineNumber: 1356,
+                                                lineNumber: 1366,
                                                 columnNumber: 100
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1356,
+                                        lineNumber: 1366,
                                         columnNumber: 72
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1356,
+                                lineNumber: 1366,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1350,
+                        lineNumber: 1360,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/BuildingScene.tsx",
-                lineNumber: 1347,
+                lineNumber: 1357,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3191,7 +3206,7 @@ function BuildingScene() {
                                 children: "设备总数"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1362,
+                                lineNumber: 1372,
                                 columnNumber: 38
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3203,19 +3218,19 @@ function BuildingScene() {
                                         children: "台"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1362,
+                                        lineNumber: 1372,
                                         columnNumber: 108
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1362,
+                                lineNumber: 1372,
                                 columnNumber: 71
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1362,
+                        lineNumber: 1372,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3226,7 +3241,7 @@ function BuildingScene() {
                                 children: "运行设备"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1363,
+                                lineNumber: 1373,
                                 columnNumber: 38
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3238,19 +3253,19 @@ function BuildingScene() {
                                         children: "台"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1363,
+                                        lineNumber: 1373,
                                         columnNumber: 114
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1363,
+                                lineNumber: 1373,
                                 columnNumber: 71
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1363,
+                        lineNumber: 1373,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3261,7 +3276,7 @@ function BuildingScene() {
                                 children: "总功率"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1364,
+                                lineNumber: 1374,
                                 columnNumber: 38
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3273,19 +3288,19 @@ function BuildingScene() {
                                         children: "kW"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1364,
+                                        lineNumber: 1374,
                                         columnNumber: 119
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1364,
+                                lineNumber: 1374,
                                 columnNumber: 70
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1364,
+                        lineNumber: 1374,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3296,7 +3311,7 @@ function BuildingScene() {
                                 children: "平均温度"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1365,
+                                lineNumber: 1375,
                                 columnNumber: 38
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3308,19 +3323,19 @@ function BuildingScene() {
                                         children: "°C"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1365,
+                                        lineNumber: 1375,
                                         columnNumber: 103
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1365,
+                                lineNumber: 1375,
                                 columnNumber: 71
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1365,
+                        lineNumber: 1375,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3331,7 +3346,7 @@ function BuildingScene() {
                                 children: "环境照度"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1366,
+                                lineNumber: 1376,
                                 columnNumber: 38
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3343,19 +3358,19 @@ function BuildingScene() {
                                         children: "lx"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/BuildingScene.tsx",
-                                        lineNumber: 1366,
+                                        lineNumber: 1376,
                                         columnNumber: 102
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1366,
+                                lineNumber: 1376,
                                 columnNumber: 71
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1366,
+                        lineNumber: 1376,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3366,7 +3381,7 @@ function BuildingScene() {
                                 children: "能耗等级"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1367,
+                                lineNumber: 1377,
                                 columnNumber: 38
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3377,13 +3392,13 @@ function BuildingScene() {
                                 children: energyLevel
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1367,
+                                lineNumber: 1377,
                                 columnNumber: 71
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1367,
+                        lineNumber: 1377,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3394,7 +3409,7 @@ function BuildingScene() {
                                 children: "系统状态"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1368,
+                                lineNumber: 1378,
                                 columnNumber: 38
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3406,19 +3421,19 @@ function BuildingScene() {
                                 children: "NORMAL"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/BuildingScene.tsx",
-                                lineNumber: 1368,
+                                lineNumber: 1378,
                                 columnNumber: 71
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/BuildingScene.tsx",
-                        lineNumber: 1368,
+                        lineNumber: 1378,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/BuildingScene.tsx",
-                lineNumber: 1361,
+                lineNumber: 1371,
                 columnNumber: 7
             }, this),
             toastMsg && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3426,13 +3441,13 @@ function BuildingScene() {
                 children: toastMsg
             }, void 0, false, {
                 fileName: "[project]/src/components/BuildingScene.tsx",
-                lineNumber: 1372,
+                lineNumber: 1382,
                 columnNumber: 20
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/BuildingScene.tsx",
-        lineNumber: 1139,
+        lineNumber: 1149,
         columnNumber: 5
     }, this);
 }

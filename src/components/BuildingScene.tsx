@@ -114,7 +114,7 @@ export default function BuildingScene() {
         T.composer = new EffectComposer(T.renderer);
         T.composer.addPass(new RenderPass(T.scene, T.camera));
         // Bloom 阈值调高，避免 HDR 照明下整体过曝，只让发光元素辉光
-        T.composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.45, 0.5, 0.6));
+        T.composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.35, 0.4, 0.7));
         T.composer.addPass(new OutputPass());
       }
 
@@ -141,6 +141,9 @@ export default function BuildingScene() {
       T.renderer.domElement.addEventListener('click', onPointerClick);
       T.renderer.domElement.addEventListener('dblclick', onDoubleClick);
 
+      // 暴露调试对象
+      (window as any).__three = T;
+
       animate();
     };
 
@@ -152,20 +155,24 @@ export default function BuildingScene() {
       T.scene.add(ambient);
 
       // 主方向光（投射清晰阴影，增强细节立体感）
-      const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
-      dirLight.position.set(35, 50, 25);
+      // 斜射角度让阴影明显投射到地面侧面
+      const dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
+      dirLight.position.set(30, 45, 18);
+      dirLight.target.position.set(0, 0, 0);
       dirLight.castShadow = true;
       dirLight.shadow.mapSize.set(2048, 2048);
       dirLight.shadow.camera.near = 1;
-      dirLight.shadow.camera.far = 150;
-      dirLight.shadow.camera.left = -50;
-      dirLight.shadow.camera.right = 50;
-      dirLight.shadow.camera.top = 50;
-      dirLight.shadow.camera.bottom = -50;
-      dirLight.shadow.bias = -0.0003;
-      dirLight.shadow.normalBias = 0.02;
-      dirLight.name = '__directional';
+      dirLight.shadow.camera.far = 120;
+      // 收紧 frustum 到模型实际范围（模型归一化后约 40×2.3×26），提高阴影分辨率
+      dirLight.shadow.camera.left = -28;
+      dirLight.shadow.camera.right = 28;
+      dirLight.shadow.camera.top = 22;
+      dirLight.shadow.camera.bottom = -22;
+      dirLight.shadow.bias = -0.0002;
+      dirLight.shadow.normalBias = 0.015;
       T.scene.add(dirLight);
+      T.scene.add(dirLight.target);
+      dirLight.name = '__directional';
 
       // 辅助方向光（冷色补光，从对侧照亮暗部细节）
       const fillLight = new THREE.DirectionalLight(0x4488cc, 0.5);
@@ -220,6 +227,7 @@ export default function BuildingScene() {
               m.name = 'merged_wall';
               m.castShadow = true; m.receiveShadow = true;
               m.userData.deviceType = 'wall';
+              m.userData.themeApplied = true; // 标记已应用主题材质，避免被 traverse 覆盖
               m.userData.deviceInfo = makeDeviceInfo(m, 'wall', 0);
               T.modelRoot.remove(groups.wall);
               T.modelRoot.add(m);
@@ -234,6 +242,7 @@ export default function BuildingScene() {
               m.name = 'merged_furniture';
               m.castShadow = true; m.receiveShadow = true;
               m.userData.deviceType = 'furniture';
+              m.userData.themeApplied = true;
               m.userData.deviceInfo = makeDeviceInfo(m, 'furniture', 0);
               T.modelRoot.remove(groups.furniture);
               T.modelRoot.add(m);
@@ -247,6 +256,7 @@ export default function BuildingScene() {
               const m = new THREE.Mesh(merged.geometry, makeThemeMaterial('logo'));
               m.name = 'merged_' + lg.name;
               m.castShadow = true; m.receiveShadow = true;
+              m.userData.themeApplied = true;
               T.modelRoot.remove(lg);
               T.modelRoot.add(m);
             }
@@ -391,18 +401,18 @@ export default function BuildingScene() {
     // 配色：深青蓝主体 + 金属质感，与 UI 青色主题呼应
     function makeThemeMaterial(type: 'wall' | 'furniture' | 'logo' | 'light' | 'ac' | 'default') {
       const presets: Record<string, any> = {
-        // 墙体：深青灰，微金属，清晰投影
-        wall: { color: 0x2a3a52, metalness: 0.15, roughness: 0.75, emissive: 0x0a1428, emissiveIntensity: 0.1 },
+        // 墙体：纯漫反射，无反射，清晰投影
+        wall: { color: 0x2a3a52, metalness: 0.0, roughness: 1.0, emissive: 0x0a1428, emissiveIntensity: 0.1, envMapIntensity: 0.0 },
         // 桌椅：中青蓝，哑光，细节清晰
-        furniture: { color: 0x1e3a5f, metalness: 0.25, roughness: 0.55, emissive: 0x0a1830, emissiveIntensity: 0.08 },
+        furniture: { color: 0x1e3a5f, metalness: 0.25, roughness: 0.55, emissive: 0x0a1830, emissiveIntensity: 0.08, envMapIntensity: 0.6 },
         // logo 装饰：亮青色，高金属反射
-        logo: { color: 0x3a6a9a, metalness: 0.6, roughness: 0.3, emissive: 0x00d4ff, emissiveIntensity: 0.15 },
+        logo: { color: 0x3a6a9a, metalness: 0.6, roughness: 0.3, emissive: 0x00d4ff, emissiveIntensity: 0.15, envMapIntensity: 1.0 },
         // 灯具：暖白发光灯罩 + 青色外壳
-        light: { color: 0x4a6080, metalness: 0.5, roughness: 0.35, emissive: 0xffe8b0, emissiveIntensity: 0.8 },
+        light: { color: 0x4a6080, metalness: 0.5, roughness: 0.35, emissive: 0xffe8b0, emissiveIntensity: 0.8, envMapIntensity: 0.8 },
         // 空调：冷青蓝金属，干净反光
-        ac: { color: 0x4a8ab8, metalness: 0.7, roughness: 0.25, emissive: 0x103040, emissiveIntensity: 0.05 },
+        ac: { color: 0x4a8ab8, metalness: 0.7, roughness: 0.25, emissive: 0x103040, emissiveIntensity: 0.05, envMapIntensity: 1.0 },
         // 默认：通用科技青
-        default: { color: 0x2a4a6a, metalness: 0.3, roughness: 0.6, emissive: 0x081830, emissiveIntensity: 0.08 },
+        default: { color: 0x2a4a6a, metalness: 0.3, roughness: 0.6, emissive: 0x081830, emissiveIntensity: 0.08, envMapIntensity: 0.6 },
       };
       const p = presets[type] || presets.default;
       return new THREE.MeshStandardMaterial({
@@ -411,7 +421,7 @@ export default function BuildingScene() {
         roughness: p.roughness,
         emissive: p.emissive,
         emissiveIntensity: p.emissiveIntensity,
-        envMapIntensity: 1.0, // HDR 环境贴图反射强度
+        envMapIntensity: p.envMapIntensity,
       });
     }
 
