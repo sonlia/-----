@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 智能楼宇可视化 - WebGPU Three.js</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            overflow: hidden;
+            background: #0a0a1a;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* 大屏标题栏 */
+        .header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background: linear-gradient(180deg, rgba(10, 10, 30, 0.95) 0%, rgba(10, 10, 30, 0.7) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            border-bottom: 2px solid #00d4ff;
+        }
+
+        .header h1 {
+            color: #00d4ff;
+            font-size: 32px;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+            letter-spacing: 8px;
+        }
+
+        /* 左侧控制面板 */
+        .control-panel {
+            position: absolute;
+            left: 20px;
+            top: 100px;
+            width: 280px;
+            background: rgba(10, 10, 30, 0.85);
+            border: 1px solid #00d4ff;
+            border-radius: 10px;
+            padding: 20px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-panel h3 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            color: #fff;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .toggle-btn {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 1px solid #00d4ff;
+            background: rgba(0, 212, 255, 0.1);
+            color: #00d4ff;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .toggle-btn:hover {
+            background: rgba(0, 212, 255, 0.2);
+        }
+
+        .toggle-btn.active {
+            background: #00d4ff;
+            color: #0a0a1a;
+        }
+
+        .slider-control {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .slider-control input[type="range"] {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            background: rgba(0, 212, 255, 0.3);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .slider-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #00d4ff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        /* 右侧信息面板 */
+        .info-panel {
+            position: absolute;
+            right: 20px;
+            top: 100px;
+            width: 320px;
+            background: rgba(10, 10, 30, 0.9);
+            border: 1px solid #00d4ff;
+            border-radius: 10px;
+            padding: 20px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            display: none;
+        }
+
+        .info-panel.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .info-panel h3 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .info-item {
+            margin: 15px 0;
+            padding: 12px;
+            background: rgba(0, 212, 255, 0.05);
+            border-radius: 5px;
+            border-left: 3px solid #00d4ff;
+        }
+
+        .info-item-label {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .info-item-value {
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 30px;
+            height: 30px;
+            background: rgba(255, 50, 50, 0.2);
+            border: 1px solid #ff3333;
+            border-radius: 50%;
+            color: #ff3333;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 28px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 50, 50, 0.4);
+        }
+
+        /* 底部状态栏 */
+        .status-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            height: 50px;
+            background: rgba(10, 10, 30, 0.85);
+            border: 1px solid #00d4ff;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            padding: 0 30px;
+            z-index: 100;
+        }
+
+        .status-item {
+            text-align: center;
+        }
+
+        .status-label {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .status-value {
+            color: #00d4ff;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        /* 加载动画 */
+        .loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.5s;
+        }
+
+        .loader.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loader-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(0, 212, 255, 0.2);
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loader-text {
+            color: #00d4ff;
+            margin-top: 20px;
+            font-size: 16px;
+            letter-spacing: 2px;
+        }
+
+        /* 设备高亮效果 */
+        .highlight-glow {
+            animation: glow 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                filter: drop-shadow(0 0 5px #00d4ff);
+            }
+            to {
+                filter: drop-shadow(0 0 20px #00d4ff);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载动画 -->
+    <div class="loader" id="loader">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">加载中...</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <!-- 标题栏 -->
+    <div class="header">
+        <h1>智能楼宇 3D 可视化系统</h1>
+    </div>
+
+    <!-- 左侧控制面板 -->
+    <div class="control-panel">
+        <h3>🎛️ 系统控制</h3>
+        
+        <div class="control-group">
+            <label>照明系统</label>
+            <button class="toggle-btn active" id="lighting-toggle">💡 照明开关</button>
+            <div class="slider-control">
+                <input type="range" id="lighting-brightness" min="0" max="100" value="80">
+                <div style="color: #888; font-size: 12px; margin-top: 5px;">亮度：<span id="brightness-value">80</span>%</div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>空调系统</label>
+            <button class="toggle-btn active" id="ac-toggle">❄️ 空调开关</button>
+            <div class="slider-control">
+                <input type="range" id="ac-temperature" min="16" max="30" value="24">
+                <div style="color: #888; font-size: 12px; margin-top: 5px;">温度：<span id="temperature-value">24</span>°C</div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>视图控制</label>
+            <button class="toggle-btn" id="auto-rotate">🔄 自动旋转</button>
+            <button class="toggle-btn" id="reset-view">🎯 重置视角</button>
+        </div>
+    </div>
+
+    <!-- 右侧信息面板 -->
+    <div class="info-panel" id="info-panel">
+        <button class="close-btn" id="close-info">×</button>
+        <h3 id="device-name">设备信息</h3>
+        <div id="device-info-content"></div>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <div class="status-bar">
+        <div class="status-item">
+            <div class="status-label">总设备数</div>
+            <div class="status-value" id="total-devices">0</div>
+        </div>
+        <div class="status-item">
+            <div class="status-label">运行中</div>
+            <div class="status-value" id="active-devices">0</div>
+        </div>
+        <div class="status-item">
+            <div class="status-label">总功率</div>
+            <div class="status-value" id="total-power">0 kW</div>
+        </div>
+        <div class="status-item">
+            <div class="status-label">平均温度</div>
+            <div class="status-value" id="avg-temp">24°C</div>
+        </div>
+        <div class="status-item">
+            <div class="status-label">照度</div>
+            <div class="status-value" id="lux-value">500 lx</div>
+        </div>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+</body>
+</html>
