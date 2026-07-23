@@ -1,0 +1,28 @@
+$ vite --host 0.0.0.0 --port 5173
+
+  VITE v5.4.21  ready in 213 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://21.0.6.216:5173/
+6:32:42 AM [vite] page reload main.js
+6:36:32 AM [vite] page reload main.js
+6:45:00 AM [vite] page reload index.html
+6:45:49 AM [vite] page reload main.js
+6:46:16 AM [vite] page reload main.js
+6:46:16 AM [vite] page reload main.js
+6:46:16 AM [vite] page reload main.js
+6:46:16 AM [vite] page reload main.js
+6:47:08 AM [vite] page reload main.js
+6:47:08 AM [vite] page reload main.js
+6:47:16 AM [vite] page reload main.js
+6:47:19 AM [vite] ✨ new dependencies optimized: three/addons/postprocessing/EffectComposer.js, three/addons/postprocessing/RenderPass.js, three/addons/postprocessing/UnrealBloomPass.js, three/addons/postprocessing/OutputPass.js
+6:47:19 AM [vite] ✨ optimized dependencies changed. reloading
+6:47:23 AM [vite] page reload main.js
+6:47:30 AM [vite] page reload main.js
+6:47:35 AM [vite] page reload main.js
+6:47:35 AM [vite] page reload main.js
+6:47:39 AM [vite] page reload main.js
+6:49:33 AM [vite] page reload main.js
+6:49:39 AM [vite] page reload main.js
+6:50:02 AM [vite] page reload main.js
+6:50:13 AM [vite] page reload main.js
