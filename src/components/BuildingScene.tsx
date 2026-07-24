@@ -447,42 +447,28 @@ export default function BuildingScene() {
 
       fixtures.forEach((f, i) => {
         const { mesh, center, size } = f;
-        // === 精确计算 RectAreaLight 位置/尺寸/朝向（用灯具本地包围盒 + 世界变换） ===
-        // 灯具几何体的本地包围盒（不受世界变换影响，反映面板原始尺寸）
-        const localBox = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position);
-        const localSize = localBox.getSize(new THREE.Vector3());
-        const localCenter = localBox.getCenter(new THREE.Vector3());
-        // 世界缩放（模型归一化 scale 已应用到 modelRoot，需取 mesh 的世界缩放）
-        const worldScale = mesh.getWorldScale(new THREE.Vector3());
-        // 面板尺寸：本地包围盒 X/Z 尺寸 × 世界缩放（修正归一化缩放）
-        const width = Math.abs(localSize.x) * Math.abs(worldScale.x);
-        const height = Math.abs(localSize.z) * Math.abs(worldScale.z);
-        // 灯具中心的世界坐标（本地中心经 world matrix 变换）
-        const worldCenter = localCenter.clone();
-        mesh.localToWorld(worldCenter);
-        // 灯具法线方向：本地 Y 轴(0,1,0)经 world quaternion 变换（Blender 导出面板法线通常沿 Y）
-        const normal = new THREE.Vector3(0, 1, 0).applyQuaternion(mesh.getWorldQuaternion(new THREE.Quaternion()));
-        // 确保法线朝下（灯具向下照）
-        if (normal.y > 0) normal.negate();
-        // === RectAreaLight 面光源：位置/尺寸/朝向与灯具模型完全一致 ===
-        // 灯具面板在本地 XZ 平面，法线沿 Y；RectAreaLight 发光面在本地 XY 平面，法线沿 Z
-        // 需要建立从灯具本地坐标到 RectAreaLight 本地坐标的旋转映射：
-        //   灯具 X(宽) → RectAreaLight X(宽)
-        //   灯具 Z(高) → RectAreaLight Y(高)
-        //   灯具 Y(法线) → RectAreaLight Z(法线)
+        // === RectAreaLight 完全复制灯具模型的变换（位置/旋转/缩放） ===
+        // 灯具是方形面板，直接用 mesh 的世界变换矩阵，确保四角完全重合
+        // 取 mesh 的世界包围盒尺寸作为 RectAreaLight 的宽高
+        const worldBox = new THREE.Box3().setFromObject(mesh);
+        const worldSize = worldBox.getSize(new THREE.Vector3());
+        const worldCenter = worldBox.getCenter(new THREE.Vector3());
+        // 面板尺寸：世界包围盒的 X 和 Z（面板在水平面）
+        const width = Math.max(Math.abs(worldSize.x), 0.3);
+        const height = Math.max(Math.abs(worldSize.z), 0.3);
+        // 灯具法线：本地 Y 轴经世界变换（Blender 面板法线沿 Y）
         const meshQuat = mesh.getWorldQuaternion(new THREE.Quaternion());
-        // 灯具三轴的世界方向
-        const meshX = new THREE.Vector3(1, 0, 0).applyQuaternion(meshQuat); // 灯具宽方向(世界)
-        const meshY = new THREE.Vector3(0, 1, 0).applyQuaternion(meshQuat); // 灯具法线(世界)
-        const meshZ = new THREE.Vector3(0, 0, 1).applyQuaternion(meshQuat); // 灯具高方向(世界)
+        const meshY = new THREE.Vector3(0, 1, 0).applyQuaternion(meshQuat);
         // 法线朝下（灯具向下照）
         const lightNormal = meshY.y > 0 ? meshY.clone().negate() : meshY.clone();
-        // 构造 RectAreaLight 的旋转矩阵：列向量 = (灯具X, 灯具Z, 法线)
-        // 这样 RectAreaLight 的 X轴对齐灯具X(宽), Y轴对齐灯具Z(高), Z轴对齐法线
-        const m = new THREE.Matrix4().makeBasis(meshX, meshZ, lightNormal);
+        // 构造 RectAreaLight 旋转：X轴对齐灯具X(宽), Y轴对齐灯具Z(高), Z轴对齐法线
+        const meshX = new THREE.Vector3(1, 0, 0).applyQuaternion(meshQuat);
+        const meshZ = new THREE.Vector3(0, 0, 1).applyQuaternion(meshQuat);
+        const rotMatrix = new THREE.Matrix4().makeBasis(meshX, meshZ, lightNormal);
+        // === RectAreaLight 面光源：位置/尺寸/朝向完全复制灯具模型 ===
         const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
         rectLight.position.copy(worldCenter);
-        rectLight.quaternion.setFromRotationMatrix(m);
+        rectLight.quaternion.setFromRotationMatrix(rotMatrix);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
