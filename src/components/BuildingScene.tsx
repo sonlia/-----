@@ -138,23 +138,21 @@ export default function BuildingScene() {
       animate();
     };
 
-    // ===== 环境（HDR 环境贴图照亮 + 方向光投影） =====
+    // ===== 环境（HDR 反射 + 弱补光，主要照明由灯具 SpotLight 提供） =====
     function setupEnvironment(T: any) {
-      // 环境光（基础填充，HDR 提供主要照明）
-      const ambient = new THREE.AmbientLight(0x88aacc, 0.25);
+      // 弱环境光（仅基础填充，不掩盖灯具照明）
+      const ambient = new THREE.AmbientLight(0x445577, 0.12);
       ambient.name = '__ambient';
       T.scene.add(ambient);
 
-      // 主方向光（投射清晰阴影，增强细节立体感）
-      // 斜射角度让阴影明显投射到地面侧面
-      const dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
+      // 弱方向光（仅补光 + 轻微投影，不抢灯具主光源）
+      const dirLight = new THREE.DirectionalLight(0x8899bb, 0.5);
       dirLight.position.set(30, 45, 18);
       dirLight.target.position.set(0, 0, 0);
       dirLight.castShadow = true;
       dirLight.shadow.mapSize.set(2048, 2048);
       dirLight.shadow.camera.near = 1;
       dirLight.shadow.camera.far = 120;
-      // 收紧 frustum 到模型实际范围（模型归一化后约 40×2.3×26），提高阴影分辨率
       dirLight.shadow.camera.left = -28;
       dirLight.shadow.camera.right = 28;
       dirLight.shadow.camera.top = 22;
@@ -165,28 +163,22 @@ export default function BuildingScene() {
       T.scene.add(dirLight.target);
       dirLight.name = '__directional';
 
-      // 辅助方向光（冷色补光，从对侧照亮暗部细节）
-      const fillLight = new THREE.DirectionalLight(0x4488cc, 0.5);
-      fillLight.position.set(-30, 20, -25);
-      fillLight.name = '__fill';
-      T.scene.add(fillLight);
-
-      const hemi = new THREE.HemisphereLight(0x88aaff, 0x223344, 0.3);
+      // 半球光（天空/地面微反射）
+      const hemi = new THREE.HemisphereLight(0x335577, 0x111122, 0.15);
       hemi.name = '__hemi';
       T.scene.add(hemi);
 
-      // 加载 HDR 环境贴图（用于 PBR 反射 + 背景照明）
+      // 加载 HDR 环境贴图（用于 PBR 反射 + 微弱环境照明）
       setLoaderText('加载 HDR 环境贴图...');
       const rgbeLoader = new RGBELoader();
       rgbeLoader.load('/studio_small.hdr', (envTexture: any) => {
         envTexture.mapping = THREE.EquirectangularReflectionMapping;
-        // HDR 用于 PBR 反射/照明，保持线性空间（不设 colorSpace，避免 sRGB 警告）
         T.scene.environment = envTexture;
-        T.scene.environmentIntensity = 0.8;
+        T.scene.environmentIntensity = 0.35; // 较低，不掩盖灯具照明
         T.envTexture = envTexture;
         console.log('HDR 环境贴图加载完成');
       }, undefined, (err: any) => {
-        console.warn('HDR 加载失败，使用程序化环境:', err);
+        console.warn('HDR 加载失败:', err);
       });
     }
 
@@ -450,7 +442,7 @@ export default function BuildingScene() {
       if (fixtures.length === 0) return;
 
       // 投影灯数量限制（SpotLight 投影开销大，取空间分散的若干个）
-      const maxShadowLights = 6;
+      const maxShadowLights = 12;
       const positions = fixtures.map((f) => f.center);
       const sampled = farthestPointSampling(positions, Math.min(maxShadowLights, positions.length));
       const sampleIdx: number[] = [];
@@ -461,19 +453,18 @@ export default function BuildingScene() {
 
       fixtures.forEach((f, i) => {
         const { center, size } = f;
-        // 面板灯尺寸决定光锥覆盖范围
-        const radius = Math.max(size.x, size.z, 1.5);
-        // SpotLight 模拟面板灯：宽光锥、软边、向下照射
-        const spot = new THREE.SpotLight(0xffe8b0, 0, 16, Math.PI / 3.2, 0.6, 1.4);
+        // SpotLight 模拟面板灯：向下照射，光锥覆盖下方区域
+        // angle 较小让光更聚焦（阴影更硬），penumbra 软边
+        const spot = new THREE.SpotLight(0xffe8b0, 0, 22, Math.PI / 4, 0.4, 1.5);
         spot.position.set(center.x, center.y - 0.05, center.z);
-        spot.target.position.set(center.x, center.y - 6, center.z);
-        // 投影设置（仅部分灯开启投影）
+        spot.target.position.set(center.x, center.y - 8, center.z);
+        // 投影设置（部分灯开启投影）
         const willShadow = sampleIdx.includes(i);
         spot.castShadow = willShadow;
         if (willShadow) {
           spot.shadow.mapSize.set(1024, 1024);
-          spot.shadow.camera.near = 0.3;
-          spot.shadow.camera.far = 12;
+          spot.shadow.camera.near = 0.2;
+          spot.shadow.camera.far = 14;
           spot.shadow.bias = -0.0002;
           spot.shadow.normalBias = 0.015;
           T.shadowLights.push(spot);
@@ -715,27 +706,27 @@ export default function BuildingScene() {
     function applyLighting(T: any) {
       const s = stateRef.current.lighting;
       const b = s.brightness;
-      // SpotLight（所有灯，向下照亮下方区域 + 投影灯产生阴影）
+      // SpotLight 灯具主光源（WebGPURenderer 物理单位，需要较大强度才能照亮空间）
       T.pointLights.forEach((light: any) => {
-        light.intensity = s.enabled ? b * 30 : 0;
+        light.intensity = s.enabled ? b * 120 : 0;
       });
-      // 灯具发光强度随开关/亮度变化（保留主题色，只调强度）
+      // 灯具自发光（灯罩明亮发光）
       T.lightFixtures.forEach((mesh: any) => {
         if (mesh.material && !mesh.userData._hlEmissive) {
-          mesh.material.emissiveIntensity = s.enabled ? 2.5 + b * 3 : 0.05;
+          mesh.material.emissiveIntensity = s.enabled ? 3 + b * 4 : 0.05;
         }
       });
-      // 环境光与半球光随照明变化
+      // 环境光随照明变化（关灯时场景变暗）
       const ambient = T.scene.getObjectByName('__ambient');
-      if (ambient) ambient.intensity = s.enabled ? 0.25 + b * 0.2 : 0.1;
+      if (ambient) ambient.intensity = s.enabled ? 0.12 + b * 0.08 : 0.05;
       const hemi = T.scene.getObjectByName('__hemi');
-      if (hemi) hemi.intensity = s.enabled ? 0.3 : 0.1;
+      if (hemi) hemi.intensity = s.enabled ? 0.15 + b * 0.1 : 0.05;
       // HDR 环境贴图强度随照明变化
       if (T.scene.environmentIntensity !== undefined) {
-        T.scene.environmentIntensity = s.enabled ? 0.6 + b * 0.4 : 0.3;
+        T.scene.environmentIntensity = s.enabled ? 0.35 + b * 0.2 : 0.15;
       }
-      // 曝光（HDR 照明下适当提高以看清细节）
-      T.renderer.toneMappingExposure = s.enabled ? 0.9 + b * 0.3 : 0.5;
+      // 曝光
+      T.renderer.toneMappingExposure = s.enabled ? 1.0 + b * 0.2 : 0.5;
       updateStatus(T);
     }
 
@@ -1031,20 +1022,20 @@ export default function BuildingScene() {
   function applyLightingClosure(T: any, enabled: boolean, b: number) {
     stateRef.current.lighting.enabled = enabled;
     stateRef.current.lighting.brightness = b;
-    T.pointLights.forEach((light: any) => { light.intensity = enabled ? b * 30 : 0; });
+    T.pointLights.forEach((light: any) => { light.intensity = enabled ? b * 120 : 0; });
     T.lightFixtures.forEach((mesh: any) => {
       if (mesh.material && !mesh.userData._hlEmissive) {
-        mesh.material.emissiveIntensity = enabled ? 2.5 + b * 3 : 0.05;
+        mesh.material.emissiveIntensity = enabled ? 3 + b * 4 : 0.05;
       }
     });
     const ambient = T.scene.getObjectByName('__ambient');
-    if (ambient) ambient.intensity = enabled ? 0.25 + b * 0.2 : 0.1;
+    if (ambient) ambient.intensity = enabled ? 0.12 + b * 0.08 : 0.05;
     const hemi = T.scene.getObjectByName('__hemi');
-    if (hemi) hemi.intensity = enabled ? 0.3 : 0.1;
+    if (hemi) hemi.intensity = enabled ? 0.15 + b * 0.1 : 0.05;
     if (T.scene.environmentIntensity !== undefined) {
-      T.scene.environmentIntensity = enabled ? 0.6 + b * 0.4 : 0.3;
+      T.scene.environmentIntensity = enabled ? 0.35 + b * 0.2 : 0.15;
     }
-    T.renderer.toneMappingExposure = enabled ? 0.9 + b * 0.3 : 0.5;
+    T.renderer.toneMappingExposure = enabled ? 1.0 + b * 0.2 : 0.5;
     setDeviceList((prev) => prev.map((it) => it.type === 'light' ? { ...it, meta: `${deviceDB.light.power}W · ${deviceDB.light.colorTemp}` } : it));
     updateStatusClosure(T);
   }
