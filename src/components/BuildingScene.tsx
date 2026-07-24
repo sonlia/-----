@@ -2,9 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { WebGPURenderer, RenderPipeline } from 'three/webgpu';
-import { pass, mrt, output, emissive } from 'three/tsl';
-import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import { WebGPURenderer } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -98,16 +96,6 @@ export default function BuildingScene() {
       T.renderer.toneMapping = THREE.ACESFilmicToneMapping;
       T.renderer.toneMappingExposure = 1.05;
       containerRef.current!.appendChild(T.renderer.domElement);
-
-      // WebGPU PostProcessing（TSL）：Bloom 辉光，让灯具发光明显
-      T.postProcessing = new RenderPipeline(T.renderer);
-      const scenePass = pass(T.scene, T.camera);
-      scenePass.setMRT(mrt({ output, emissive }));
-      const outputPass = scenePass.getTextureNode('output');
-      const emissivePass = scenePass.getTextureNode('emissive');
-      const bloomPass = bloom(emissivePass, 0.5, 0.5, 0.45); // strength, radius, threshold
-      T.postProcessing.outputNode = outputPass.add(bloomPass);
-      T.scenePass = scenePass;
 
       // 控制器
       T.controls = new OrbitControls(T.camera, T.renderer.domElement);
@@ -628,7 +616,6 @@ export default function BuildingScene() {
       T.camera.aspect = window.innerWidth / window.innerHeight;
       T.camera.updateProjectionMatrix();
       T.renderer.setSize(window.innerWidth, window.innerHeight);
-      if (T.postProcessing) T.postProcessing.setSize(window.innerWidth, window.innerHeight);
     }
     function onPointerMove(e: any) {
       const mouse = getMouseNDC(e);
@@ -831,14 +818,8 @@ export default function BuildingScene() {
         const fpsEl = document.getElementById('fps-value');
         if (fpsEl) fpsEl.textContent = String(fpsVal);
       }
-      // 渲染：WebGPU 后端用 RenderPipeline（含 Bloom），WebGL2 后端直接 renderer.render 更稳定
-      try {
-        const isWebGPU = T.renderer.backend && T.renderer.backend.isWebGPUBackend;
-        if (T.postProcessing && isWebGPU) T.postProcessing.render();
-        else T.renderer.render(T.scene, T.camera);
-      } catch (e) {
-        T.renderer.render(T.scene, T.camera);
-      }
+      // 直接渲染（无 Bloom 辉光，让 SpotLight 光照效果清晰可见）
+      T.renderer.render(T.scene, T.camera);
     }
 
     function updateAirflow(T: any, delta: number) {
