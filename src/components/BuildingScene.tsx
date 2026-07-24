@@ -2,11 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { WebGPURenderer } from 'three/webgpu';
+import { WebGPURenderer, RectAreaLightNode } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { RectAreaLightTexturesLib } from 'three/addons/lights/RectAreaLightTexturesLib.js';
+
+// 模块级初始化 RectAreaLight LTC 纹理（必须在任何 RectAreaLight 节点构建前完成注册）
+RectAreaLightTexturesLib.init();
+RectAreaLightNode.setLTC(RectAreaLightTexturesLib);
 
 // ===== 设备信息数据库 =====
 const deviceDB: any = {
@@ -436,17 +441,35 @@ export default function BuildingScene() {
       const sampleIdx: number[] = [];
       fixtures.forEach((f, i) => { if (sampled.includes(f.center)) sampleIdx.push(i); });
 
-      T.pointLights = [];   // 所有灯的 SpotLight（照亮）
+      T.pointLights = [];   // 所有灯的 SpotLight（投影+照亮）
       T.shadowLights = [];  // 投影灯（子集）
+      T.rectLights = [];    // RectAreaLight 面光源（部分灯，大小=灯具面板）
+
+      // RectAreaLight 数量限制（性能：面光源开销大，取空间分散的若干个）
+      const maxRectLights = 10;
+      const rectPositions = fixtures.map((f) => f.center);
+      const rectSampled = farthestPointSampling(rectPositions, Math.min(maxRectLights, rectPositions.length));
+      const rectSampleIdx: number[] = [];
+      fixtures.forEach((f, i) => { if (rectSampled.includes(f.center)) rectSampleIdx.push(i); });
 
       fixtures.forEach((f, i) => {
         const { center, size } = f;
-        // SpotLight 模拟面板灯：向下照射，光锥覆盖下方区域
-        // angle 较小让光更聚焦（阴影更硬），penumbra 软边
+        // === RectAreaLight 面光源（仅部分灯）：大小与灯具面板一致，向下照亮 ===
+        if (rectSampleIdx.includes(i)) {
+          const rw = Math.max(size.x, 0.6);
+          const rh = Math.max(size.z, 0.6);
+          const rectLight = new THREE.RectAreaLight(0xffe8b0, 0, rw, rh);
+          rectLight.position.set(center.x, center.y - 0.05, center.z);
+          rectLight.lookAt(center.x, center.y - 5, center.z);
+          rectLight.name = `__rectLight_${i}`;
+          T.scene.add(rectLight);
+          T.rectLights.push(rectLight);
+        }
+
+        // === SpotLight：所有灯，负责投影+定向照亮 ===
         const spot = new THREE.SpotLight(0xffe8b0, 0, 22, Math.PI / 4, 0.4, 1.5);
         spot.position.set(center.x, center.y - 0.05, center.z);
         spot.target.position.set(center.x, center.y - 8, center.z);
-        // 投影设置（部分灯开启投影）
         const willShadow = sampleIdx.includes(i);
         spot.castShadow = willShadow;
         if (willShadow) {
@@ -462,7 +485,7 @@ export default function BuildingScene() {
         T.scene.add(spot.target);
         T.pointLights.push(spot);
       });
-      console.log(`灯具光源: ${T.pointLights.length} 个 SpotLight, ${T.shadowLights.length} 个投影灯`);
+      console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight, ${T.pointLights.length} 个 SpotLight, ${T.shadowLights.length} 个投影灯`);
     }
 
     function farthestPointSampling(points: any[], n: number) {
@@ -693,9 +716,13 @@ export default function BuildingScene() {
     function applyLighting(T: any) {
       const s = stateRef.current.lighting;
       const b = s.brightness;
-      // SpotLight 灯具主光源（WebGPURenderer 物理单位，需要较大强度才能照亮空间）
+      // RectAreaLight 面光源（大小=灯具面板，向下柔和照亮下方区域）
+      T.rectLights.forEach((light: any) => {
+        light.intensity = s.enabled ? b * 40 : 0;
+      });
+      // SpotLight 灯具主光源（投影+定向照亮）
       T.pointLights.forEach((light: any) => {
-        light.intensity = s.enabled ? b * 120 : 0;
+        light.intensity = s.enabled ? b * 60 : 0;
       });
       // 灯具自发光（灯罩明亮发光）
       T.lightFixtures.forEach((mesh: any) => {
@@ -1003,7 +1030,8 @@ export default function BuildingScene() {
   function applyLightingClosure(T: any, enabled: boolean, b: number) {
     stateRef.current.lighting.enabled = enabled;
     stateRef.current.lighting.brightness = b;
-    T.pointLights.forEach((light: any) => { light.intensity = enabled ? b * 120 : 0; });
+    T.rectLights.forEach((light: any) => { light.intensity = enabled ? b * 40 : 0; });
+    T.pointLights.forEach((light: any) => { light.intensity = enabled ? b * 60 : 0; });
     T.lightFixtures.forEach((mesh: any) => {
       if (mesh.material && !mesh.userData._hlEmissive) {
         mesh.material.emissiveIntensity = enabled ? 3 + b * 4 : 0.05;
