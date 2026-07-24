@@ -652,7 +652,15 @@ export default function BuildingScene() {
           child.material.emissiveIntensity = 0.7;
         }
       });
-      setSelectedDevice({ obj, info: obj.userData.deviceInfo, type: obj.userData.deviceType });
+      // 记录灯具在 lightFixtures/rectLights 中的索引（用于单灯开关）
+      let lightIdx = -1;
+      if (obj.userData.deviceType === 'light') {
+        lightIdx = T.lightFixtures.indexOf(obj);
+      }
+      // 读取单灯开关状态（默认跟随全局照明状态）
+      const individualOn = obj.userData.individualOn ?? stateRef.current.lighting.enabled;
+      obj.userData.individualOn = individualOn;
+      setSelectedDevice({ obj, info: obj.userData.deviceInfo, type: obj.userData.deviceType, lightIdx, individualOn });
       // 高亮列表项
       const idx = deviceListRef.current.findIndex((it: any) => it.obj === obj);
       setActiveDeviceIdx(idx);
@@ -687,9 +695,12 @@ export default function BuildingScene() {
     function applyLighting(T: any) {
       const s = stateRef.current.lighting;
       const b = s.brightness;
-      // RectAreaLight 黄色面光源（所有灯具，关灯时强度为 0）
-      T.rectLights.forEach((light: any) => {
-        light.intensity = s.enabled ? b * 30 : 0;
+      // RectAreaLight 黄色面光源（全局开关 + 单灯开关 individualOn 优先）
+      T.rectLights.forEach((light: any, i: number) => {
+        const fixture = T.lightFixtures[i];
+        const indOn = fixture?.userData?.individualOn;
+        const finalOn = s.enabled && (indOn !== false);
+        light.intensity = finalOn ? b * 30 : 0;
       });
       // 灯具自发光（关灯时归零，即使 mesh 隐藏也要关闭 emissive）
       T.lightFixtures.forEach((mesh: any) => {
@@ -1015,7 +1026,13 @@ export default function BuildingScene() {
   function applyLightingClosure(T: any, enabled: boolean, b: number) {
     stateRef.current.lighting.enabled = enabled;
     stateRef.current.lighting.brightness = b;
-    T.rectLights.forEach((light: any) => { light.intensity = enabled ? b * 30 : 0; });
+    // RectAreaLight：全局开关 + 单灯开关（individualOn 优先，未设置则跟随全局）
+    T.rectLights.forEach((light: any, i: number) => {
+      const fixture = T.lightFixtures[i];
+      const indOn = fixture?.userData?.individualOn;
+      const finalOn = enabled && (indOn !== false);
+      light.intensity = finalOn ? b * 30 : 0;
+    });
     T.lightFixtures.forEach((mesh: any) => {
       if (mesh.material && !mesh.userData._hlEmissive) {
         mesh.material.emissiveIntensity = enabled ? 3 + b * 4 : 0;
@@ -1114,6 +1131,13 @@ export default function BuildingScene() {
       }
     });
     setSelectedDevice({ obj: item.obj, info: item.obj.userData.deviceInfo, type: item.obj.userData.deviceType });
+    // 记录灯具索引和单灯状态
+    if (item.type === 'light') {
+      const lightIdx = T.lightFixtures.indexOf(item.obj);
+      const individualOn = item.obj.userData.individualOn ?? stateRef.current.lighting.enabled;
+      item.obj.userData.individualOn = individualOn;
+      setSelectedDevice({ obj: item.obj, info: item.obj.userData.deviceInfo, type: 'light', lightIdx, individualOn });
+    }
     setActiveDeviceIdx(idx);
     // 聚焦
     const box = new THREE.Box3().setFromObject(item.obj);
@@ -1126,6 +1150,33 @@ export default function BuildingScene() {
   };
 
   const onCloseInfo = () => { const T = threeRef.current; deselectClosure(T); setShowList(true); };
+
+  // 单灯开关（控制选中的单个灯具）
+  const onToggleIndividualLight = () => {
+    if (!selectedDevice || selectedDevice.type !== 'light' || selectedDevice.lightIdx < 0) return;
+    const T = threeRef.current;
+    const newOn = !selectedDevice.individualOn;
+    const lightIdx = selectedDevice.lightIdx;
+    const obj = selectedDevice.obj;
+    // 记录单灯状态
+    obj.userData.individualOn = newOn;
+    // 控制对应的 RectAreaLight
+    const rect = T.rectLights?.[lightIdx];
+    if (rect) {
+      rect.intensity = newOn ? stateRef.current.lighting.brightness * 30 : 0;
+    }
+    // 控制灯具 mesh 自发光（虽然 mesh 已隐藏，保持状态一致）
+    if (obj.material && !obj.userData._hlEmissive) {
+      obj.material.emissiveIntensity = newOn ? 3 + stateRef.current.lighting.brightness * 4 : 0;
+    }
+    // 更新设备信息状态
+    obj.userData.deviceInfo.status = newOn ? '运行中' : '已关闭';
+    setSelectedDevice({ ...selectedDevice, individualOn: newOn, info: { ...selectedDevice.info, status: newOn ? '运行中' : '已关闭' } });
+    // 更新设备列表 meta
+    setDeviceList((prev) => prev.map((it, i) => i === activeDeviceIdx ? { ...it, meta: `${deviceDB.light.power}W · ${newOn ? '运行中' : '已关闭'}` } : it));
+    showToast(`${selectedDevice.info.name} 已${newOn ? '开启' : '关闭'}`);
+    pushAlertUI(newOn ? 'info' : 'warning', `${selectedDevice.info.name} 已${newOn ? '开启' : '关闭'}`);
+  };
 
   // 计算状态栏数据
   const lightCount = deviceList.filter((d) => d.type === 'light').length;
@@ -1350,8 +1401,16 @@ export default function BuildingScene() {
           </div>
           <div className="device-name">
             <span>{selectedDevice.info.name}</span>
-            <span className="status-pill">{selectedDevice.info.status || '运行中'}</span>
+            <span className="status-pill" style={selectedDevice.individualOn === false ? { color: 'var(--text-dim)', borderColor: 'var(--text-dim)', background: 'rgba(74,100,133,0.1)' } : {}}>{selectedDevice.info.status || '运行中'}</span>
           </div>
+          {/* 灯具单灯开关控制 */}
+          {selectedDevice.type === 'light' && (
+            <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-line)' }}>
+              <button className={'toggle-btn' + (selectedDevice.individualOn !== false ? ' active' : '')} onClick={onToggleIndividualLight}>
+                <span>{selectedDevice.individualOn !== false ? '灯具已开启' : '灯具已关闭'}</span>
+              </button>
+            </div>
+          )}
           <div className="info-grid">
             {infoFields.map((f, i) => (
               <div key={i} className={'info-cell' + (f.full ? ' full' : '')}>
