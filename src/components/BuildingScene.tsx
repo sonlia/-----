@@ -2,16 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { WebGPURenderer } from 'three/webgpu';
+import { WebGPURenderer, RenderPipeline } from 'three/webgpu';
+import { pass, mrt, output, emissive } from 'three/tsl';
+import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
-import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 
 // ===== 设备信息数据库 =====
 const deviceDB: any = {
@@ -87,21 +84,13 @@ export default function BuildingScene() {
       T.camera.position.set(30, 22, 30);
 
       // 渲染器
-      setLoaderText('初始化渲染器...');
-      let realWebGPU = false;
-      if (navigator.gpu && (navigator.gpu as any).requestAdapter) {
-        try { const adapter = await (navigator.gpu as any).requestAdapter(); realWebGPU = !!adapter; } catch { realWebGPU = false; }
-      }
-      try {
-        if (realWebGPU) {
-          T.renderer = new WebGPURenderer({ antialias: true, powerPreference: 'high-performance' });
-          await T.renderer.init();
-          setRenderMode('WebGPU');
-        } else throw new Error('no webgpu');
-      } catch {
-        T.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-        setRenderMode('WebGL2');
-      }
+      // 强制使用 WebGPU 渲染器
+      setLoaderText('初始化 WebGPU 渲染器...');
+      T.renderer = new WebGPURenderer({ antialias: true, powerPreference: 'high-performance' });
+      await T.renderer.init();
+      // 检测实际后端（测试环境可能回退 WebGL2）
+      const isWebGPU = T.renderer.backend && T.renderer.backend.isWebGPUBackend;
+      setRenderMode(isWebGPU ? 'WebGPU' : 'WebGL2');
       T.renderer.setSize(window.innerWidth, window.innerHeight);
       T.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       T.renderer.shadowMap.enabled = true;
@@ -110,14 +99,15 @@ export default function BuildingScene() {
       T.renderer.toneMappingExposure = 1.05;
       containerRef.current!.appendChild(T.renderer.domElement);
 
-      // 后期处理
-      if (renderModeRef.current !== 'WebGPU') {
-        T.composer = new EffectComposer(T.renderer);
-        T.composer.addPass(new RenderPass(T.scene, T.camera));
-        // Bloom 阈值适中，让灯具辉光明显但不冲淡阴影
-        T.composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.5, 0.45));
-        T.composer.addPass(new OutputPass());
-      }
+      // WebGPU PostProcessing（TSL）：Bloom 辉光，让灯具发光明显
+      T.postProcessing = new RenderPipeline(T.renderer);
+      const scenePass = pass(T.scene, T.camera);
+      scenePass.setMRT(mrt({ output, emissive }));
+      const outputPass = scenePass.getTextureNode('output');
+      const emissivePass = scenePass.getTextureNode('emissive');
+      const bloomPass = bloom(emissivePass, 0.5, 0.5, 0.45); // strength, radius, threshold
+      T.postProcessing.outputNode = outputPass.add(bloomPass);
+      T.scenePass = scenePass;
 
       // 控制器
       T.controls = new OrbitControls(T.camera, T.renderer.domElement);
@@ -447,11 +437,8 @@ export default function BuildingScene() {
       };
     }
 
-    // ===== 灯具发光光源（RectAreaLight 面光源照亮下方 + SpotLight 投影） =====
+    // ===== 灯具发光光源（SpotLight 面板灯效果：向下照亮 + 投影） =====
     function setupPointLights(T: any) {
-      // 初始化 RectAreaLight uniforms（必须，否则面光源无效果）
-      RectAreaLightUniformsLib.init();
-
       const fixtures: any[] = [];
       const tmpBox = new THREE.Box3();
       T.lightFixtures.forEach((mesh: any) => {
@@ -462,55 +449,41 @@ export default function BuildingScene() {
       });
       if (fixtures.length === 0) return;
 
-      // 投影灯数量限制（性能：SpotLight 投影开销大，只取分散的若干个）
-      const maxShadowLights = 4;
-      // 用最远点采样选出空间分散的灯具作为投影灯
-      const sampleIdx: number[] = [];
+      // 投影灯数量限制（SpotLight 投影开销大，取空间分散的若干个）
+      const maxShadowLights = 6;
       const positions = fixtures.map((f) => f.center);
       const sampled = farthestPointSampling(positions, Math.min(maxShadowLights, positions.length));
+      const sampleIdx: number[] = [];
       fixtures.forEach((f, i) => { if (sampled.includes(f.center)) sampleIdx.push(i); });
 
-      T.pointLights = [];   // RectAreaLight 面光源（所有灯）
-      T.shadowLights = [];  // SpotLight 投影灯（部分灯）
+      T.pointLights = [];   // 所有灯的 SpotLight（照亮）
+      T.shadowLights = [];  // 投影灯（子集）
 
       fixtures.forEach((f, i) => {
-        const { mesh, center, size } = f;
-        // 面板灯尺寸（取 X/Z 较大值，归一化后通常 1.5~2 单位）
-        const w = Math.max(size.x, 0.8);
-        const h = Math.max(size.z, 0.8);
-
-        // === RectAreaLight：面光源，向下照亮（面板灯效果） ===
-        const rectLight = new THREE.RectAreaLight(0xffe8b0, 0, w, h);
-        rectLight.position.set(center.x, center.y - 0.05, center.z);
-        rectLight.lookAt(center.x, center.y - 5, center.z); // 向下照射
-        rectLight.name = `__rectLight_${i}`;
-        T.scene.add(rectLight);
-        T.pointLights.push(rectLight);
-
-        // === SpotLight：投影灯（仅分散的几个灯），向下投射阴影 ===
-        if (sampleIdx.includes(i)) {
-          // 光锥角度大些覆盖更广，penumbra 软边
-          const spot = new THREE.SpotLight(0xffe8b0, 0, 20, Math.PI / 3, 0.5, 1.5);
-          spot.position.set(center.x, center.y - 0.05, center.z);
-          spot.target.position.set(center.x, center.y - 5, center.z);
-          spot.castShadow = true;
+        const { center, size } = f;
+        // 面板灯尺寸决定光锥覆盖范围
+        const radius = Math.max(size.x, size.z, 1.5);
+        // SpotLight 模拟面板灯：宽光锥、软边、向下照射
+        const spot = new THREE.SpotLight(0xffe8b0, 0, 16, Math.PI / 3.2, 0.6, 1.4);
+        spot.position.set(center.x, center.y - 0.05, center.z);
+        spot.target.position.set(center.x, center.y - 6, center.z);
+        // 投影设置（仅部分灯开启投影）
+        const willShadow = sampleIdx.includes(i);
+        spot.castShadow = willShadow;
+        if (willShadow) {
           spot.shadow.mapSize.set(1024, 1024);
           spot.shadow.camera.near = 0.3;
-          spot.shadow.camera.far = 20;
+          spot.shadow.camera.far = 12;
           spot.shadow.bias = -0.0002;
           spot.shadow.normalBias = 0.015;
-          spot.name = `__spotLight_${i}`;
-          T.scene.add(spot);
-          T.scene.add(spot.target);
           T.shadowLights.push(spot);
         }
+        spot.name = `__spotLight_${i}`;
+        T.scene.add(spot);
+        T.scene.add(spot.target);
+        T.pointLights.push(spot);
       });
-      // 调试：输出第一个灯的位置信息
-      if (fixtures.length > 0) {
-        const f0 = fixtures[0];
-        console.log(`灯具采样: y=${f0.center.y.toFixed(2)}, size=${f0.size.x.toFixed(2)}x${f0.size.z.toFixed(2)}`);
-      }
-      console.log(`灯具光源: ${T.pointLights.length} 个面光源, ${T.shadowLights.length} 个投影灯`);
+      console.log(`灯具光源: ${T.pointLights.length} 个 SpotLight, ${T.shadowLights.length} 个投影灯`);
     }
 
     function farthestPointSampling(points: any[], n: number) {
@@ -664,7 +637,7 @@ export default function BuildingScene() {
       T.camera.aspect = window.innerWidth / window.innerHeight;
       T.camera.updateProjectionMatrix();
       T.renderer.setSize(window.innerWidth, window.innerHeight);
-      if (T.composer) T.composer.setSize(window.innerWidth, window.innerHeight);
+      if (T.postProcessing) T.postProcessing.setSize(window.innerWidth, window.innerHeight);
     }
     function onPointerMove(e: any) {
       const mouse = getMouseNDC(e);
@@ -742,13 +715,9 @@ export default function BuildingScene() {
     function applyLighting(T: any) {
       const s = stateRef.current.lighting;
       const b = s.brightness;
-      // RectAreaLight 面光源（所有灯，向下照亮下方区域）
+      // SpotLight（所有灯，向下照亮下方区域 + 投影灯产生阴影）
       T.pointLights.forEach((light: any) => {
-        light.intensity = s.enabled ? b * 25 : 0; // RectAreaLight 物理单位，需要较大值
-      });
-      // SpotLight 投影灯（部分灯，产生阴影）
-      T.shadowLights.forEach((light: any) => {
-        light.intensity = s.enabled ? b * 60 : 0;
+        light.intensity = s.enabled ? b * 30 : 0;
       });
       // 灯具发光强度随开关/亮度变化（保留主题色，只调强度）
       T.lightFixtures.forEach((mesh: any) => {
@@ -837,7 +806,7 @@ export default function BuildingScene() {
     }
 
     // ===== 动画 =====
-    let fpsCounter = { frames: 0, lastTime: 0 };
+    let fpsCounter = { frames: 0, lastTime: performance.now() };
     function animate() {
       if (disposed) return;
       T.rafId = requestAnimationFrame(animate);
@@ -864,12 +833,21 @@ export default function BuildingScene() {
       fpsCounter.frames++;
       const now = performance.now();
       if (now - fpsCounter.lastTime >= 1000) {
-        setFps(Math.round((fpsCounter.frames * 1000) / (now - fpsCounter.lastTime)));
+        const fpsVal = Math.round((fpsCounter.frames * 1000) / (now - fpsCounter.lastTime));
         fpsCounter.frames = 0;
         fpsCounter.lastTime = now;
+        // 直接更新 DOM 避免 React state 在 rAF 闭包里的延迟
+        const fpsEl = document.getElementById('fps-value');
+        if (fpsEl) fpsEl.textContent = String(fpsVal);
       }
-      if (T.composer) T.composer.render();
-      else T.renderer.render(T.scene, T.camera);
+      // 渲染：WebGPU 后端用 RenderPipeline（含 Bloom），WebGL2 后端直接 renderer.render 更稳定
+      try {
+        const isWebGPU = T.renderer.backend && T.renderer.backend.isWebGPUBackend;
+        if (T.postProcessing && isWebGPU) T.postProcessing.render();
+        else T.renderer.render(T.scene, T.camera);
+      } catch (e) {
+        T.renderer.render(T.scene, T.camera);
+      }
     }
 
     function updateAirflow(T: any, delta: number) {
@@ -1053,8 +1031,7 @@ export default function BuildingScene() {
   function applyLightingClosure(T: any, enabled: boolean, b: number) {
     stateRef.current.lighting.enabled = enabled;
     stateRef.current.lighting.brightness = b;
-    T.pointLights.forEach((light: any) => { light.intensity = enabled ? b * 25 : 0; });
-    T.shadowLights.forEach((light: any) => { light.intensity = enabled ? b * 60 : 0; });
+    T.pointLights.forEach((light: any) => { light.intensity = enabled ? b * 30 : 0; });
     T.lightFixtures.forEach((mesh: any) => {
       if (mesh.material && !mesh.userData._hlEmissive) {
         mesh.material.emissiveIntensity = enabled ? 2.5 + b * 3 : 0.05;
@@ -1226,7 +1203,7 @@ export default function BuildingScene() {
           </div>
           <div className="header-stat">
             <div className="label">FPS</div>
-            <div className="value">{fps || '--'}</div>
+            <div className="value" id="fps-value">{fps || '--'}</div>
           </div>
           <div className="header-stat">
             <div className="label">SYS TIME</div>
