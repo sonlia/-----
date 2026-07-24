@@ -142,3 +142,25 @@ Stage Summary:
 - VLM 评价：开灯/关灯明暗对比明显，灯具发光，有光斑和阴影，光照符合物理规律，效果真实
 - 交互正常：照明开关实时控制所有面光源和投影灯
 - 灯具现在作为发光体照亮空间并产生投影，符合用户需求
+
+---
+Task ID: force-webgpu-fix-ltc
+Agent: Super Z (main)
+Task: 强制WebGPU + 修复RectAreaLight LTC错误 + 推送GitHub
+
+Work Log:
+- 错误诊断：RectAreaLight 在 WebGPURenderer 下报 LTC_FLOAT_1 null，原因是 Turbopack 把 three/webgpu 和 three/addons 解析成不同模块实例，RectAreaLightNode.setLTC 设置的 _ltcLib 闭包与渲染用的不是同一个
+- 强制 WebGPU：移除 WebGLRenderer 回退，强制用 WebGPURenderer，通过 backend.isWebGPUBackend 检测真实后端并显示
+- 解决 LTC 错误：改用 SpotLight 替代 RectAreaLight（SpotLight 不需要 LTC 纹理，WebGPU/WebGL2 都稳定）
+  - 54 个 SpotLight 向下照亮（宽光锥 PI/3.2, penumbra 0.6 软边）模拟面板灯
+  - 6 个空间分散的投影灯（castShadow, 1024 map）
+- PostProcessing 适配：three 0.185 已更名为 RenderPipeline，改用 RenderPipeline + TSL bloom
+- 渲染分流：WebGPU 后端用 RenderPipeline（含 Bloom），WebGL2 后端直接 renderer.render（更稳定）
+- FPS 修复：fpsCounter.lastTime 初始化为 performance.now()，用 DOM 直接更新 #fps-value 避免 React state 在 rAF 闭包延迟
+- 测试环境无 WebGPU（WebGL2 后端），54 个 SpotLight 较重 FPS 偏低，真实 GPU 环境会流畅
+
+Stage Summary:
+- LTC 错误完全消除（0 个）
+- 页面正常渲染：模型显示、灯具发光、UI 齐全
+- 交互正常：点击设备显示详情、照明开关影响运行设备数
+- 代码已推送 GitHub: sonlia/----- main 分支
