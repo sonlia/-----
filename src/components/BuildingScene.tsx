@@ -431,6 +431,8 @@ export default function BuildingScene() {
     function setupPointLights(T: any) {
       const fixtures: any[] = [];
       const tmpBox = new THREE.Box3();
+      // 确保世界矩阵已更新（localToWorld 依赖 matrixWorld）
+      T.modelRoot.updateMatrixWorld(true);
       T.lightFixtures.forEach((mesh: any) => {
         tmpBox.setFromObject(mesh);
         const center = tmpBox.getCenter(new THREE.Vector3());
@@ -445,12 +447,43 @@ export default function BuildingScene() {
 
       fixtures.forEach((f, i) => {
         const { mesh, center, size } = f;
-        // === RectAreaLight 面光源：黄色光，大小与该灯具面板一致，向下照亮 ===
-        const rw = Math.max(size.x, 0.5);
-        const rh = Math.max(size.z, 0.5);
-        const rectLight = new THREE.RectAreaLight(0xffcc44, 0, rw, rh);
-        rectLight.position.set(center.x, center.y - 0.05, center.z);
-        rectLight.lookAt(center.x, center.y - 5, center.z);
+        // === 精确计算 RectAreaLight 位置/尺寸/朝向（用灯具模型顶点世界坐标） ===
+        // 取灯具几何体的世界坐标顶点，计算平面法线和宽高方向
+        const geo = mesh.geometry;
+        const posAttr = geo.attributes.position;
+        const worldVerts: THREE.Vector3[] = [];
+        for (let v = 0; v < posAttr.count; v++) {
+          const wv = new THREE.Vector3().fromBufferAttribute(posAttr, v);
+          mesh.localToWorld(wv);
+          worldVerts.push(wv);
+        }
+        // 计算平面法线（用前3个顶点的叉积）
+        let normal = new THREE.Vector3(0, -1, 0); // 默认向下
+        let width = Math.max(size.x, 0.5);
+        let height = Math.max(size.z, 0.5);
+        let rectCenter = center.clone();
+        if (worldVerts.length >= 3) {
+          const v0 = worldVerts[0], v1 = worldVerts[1], v2 = worldVerts[2];
+          const e1 = new THREE.Vector3().subVectors(v1, v0);
+          const e2 = new THREE.Vector3().subVectors(v2, v0);
+          normal = new THREE.Vector3().crossVectors(e1, e2).normalize();
+          // 宽高方向：e1 为宽方向，叉积得高方向
+          const widthDir = e1.clone().normalize();
+          const heightDir = new THREE.Vector3().crossVectors(normal, widthDir).normalize();
+          width = e1.length();
+          height = new THREE.Vector3().subVectors(v2, v0).projectOnVector(heightDir).length();
+          // 中心点：所有顶点平均
+          rectCenter = new THREE.Vector3();
+          worldVerts.forEach(v => rectCenter.add(v));
+          rectCenter.divideScalar(worldVerts.length);
+          // 确保法线朝下（灯具向下照）
+          if (normal.y > 0) normal.negate();
+        }
+        // === RectAreaLight 面光源：位置/尺寸/朝向与灯具模型完全一致 ===
+        const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
+        rectLight.position.copy(rectCenter);
+        // lookAt 中心点沿法线方向，让面光源朝向与灯具面板一致
+        rectLight.lookAt(rectCenter.clone().add(normal));
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
