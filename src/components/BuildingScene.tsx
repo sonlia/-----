@@ -447,37 +447,54 @@ export default function BuildingScene() {
 
       fixtures.forEach((f, i) => {
         const { mesh } = f;
-        // === RectAreaLight 长边对齐灯具模型长边，尺寸用本地包围盒×世界缩放（OBB精确） ===
+        // === 用灯具几何体的4个顶点世界坐标精确计算 RectAreaLight ===
         mesh.updateWorldMatrix(true, false);
-        // decompose 世界变换
-        const meshQuat = mesh.getWorldQuaternion(new THREE.Quaternion());
-        const meshScale = mesh.getWorldScale(new THREE.Vector3());
-        // 本地包围盒尺寸（面板原始尺寸，未受旋转影响）
-        const localBox = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position);
-        const localSize = localBox.getSize(new THREE.Vector3());
-        const localCenter = localBox.getCenter(new THREE.Vector3());
-        // 世界尺寸 = 本地尺寸 × 世界缩放（精确面板尺寸，非AABB）
-        const worldW = Math.abs(localSize.x) * Math.abs(meshScale.x);
-        const worldH = Math.abs(localSize.z) * Math.abs(meshScale.z);
-        // 长边对齐：取较大者作长边
-        const xLonger = worldW >= worldH;
-        const width = xLonger ? worldW : worldH;   // 长边
-        const height = xLonger ? worldH : worldW;  // 短边
-        // 灯具几何中心世界坐标
-        const worldCenter = localCenter.clone().applyMatrix4(mesh.matrixWorld);
-        // 灯具法线：本地 Y 轴经世界旋转
-        const meshY = new THREE.Vector3(0, 1, 0).applyQuaternion(meshQuat);
-        const lightNormal = meshY.y > 0 ? meshY.clone().negate() : meshY.clone();
-        // 灯具本地 X/Z 轴的世界方向，长边方向取较长的那个轴
-        const meshX = new THREE.Vector3(1, 0, 0).applyQuaternion(meshQuat);
-        const meshZ = new THREE.Vector3(0, 0, 1).applyQuaternion(meshQuat);
-        const longAxis = xLonger ? meshX : meshZ;
-        const shortAxis = xLonger ? meshZ : meshX;
+        const posAttr = mesh.geometry.attributes.position;
+        // 取所有顶点的世界坐标
+        const worldVerts: THREE.Vector3[] = [];
+        for (let v = 0; v < posAttr.count; v++) {
+          const wv = new THREE.Vector3().fromBufferAttribute(posAttr, v);
+          mesh.localToWorld(wv);
+          worldVerts.push(wv);
+        }
+        // 中心点 = 4顶点平均
+        const center = new THREE.Vector3();
+        worldVerts.forEach(v => center.add(v));
+        center.divideScalar(worldVerts.length);
+        // 找最长边：计算相邻顶点间距离，取最长作为长边方向
+        // 假设顶点是按顺序排列的(三角形扇或四边形)，计算所有相邻边
+        let maxLen = 0;
+        let longDir = new THREE.Vector3(1, 0, 0);
+        for (let a = 0; a < worldVerts.length; a++) {
+          for (let b = a + 1; b < worldVerts.length; b++) {
+            const d = new THREE.Vector3().subVectors(worldVerts[b], worldVerts[a]);
+            const len = d.length();
+            if (len > maxLen) { maxLen = len; longDir = d.clone().normalize(); }
+          }
+        }
+        const width = maxLen; // 长边长度
+        // 短边方向：与长边垂直且在面板平面内，用另一对顶点计算
+        // 找与长边中点最近的另一顶点，计算短边长度
+        // 用叉积算法线，再算短边
+        const v0 = worldVerts[0], v1 = worldVerts[1], v2 = worldVerts[2];
+        const e1 = new THREE.Vector3().subVectors(v1, v0);
+        const e2 = new THREE.Vector3().subVectors(v2, v0);
+        const normal = new THREE.Vector3().crossVectors(e1, e2).normalize();
+        if (normal.y > 0) normal.negate(); // 法线朝下
+        // 短边方向 = 法线 × 长边方向
+        const shortDir = new THREE.Vector3().crossVectors(normal, longDir).normalize();
+        // 短边长度：投影任意顶点到短边方向的距离范围
+        let minProj = Infinity, maxProj = -Infinity;
+        worldVerts.forEach(v => {
+          const p = new THREE.Vector3().subVectors(v, center).dot(shortDir);
+          if (p < minProj) minProj = p;
+          if (p > maxProj) maxProj = p;
+        });
+        const height = maxProj - minProj;
         // RectAreaLight: X轴=长边, Y轴=短边, Z轴=法线
-        const rotMatrix = new THREE.Matrix4().makeBasis(longAxis, shortAxis, lightNormal);
-        // === RectAreaLight：长边对齐灯具长边，尺寸按长宽比 ===
+        const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
         const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
-        rectLight.position.copy(worldCenter);
+        rectLight.position.copy(center);
         rectLight.quaternion.setFromRotationMatrix(rotMatrix);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
