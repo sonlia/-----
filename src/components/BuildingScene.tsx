@@ -134,13 +134,13 @@ export default function BuildingScene() {
 
     // ===== 环境（弱环境光 + 方向光投影，HDR 仅用于微反射） =====
     function setupEnvironment(T: any) {
-      // 弱环境光
-      const ambient = new THREE.AmbientLight(0x667799, 0.15);
+      // 极弱环境光（仅防止全黑，RectAreaLight 主导照明）
+      const ambient = new THREE.AmbientLight(0x445577, 0.05);
       ambient.name = '__ambient';
       T.scene.add(ambient);
 
-      // 主方向光（投影源 + 补光）
-      const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.2);
+      // 弱方向光（仅投影，不抢 RectAreaLight 主光源）
+      const dirLight = new THREE.DirectionalLight(0xfff5e0, 0.3);
       dirLight.position.set(30, 45, 18);
       dirLight.target.position.set(0, 0, 0);
       dirLight.castShadow = true;
@@ -157,8 +157,8 @@ export default function BuildingScene() {
       T.scene.add(dirLight.target);
       dirLight.name = '__directional';
 
-      // 半球光
-      const hemi = new THREE.HemisphereLight(0x445566, 0x222233, 0.2);
+      // 半球光（极弱）
+      const hemi = new THREE.HemisphereLight(0x334455, 0x111122, 0.08);
       hemi.name = '__hemi';
       T.scene.add(hemi);
 
@@ -775,7 +775,7 @@ export default function BuildingScene() {
         const fixture = T.lightFixtures[i];
         const indOn = fixture?.userData?.individualOn;
         const finalOn = s.enabled && (indOn !== false);
-        light.intensity = finalOn ? b * 60 : 0;
+        light.intensity = finalOn ? b * 150 : 0;
       });
       // 灯具自发光（关灯时归零，即使 mesh 隐藏也要关闭 emissive）
       T.lightFixtures.forEach((mesh: any) => {
@@ -802,11 +802,11 @@ export default function BuildingScene() {
       }
       // 关灯时：所有光源全部归零，空间完全变黑
       const ambient = T.scene.getObjectByName('__ambient');
-      if (ambient) ambient.intensity = s.enabled ? 0.15 + b * 0.1 : 0;
+      if (ambient) ambient.intensity = s.enabled ? 0.05 : 0;
       const hemi = T.scene.getObjectByName('__hemi');
-      if (hemi) hemi.intensity = s.enabled ? 0.2 : 0;
+      if (hemi) hemi.intensity = s.enabled ? 0.08 : 0;
       const dirLight = T.scene.getObjectByName('__directional');
-      if (dirLight) dirLight.intensity = s.enabled ? 1.2 : 0;
+      if (dirLight) dirLight.intensity = s.enabled ? 0.3 : 0;
       // HDR 环境贴图强度归零，关灯时移除环境贴图避免残余反射
       if (T.scene.environmentIntensity !== undefined) {
         T.scene.environmentIntensity = s.enabled ? 0.15 : 0;
@@ -1114,7 +1114,7 @@ export default function BuildingScene() {
       const fixture = T.lightFixtures[i];
       const indOn = fixture?.userData?.individualOn;
       const finalOn = enabled && (indOn !== false);
-      light.intensity = finalOn ? b * 60 : 0;
+      light.intensity = finalOn ? b * 150 : 0;
     });
     T.lightFixtures.forEach((mesh: any) => {
       if (mesh.material && !mesh.userData._hlEmissive) {
@@ -1136,11 +1136,11 @@ export default function BuildingScene() {
       T.rectHelpers.forEach((h: any) => { if (h) h.visible = enabled; });
     }
     const ambient = T.scene.getObjectByName('__ambient');
-    if (ambient) ambient.intensity = enabled ? 0.15 + b * 0.1 : 0;
+    if (ambient) ambient.intensity = enabled ? 0.05 : 0;
     const hemi = T.scene.getObjectByName('__hemi');
-    if (hemi) hemi.intensity = enabled ? 0.2 : 0;
+    if (hemi) hemi.intensity = enabled ? 0.08 : 0;
     const dirLight = T.scene.getObjectByName('__directional');
-    if (dirLight) dirLight.intensity = enabled ? 1.2 : 0;
+    if (dirLight) dirLight.intensity = enabled ? 0.3 : 0;
     if (T.scene.environmentIntensity !== undefined) {
       T.scene.environmentIntensity = enabled ? 0.15 : 0;
     }
