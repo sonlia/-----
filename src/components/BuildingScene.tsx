@@ -11,6 +11,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 
 // ===== 设备信息数据库 =====
 const deviceDB: any = {
@@ -113,8 +114,8 @@ export default function BuildingScene() {
       if (renderModeRef.current !== 'WebGPU') {
         T.composer = new EffectComposer(T.renderer);
         T.composer.addPass(new RenderPass(T.scene, T.camera));
-        // Bloom 阈值调高，避免 HDR 照明下整体过曝，只让发光元素辉光
-        T.composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.35, 0.4, 0.7));
+        // Bloom 阈值适中，让灯具辉光明显但不冲淡阴影
+        T.composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.5, 0.45));
         T.composer.addPass(new OutputPass());
       }
 
@@ -446,27 +447,70 @@ export default function BuildingScene() {
       };
     }
 
+    // ===== 灯具发光光源（RectAreaLight 面光源照亮下方 + SpotLight 投影） =====
     function setupPointLights(T: any) {
-      const positions: any[] = [];
+      // 初始化 RectAreaLight uniforms（必须，否则面光源无效果）
+      RectAreaLightUniformsLib.init();
+
+      const fixtures: any[] = [];
       const tmpBox = new THREE.Box3();
-      const tmp = new THREE.Vector3();
       T.lightFixtures.forEach((mesh: any) => {
         tmpBox.setFromObject(mesh);
-        tmpBox.getCenter(tmp);
-        positions.push(tmp.clone());
+        const center = tmpBox.getCenter(new THREE.Vector3());
+        const size = tmpBox.getSize(new THREE.Vector3());
+        fixtures.push({ mesh, center, size });
       });
-      if (positions.length === 0) return;
-      const maxLights = 6;
-      const samples = farthestPointSampling(positions, Math.min(maxLights, positions.length));
-      T.pointLights = [];
-      samples.forEach((pos: any, i: number) => {
-        const light = new THREE.PointLight(0xffe8b0, 0, 22, 1.8);
-        light.position.set(pos.x, pos.y - 0.3, pos.z);
-        light.name = `__pointLight_${i}`;
-        light.castShadow = false;
-        T.scene.add(light);
-        T.pointLights.push(light);
+      if (fixtures.length === 0) return;
+
+      // 投影灯数量限制（性能：SpotLight 投影开销大，只取分散的若干个）
+      const maxShadowLights = 4;
+      // 用最远点采样选出空间分散的灯具作为投影灯
+      const sampleIdx: number[] = [];
+      const positions = fixtures.map((f) => f.center);
+      const sampled = farthestPointSampling(positions, Math.min(maxShadowLights, positions.length));
+      fixtures.forEach((f, i) => { if (sampled.includes(f.center)) sampleIdx.push(i); });
+
+      T.pointLights = [];   // RectAreaLight 面光源（所有灯）
+      T.shadowLights = [];  // SpotLight 投影灯（部分灯）
+
+      fixtures.forEach((f, i) => {
+        const { mesh, center, size } = f;
+        // 面板灯尺寸（取 X/Z 较大值，归一化后通常 1.5~2 单位）
+        const w = Math.max(size.x, 0.8);
+        const h = Math.max(size.z, 0.8);
+
+        // === RectAreaLight：面光源，向下照亮（面板灯效果） ===
+        const rectLight = new THREE.RectAreaLight(0xffe8b0, 0, w, h);
+        rectLight.position.set(center.x, center.y - 0.05, center.z);
+        rectLight.lookAt(center.x, center.y - 5, center.z); // 向下照射
+        rectLight.name = `__rectLight_${i}`;
+        T.scene.add(rectLight);
+        T.pointLights.push(rectLight);
+
+        // === SpotLight：投影灯（仅分散的几个灯），向下投射阴影 ===
+        if (sampleIdx.includes(i)) {
+          // 光锥角度大些覆盖更广，penumbra 软边
+          const spot = new THREE.SpotLight(0xffe8b0, 0, 20, Math.PI / 3, 0.5, 1.5);
+          spot.position.set(center.x, center.y - 0.05, center.z);
+          spot.target.position.set(center.x, center.y - 5, center.z);
+          spot.castShadow = true;
+          spot.shadow.mapSize.set(1024, 1024);
+          spot.shadow.camera.near = 0.3;
+          spot.shadow.camera.far = 20;
+          spot.shadow.bias = -0.0002;
+          spot.shadow.normalBias = 0.015;
+          spot.name = `__spotLight_${i}`;
+          T.scene.add(spot);
+          T.scene.add(spot.target);
+          T.shadowLights.push(spot);
+        }
       });
+      // 调试：输出第一个灯的位置信息
+      if (fixtures.length > 0) {
+        const f0 = fixtures[0];
+        console.log(`灯具采样: y=${f0.center.y.toFixed(2)}, size=${f0.size.x.toFixed(2)}x${f0.size.z.toFixed(2)}`);
+      }
+      console.log(`灯具光源: ${T.pointLights.length} 个面光源, ${T.shadowLights.length} 个投影灯`);
     }
 
     function farthestPointSampling(points: any[], n: number) {
@@ -698,12 +742,18 @@ export default function BuildingScene() {
     function applyLighting(T: any) {
       const s = stateRef.current.lighting;
       const b = s.brightness;
-      // 点光源强度随亮度调节
-      T.pointLights.forEach((light: any) => { light.intensity = s.enabled ? b * 22 : 0; });
+      // RectAreaLight 面光源（所有灯，向下照亮下方区域）
+      T.pointLights.forEach((light: any) => {
+        light.intensity = s.enabled ? b * 25 : 0; // RectAreaLight 物理单位，需要较大值
+      });
+      // SpotLight 投影灯（部分灯，产生阴影）
+      T.shadowLights.forEach((light: any) => {
+        light.intensity = s.enabled ? b * 60 : 0;
+      });
       // 灯具发光强度随开关/亮度变化（保留主题色，只调强度）
       T.lightFixtures.forEach((mesh: any) => {
         if (mesh.material && !mesh.userData._hlEmissive) {
-          mesh.material.emissiveIntensity = s.enabled ? 0.5 + b * 1.2 : 0.05;
+          mesh.material.emissiveIntensity = s.enabled ? 2.5 + b * 3 : 0.05;
         }
       });
       // 环境光与半球光随照明变化
@@ -1003,10 +1053,11 @@ export default function BuildingScene() {
   function applyLightingClosure(T: any, enabled: boolean, b: number) {
     stateRef.current.lighting.enabled = enabled;
     stateRef.current.lighting.brightness = b;
-    T.pointLights.forEach((light: any) => { light.intensity = enabled ? b * 22 : 0; });
+    T.pointLights.forEach((light: any) => { light.intensity = enabled ? b * 25 : 0; });
+    T.shadowLights.forEach((light: any) => { light.intensity = enabled ? b * 60 : 0; });
     T.lightFixtures.forEach((mesh: any) => {
       if (mesh.material && !mesh.userData._hlEmissive) {
-        mesh.material.emissiveIntensity = enabled ? 0.5 + b * 1.2 : 0.05;
+        mesh.material.emissiveIntensity = enabled ? 2.5 + b * 3 : 0.05;
       }
     });
     const ambient = T.scene.getObjectByName('__ambient');

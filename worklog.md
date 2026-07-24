@@ -120,3 +120,25 @@ Stage Summary:
 - 墙体验证：metalness=0, roughness=1, envMapIntensity=0（纯漫反射）
 - VLM 评价：投影柔和可见、墙体哑光无高光、HDR 光影层次丰富、真实感良好
 - 交互无回归：点击设备、照明开关正常
+
+---
+Task ID: rect-area-light
+Agent: Super Z (main)
+Task: 灯具（面板）改为发光体，开灯时照亮下方区域并产生投影
+
+Work Log:
+- 分析灯具几何：扁平面板（归一化后约 1.9×0.09×1.86），离地 Y=1.64，适合用 RectAreaLight 面光源
+- 技术方案：RectAreaLight（面光源照亮下方，所有灯）+ SpotLight（投影，4个分散灯）+ 高 emissive 发光 + Bloom
+- 导入 RectAreaLightUniformsLib 并 init（必须，否则面光源无效果）
+- 重写 setupPointLights：
+  - 为每个灯具创建 RectAreaLight（尺寸=面板尺寸，向下 lookAt 照亮下方）
+  - 用最远点采样选 4 个空间分散的灯创建 SpotLight（castShadow, 1024 map, 光锥 PI/3, penumbra 0.5 软边）
+- 强度调整：RectAreaLight intensity=b*25（物理单位大），SpotLight=b*60，emissiveIntensity=2.5+b*3
+- Bloom 阈值 0.7→0.45，strength 0.35→0.5（让灯具辉光明显）
+- 更新 applyLighting/applyLightingClosure 同步控制 RectAreaLight + SpotLight 强度
+
+Stage Summary:
+- 54 个 RectAreaLight 面光源 + 4 个 SpotLight 投影灯创建成功
+- VLM 评价：开灯/关灯明暗对比明显，灯具发光，有光斑和阴影，光照符合物理规律，效果真实
+- 交互正常：照明开关实时控制所有面光源和投影灯
+- 灯具现在作为发光体照亮空间并产生投影，符合用户需求
