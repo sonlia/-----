@@ -527,12 +527,8 @@ export default function BuildingScene() {
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
-        // 调试：显示灯具 mesh（橙色线框）+ RectAreaLightHelper（品红线框）对比
-        mesh.visible = true;
-        (mesh as any).material = new (THREE as any).MeshBasicMaterial({ color: 0xff8800, side: THREE.DoubleSide, wireframe: true });
-        const helper = new RectAreaLightHelper(rectLight, 0xff00ff);
-        helper.name = `__rectHelper_${i}`;
-        T.scene.add(helper);
+        // 隐藏原始灯具 mesh（用 RectAreaLight 面光源替代）
+        mesh.visible = false;
       });
       T.rectHelpers = T.rectLights.map((l: any) => T.scene.getObjectByName(`__rectHelper_${T.rectLights.indexOf(l)}`));
       console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (已隐藏原始模型，显示 Helper)`);
@@ -779,7 +775,7 @@ export default function BuildingScene() {
         const fixture = T.lightFixtures[i];
         const indOn = fixture?.userData?.individualOn;
         const finalOn = s.enabled && (indOn !== false);
-        light.intensity = finalOn ? b * 30 : 0;
+        light.intensity = finalOn ? b * 60 : 0;
       });
       // 灯具自发光（关灯时归零，即使 mesh 隐藏也要关闭 emissive）
       T.lightFixtures.forEach((mesh: any) => {
@@ -1118,7 +1114,7 @@ export default function BuildingScene() {
       const fixture = T.lightFixtures[i];
       const indOn = fixture?.userData?.individualOn;
       const finalOn = enabled && (indOn !== false);
-      light.intensity = finalOn ? b * 30 : 0;
+      light.intensity = finalOn ? b * 60 : 0;
     });
     T.lightFixtures.forEach((mesh: any) => {
       if (mesh.material && !mesh.userData._hlEmissive) {
