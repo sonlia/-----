@@ -446,40 +446,45 @@ export default function BuildingScene() {
       T.rectLights = [];    // RectAreaLight 面光源（所有灯具，大小=各自面板尺寸）
 
       fixtures.forEach((f, i) => {
-        const { mesh, center, size } = f;
-        // === RectAreaLight 完全复制灯具模型的世界变换（位置/旋转/缩放） ===
-        // 用 mesh.matrixWorld decompose 出精确的位置/旋转/缩放
+        const { mesh } = f;
+        // === RectAreaLight 长边对齐灯具模型长边，尺寸用本地包围盒×世界缩放（OBB精确） ===
         mesh.updateWorldMatrix(true, false);
-        const meshPos = new THREE.Vector3();
-        const meshQuat = new THREE.Quaternion();
-        const meshScale = new THREE.Vector3();
-        mesh.matrixWorld.decompose(meshPos, meshQuat, meshScale);
-        // 尺寸：本地包围盒 × 世界缩放（精确面板尺寸）
+        // decompose 世界变换
+        const meshQuat = mesh.getWorldQuaternion(new THREE.Quaternion());
+        const meshScale = mesh.getWorldScale(new THREE.Vector3());
+        // 本地包围盒尺寸（面板原始尺寸，未受旋转影响）
         const localBox = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position);
         const localSize = localBox.getSize(new THREE.Vector3());
-        const width = Math.max(Math.abs(localSize.x) * Math.abs(meshScale.x), 0.3);
-        const height = Math.max(Math.abs(localSize.z) * Math.abs(meshScale.z), 0.3);
-        // 灯具几何中心的世界位置（本地包围盒中心经 world matrix 变换）
         const localCenter = localBox.getCenter(new THREE.Vector3());
+        // 世界尺寸 = 本地尺寸 × 世界缩放（精确面板尺寸，非AABB）
+        const worldW = Math.abs(localSize.x) * Math.abs(meshScale.x);
+        const worldH = Math.abs(localSize.z) * Math.abs(meshScale.z);
+        // 长边对齐：取较大者作长边
+        const xLonger = worldW >= worldH;
+        const width = xLonger ? worldW : worldH;   // 长边
+        const height = xLonger ? worldH : worldW;  // 短边
+        // 灯具几何中心世界坐标
         const worldCenter = localCenter.clone().applyMatrix4(mesh.matrixWorld);
-        // 法线：本地 Y 轴经世界旋转
+        // 灯具法线：本地 Y 轴经世界旋转
         const meshY = new THREE.Vector3(0, 1, 0).applyQuaternion(meshQuat);
         const lightNormal = meshY.y > 0 ? meshY.clone().negate() : meshY.clone();
-        // 旋转矩阵：X轴=灯具X(宽), Y轴=灯具Z(高), Z轴=法线
+        // 灯具本地 X/Z 轴的世界方向，长边方向取较长的那个轴
         const meshX = new THREE.Vector3(1, 0, 0).applyQuaternion(meshQuat);
         const meshZ = new THREE.Vector3(0, 0, 1).applyQuaternion(meshQuat);
-        const rotMatrix = new THREE.Matrix4().makeBasis(meshX, meshZ, lightNormal);
-        // === RectAreaLight：位置=灯具几何中心世界坐标，旋转=复制灯具旋转 ===
+        const longAxis = xLonger ? meshX : meshZ;
+        const shortAxis = xLonger ? meshZ : meshX;
+        // RectAreaLight: X轴=长边, Y轴=短边, Z轴=法线
+        const rotMatrix = new THREE.Matrix4().makeBasis(longAxis, shortAxis, lightNormal);
+        // === RectAreaLight：长边对齐灯具长边，尺寸按长宽比 ===
         const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
         rectLight.position.copy(worldCenter);
         rectLight.quaternion.setFromRotationMatrix(rotMatrix);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
-        // 调试：显示灯具 mesh（橙色线框）+ RectAreaLightHelper（青色线框）对比对齐
+        // 调试：显示灯具 mesh（橙色线框）+ RectAreaLightHelper（品红线框）对比
         mesh.visible = true;
         (mesh as any).material = new (THREE as any).MeshBasicMaterial({ color: 0xff8800, side: THREE.DoubleSide, wireframe: true });
-        // RectAreaLightHelper 用品红色线框，与橙色灯具区分
         const helper = new RectAreaLightHelper(rectLight, 0xff00ff);
         helper.name = `__rectHelper_${i}`;
         T.scene.add(helper);
