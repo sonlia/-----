@@ -80,8 +80,8 @@ export default function BuildingScene() {
     const init = async () => {
       T.clock = new THREE.Clock();
       T.scene = new THREE.Scene();
-      T.scene.background = new THREE.Color(0x06081a);
-      T.scene.fog = new THREE.FogExp2(0x06081a, 0.012);
+      T.scene.background = new THREE.Color(0x0a1228);
+      T.scene.fog = new THREE.FogExp2(0x0a1228, 0.008);
 
       T.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
       T.camera.position.set(30, 22, 30);
@@ -131,15 +131,15 @@ export default function BuildingScene() {
       animate();
     };
 
-    // ===== 环境（HDR 反射 + 弱补光，主要照明由灯具 SpotLight 提供） =====
+    // ===== 环境（弱环境光 + 方向光投影，HDR 仅用于微反射） =====
     function setupEnvironment(T: any) {
-      // 弱环境光（仅基础填充，不掩盖灯具照明）
-      const ambient = new THREE.AmbientLight(0x445577, 0.12);
+      // 弱环境光
+      const ambient = new THREE.AmbientLight(0x667799, 0.15);
       ambient.name = '__ambient';
       T.scene.add(ambient);
 
-      // 主方向光（主要投影源 + 补光，RectAreaLight 不投影所以阴影由方向光负责）
-      const dirLight = new THREE.DirectionalLight(0xfff0dd, 1.5);
+      // 主方向光（投影源 + 补光）
+      const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.2);
       dirLight.position.set(30, 45, 18);
       dirLight.target.position.set(0, 0, 0);
       dirLight.castShadow = true;
@@ -156,18 +156,21 @@ export default function BuildingScene() {
       T.scene.add(dirLight.target);
       dirLight.name = '__directional';
 
-      // 半球光（天空/地面微反射）
-      const hemi = new THREE.HemisphereLight(0x335577, 0x111122, 0.15);
+      // 半球光
+      const hemi = new THREE.HemisphereLight(0x445566, 0x222233, 0.2);
       hemi.name = '__hemi';
       T.scene.add(hemi);
 
-      // 加载 HDR 环境贴图（用于 PBR 反射 + 微弱环境照明）
+      // 背景色：深蓝（统一，不随空调温度变化，避免暗灰蓝色调）
+      T.scene.background = new THREE.Color(0x0a1228);
+
+      // HDR 环境贴图（仅用于 PBR 反射，强度很低，避免暗灰蓝色调主导）
       setLoaderText('加载 HDR 环境贴图...');
       const rgbeLoader = new RGBELoader();
       rgbeLoader.load('/studio_small.hdr', (envTexture: any) => {
         envTexture.mapping = THREE.EquirectangularReflectionMapping;
         T.scene.environment = envTexture;
-        T.scene.environmentIntensity = 0.35; // 较低，不掩盖灯具照明
+        T.scene.environmentIntensity = 0.15; // 很低，仅微反射
         T.envTexture = envTexture;
         console.log('HDR 环境贴图加载完成');
       }, undefined, (err: any) => {
@@ -378,13 +381,14 @@ export default function BuildingScene() {
     function makeThemeMaterial(type: 'wall' | 'furniture' | 'logo' | 'light' | 'ac' | 'default') {
       const presets: Record<string, any> = {
         // 墙体：纯漫反射，无反射，清晰投影
-        wall: { color: 0x2a3a52, metalness: 0.0, roughness: 1.0, emissive: 0x0a1428, emissiveIntensity: 0.1, envMapIntensity: 0.0 },
-        // 桌椅：中青蓝，哑光，细节清晰
-        furniture: { color: 0x1e3a5f, metalness: 0.25, roughness: 0.55, emissive: 0x0a1830, emissiveIntensity: 0.08, envMapIntensity: 0.6 },
+        // 墙体：中性灰蓝，纯漫反射，调亮便于看清细节
+        wall: { color: 0x4a5870, metalness: 0.0, roughness: 1.0, emissive: 0x1a2238, emissiveIntensity: 0.15, envMapIntensity: 0.0 },
+        // 桌椅：中青蓝，调亮
+        furniture: { color: 0x3a5878, metalness: 0.25, roughness: 0.55, emissive: 0x1a2840, emissiveIntensity: 0.1, envMapIntensity: 0.6 },
         // logo 装饰：亮青色，高金属反射
         logo: { color: 0x3a6a9a, metalness: 0.6, roughness: 0.3, emissive: 0x00d4ff, emissiveIntensity: 0.15, envMapIntensity: 1.0 },
         // 灯具：暖白发光灯罩 + 青色外壳
-        light: { color: 0x4a6080, metalness: 0.5, roughness: 0.35, emissive: 0xffe8b0, emissiveIntensity: 0.8, envMapIntensity: 0.8 },
+        light: { color: 0x4a6080, metalness: 0.5, roughness: 0.35, emissive: 0xffcc44, emissiveIntensity: 0.8, envMapIntensity: 0.8 },
         // 空调：冷青蓝金属，干净反光
         ac: { color: 0x4a8ab8, metalness: 0.7, roughness: 0.25, emissive: 0x103040, emissiveIntensity: 0.05, envMapIntensity: 1.0 },
         // 默认：通用科技青
@@ -440,10 +444,10 @@ export default function BuildingScene() {
 
       fixtures.forEach((f, i) => {
         const { mesh, center, size } = f;
-        // === RectAreaLight 面光源：大小与该灯具面板一致，向下照亮 ===
+        // === RectAreaLight 面光源：黄色光，大小与该灯具面板一致，向下照亮 ===
         const rw = Math.max(size.x, 0.5);
         const rh = Math.max(size.z, 0.5);
-        const rectLight = new THREE.RectAreaLight(0xffe8b0, 0, rw, rh);
+        const rectLight = new THREE.RectAreaLight(0xffcc44, 0, rw, rh);
         rectLight.position.set(center.x, center.y - 0.05, center.z);
         rectLight.lookAt(center.x, center.y - 5, center.z);
         rectLight.name = `__rectLight_${i}`;
@@ -683,9 +687,9 @@ export default function BuildingScene() {
     function applyLighting(T: any) {
       const s = stateRef.current.lighting;
       const b = s.brightness;
-      // RectAreaLight 面光源（所有灯具，大小=各自面板，向下照亮下方区域）
+      // RectAreaLight 黄色面光源（所有灯具，关灯时强度为 0）
       T.rectLights.forEach((light: any) => {
-        light.intensity = s.enabled ? b * 25 : 0;
+        light.intensity = s.enabled ? b * 30 : 0;
       });
       // 灯具自发光（已隐藏 mesh，无需调整）
       T.lightFixtures.forEach((mesh: any) => {
@@ -693,17 +697,19 @@ export default function BuildingScene() {
           mesh.material.emissiveIntensity = s.enabled ? 3 + b * 4 : 0.05;
         }
       });
-      // 环境光随照明变化（关灯时场景变暗）
+      // 关灯时：环境光、方向光、HDR 全部大幅降低，让关灯效果明显
       const ambient = T.scene.getObjectByName('__ambient');
-      if (ambient) ambient.intensity = s.enabled ? 0.12 + b * 0.08 : 0.05;
+      if (ambient) ambient.intensity = s.enabled ? 0.15 + b * 0.1 : 0.03;
       const hemi = T.scene.getObjectByName('__hemi');
-      if (hemi) hemi.intensity = s.enabled ? 0.15 + b * 0.1 : 0.05;
+      if (hemi) hemi.intensity = s.enabled ? 0.2 : 0.05;
+      const dirLight = T.scene.getObjectByName('__directional');
+      if (dirLight) dirLight.intensity = s.enabled ? 1.2 : 0.15; // 关灯时方向光也大幅降低
       // HDR 环境贴图强度随照明变化
       if (T.scene.environmentIntensity !== undefined) {
-        T.scene.environmentIntensity = s.enabled ? 0.35 + b * 0.2 : 0.15;
+        T.scene.environmentIntensity = s.enabled ? 0.15 : 0.05;
       }
-      // 曝光
-      T.renderer.toneMappingExposure = s.enabled ? 1.0 + b * 0.2 : 0.5;
+      // 曝光：关灯时降低曝光让场景明显变暗
+      T.renderer.toneMappingExposure = s.enabled ? 1.0 + b * 0.2 : 0.4;
       updateStatus(T);
     }
 
@@ -727,8 +733,10 @@ export default function BuildingScene() {
         ambientColor = new THREE.Color(0x6688aa);
         particleColor = new THREE.Color(0x88ccff);
       }
-      if (s.enabled) { T.scene.fog.color = fogColor; T.scene.background = fogColor; }
-      else { T.scene.fog.color = new THREE.Color(0x06081a); T.scene.background = new THREE.Color(0x06081a); }
+      if (s.enabled) { T.scene.fog.color = fogColor; }
+      else { T.scene.fog.color = new THREE.Color(0x0a1228); }
+      // 背景色保持统一深蓝（不随空调温度变化，避免暗灰蓝色调）
+      T.scene.background = new THREE.Color(0x0a1228);
       const ambient = T.scene.getObjectByName('__ambient');
       if (ambient && stateRef.current.lighting.enabled) ambient.color = s.enabled ? ambientColor : new THREE.Color(0x6688aa);
       T.airflowSystems.forEach((sys: any) => { sys.mat.color = s.enabled ? particleColor : sys.mat.color; });
@@ -993,20 +1001,22 @@ export default function BuildingScene() {
   function applyLightingClosure(T: any, enabled: boolean, b: number) {
     stateRef.current.lighting.enabled = enabled;
     stateRef.current.lighting.brightness = b;
-    T.rectLights.forEach((light: any) => { light.intensity = enabled ? b * 25 : 0; });
+    T.rectLights.forEach((light: any) => { light.intensity = enabled ? b * 30 : 0; });
     T.lightFixtures.forEach((mesh: any) => {
       if (mesh.material && !mesh.userData._hlEmissive) {
         mesh.material.emissiveIntensity = enabled ? 3 + b * 4 : 0.05;
       }
     });
     const ambient = T.scene.getObjectByName('__ambient');
-    if (ambient) ambient.intensity = enabled ? 0.12 + b * 0.08 : 0.05;
+    if (ambient) ambient.intensity = enabled ? 0.15 + b * 0.1 : 0.03;
     const hemi = T.scene.getObjectByName('__hemi');
-    if (hemi) hemi.intensity = enabled ? 0.15 + b * 0.1 : 0.05;
+    if (hemi) hemi.intensity = enabled ? 0.2 : 0.05;
+    const dirLight = T.scene.getObjectByName('__directional');
+    if (dirLight) dirLight.intensity = enabled ? 1.2 : 0.15;
     if (T.scene.environmentIntensity !== undefined) {
-      T.scene.environmentIntensity = enabled ? 0.35 + b * 0.2 : 0.15;
+      T.scene.environmentIntensity = enabled ? 0.15 : 0.05;
     }
-    T.renderer.toneMappingExposure = enabled ? 1.0 + b * 0.2 : 0.5;
+    T.renderer.toneMappingExposure = enabled ? 1.0 + b * 0.2 : 0.4;
     setDeviceList((prev) => prev.map((it) => it.type === 'light' ? { ...it, meta: `${deviceDB.light.power}W · ${deviceDB.light.colorTemp}` } : it));
     updateStatusClosure(T);
   }
@@ -1019,8 +1029,9 @@ export default function BuildingScene() {
     if (t < 0.4) { const k = (0.4 - t) / 0.4; fogColor = new THREE.Color(0x06081a).lerp(new THREE.Color(0x0a1428), k); ambientColor = new THREE.Color(0x6688aa).lerp(new THREE.Color(0x4466aa), k * 0.5); particleColor = new THREE.Color(0x88ccff).lerp(new THREE.Color(0x44aaff), k * 0.5); }
     else if (t > 0.6) { const k = (t - 0.6) / 0.4; fogColor = new THREE.Color(0x06081a).lerp(new THREE.Color(0x1a1008), k); ambientColor = new THREE.Color(0x6688aa).lerp(new THREE.Color(0xaa8866), k * 0.5); particleColor = new THREE.Color(0x88ccff).lerp(new THREE.Color(0xffaa66), k * 0.6); }
     else { fogColor = new THREE.Color(0x06081a); ambientColor = new THREE.Color(0x6688aa); particleColor = new THREE.Color(0x88ccff); }
-    if (enabled) { T.scene.fog.color = fogColor; T.scene.background = fogColor; }
-    else { T.scene.fog.color = new THREE.Color(0x06081a); T.scene.background = new THREE.Color(0x06081a); }
+    if (enabled) { T.scene.fog.color = fogColor; }
+    else { T.scene.fog.color = new THREE.Color(0x0a1228); }
+    T.scene.background = new THREE.Color(0x0a1228);
     const ambient = T.scene.getObjectByName('__ambient');
     if (ambient && stateRef.current.lighting.enabled) ambient.color = enabled ? ambientColor : new THREE.Color(0x6688aa);
     T.airflowSystems.forEach((sys: any) => { sys.mat.color = enabled ? particleColor : sys.mat.color; });
