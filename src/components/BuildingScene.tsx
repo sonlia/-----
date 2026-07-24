@@ -7,6 +7,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { RectAreaLightHelper } from 'three/addons/helpers/RectAreaLightHelper.js';
 import { RectAreaLightTexturesLib } from 'three/addons/lights/RectAreaLightTexturesLib.js';
 
 // 模块级初始化 RectAreaLight LTC 纹理（必须在任何 RectAreaLight 节点构建前完成注册）
@@ -455,8 +456,13 @@ export default function BuildingScene() {
         T.rectLights.push(rectLight);
         // 隐藏原始灯具 mesh（用 RectAreaLight 面光源替代）
         mesh.visible = false;
+        // === 调试：显示 RectAreaLight 位置和尺寸（线框矩形） ===
+        const helper = new RectAreaLightHelper(rectLight, 0x00ffcc);
+        helper.name = `__rectHelper_${i}`;
+        T.scene.add(helper);
       });
-      console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (所有灯具，已隐藏原始模型)`);
+      T.rectHelpers = T.rectLights.map((l: any) => T.scene.getObjectByName(`__rectHelper_${T.rectLights.indexOf(l)}`));
+      console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (已隐藏原始模型，显示 Helper)`);
     }
 
     function farthestPointSampling(points: any[], n: number) {
