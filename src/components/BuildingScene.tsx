@@ -476,9 +476,11 @@ export default function BuildingScene() {
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
-        // 隐藏原始灯具 mesh（用 RectAreaLight 面光源替代）
-        mesh.visible = false;
-        const helper = new RectAreaLightHelper(rectLight, 0x00ffcc);
+        // 调试：显示灯具 mesh（橙色线框）+ RectAreaLightHelper（青色线框）对比对齐
+        mesh.visible = true;
+        (mesh as any).material = new (THREE as any).MeshBasicMaterial({ color: 0xff8800, side: THREE.DoubleSide, wireframe: true });
+        // RectAreaLightHelper 用品红色线框，与橙色灯具区分
+        const helper = new RectAreaLightHelper(rectLight, 0xff00ff);
         helper.name = `__rectHelper_${i}`;
         T.scene.add(helper);
       });
