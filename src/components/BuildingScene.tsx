@@ -723,6 +723,14 @@ export default function BuildingScene() {
           }
         }
       });
+      // 关灯时隐藏空调脉冲标记光柱（避免蓝色光柱干扰）
+      if (T.deviceMarkers) {
+        T.deviceMarkers.forEach((m: any) => { m.group.visible = s.enabled; });
+      }
+      // 关灯时隐藏 RectAreaLightHelper 线框
+      if (T.rectHelpers) {
+        T.rectHelpers.forEach((h: any) => { if (h) h.visible = s.enabled; });
+      }
       // 关灯时：所有光源全部归零，空间完全变黑
       const ambient = T.scene.getObjectByName('__ambient');
       if (ambient) ambient.intensity = s.enabled ? 0.15 + b * 0.1 : 0;
@@ -1051,6 +1059,13 @@ export default function BuildingScene() {
         child.material.emissiveIntensity = enabled ? child.userData._origEmissiveInt : 0;
       }
     });
+    // 关灯时隐藏空调脉冲标记光柱 + RectAreaLightHelper
+    if (T.deviceMarkers) {
+      T.deviceMarkers.forEach((m: any) => { m.group.visible = enabled; });
+    }
+    if (T.rectHelpers) {
+      T.rectHelpers.forEach((h: any) => { if (h) h.visible = enabled; });
+    }
     const ambient = T.scene.getObjectByName('__ambient');
     if (ambient) ambient.intensity = enabled ? 0.15 + b * 0.1 : 0;
     const hemi = T.scene.getObjectByName('__hemi');
