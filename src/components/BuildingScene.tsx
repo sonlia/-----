@@ -448,13 +448,15 @@ export default function BuildingScene() {
       fixtures.forEach((f, i) => {
         const { mesh, center, size } = f;
         // === 精确计算 RectAreaLight 位置/尺寸/朝向（用灯具本地包围盒 + 世界变换） ===
-        // 灯具几何体的本地包围盒（不受世界变换影响，反映面板实际尺寸）
+        // 灯具几何体的本地包围盒（不受世界变换影响，反映面板原始尺寸）
         const localBox = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position);
         const localSize = localBox.getSize(new THREE.Vector3());
         const localCenter = localBox.getCenter(new THREE.Vector3());
-        // 面板尺寸：取本地包围盒的 X 和 Z（面板在 XZ 平面）
-        const width = Math.abs(localSize.x);
-        const height = Math.abs(localSize.z);
+        // 世界缩放（模型归一化 scale 已应用到 modelRoot，需取 mesh 的世界缩放）
+        const worldScale = mesh.getWorldScale(new THREE.Vector3());
+        // 面板尺寸：本地包围盒 X/Z 尺寸 × 世界缩放（修正归一化缩放）
+        const width = Math.abs(localSize.x) * Math.abs(worldScale.x);
+        const height = Math.abs(localSize.z) * Math.abs(worldScale.z);
         // 灯具中心的世界坐标（本地中心经 world matrix 变换）
         const worldCenter = localCenter.clone();
         mesh.localToWorld(worldCenter);
