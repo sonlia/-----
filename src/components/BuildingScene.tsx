@@ -691,25 +691,39 @@ export default function BuildingScene() {
       T.rectLights.forEach((light: any) => {
         light.intensity = s.enabled ? b * 30 : 0;
       });
-      // 灯具自发光（已隐藏 mesh，无需调整）
+      // 灯具自发光（关灯时归零，即使 mesh 隐藏也要关闭 emissive）
       T.lightFixtures.forEach((mesh: any) => {
         if (mesh.material && !mesh.userData._hlEmissive) {
-          mesh.material.emissiveIntensity = s.enabled ? 3 + b * 4 : 0.05;
+          mesh.material.emissiveIntensity = s.enabled ? 3 + b * 4 : 0;
         }
       });
-      // 关灯时：环境光、方向光、HDR 全部大幅降低，让关灯效果明显
+      // 关灯时：所有 mesh 的自发光归零（墙/桌椅/logo/空调等），避免残余亮度
+      T.modelRoot.traverse((child: any) => {
+        if (child.isMesh && child.material && !child.userData._hlEmissive) {
+          if (child.userData.deviceType !== 'light') {
+            child.userData._origEmissiveInt = child.userData._origEmissiveInt ?? child.material.emissiveIntensity;
+            child.material.emissiveIntensity = s.enabled ? child.userData._origEmissiveInt : 0;
+          }
+        }
+      });
+      // 关灯时：所有光源全部归零，空间完全变黑
       const ambient = T.scene.getObjectByName('__ambient');
-      if (ambient) ambient.intensity = s.enabled ? 0.15 + b * 0.1 : 0.03;
+      if (ambient) ambient.intensity = s.enabled ? 0.15 + b * 0.1 : 0;
       const hemi = T.scene.getObjectByName('__hemi');
-      if (hemi) hemi.intensity = s.enabled ? 0.2 : 0.05;
+      if (hemi) hemi.intensity = s.enabled ? 0.2 : 0;
       const dirLight = T.scene.getObjectByName('__directional');
-      if (dirLight) dirLight.intensity = s.enabled ? 1.2 : 0.15; // 关灯时方向光也大幅降低
-      // HDR 环境贴图强度随照明变化
+      if (dirLight) dirLight.intensity = s.enabled ? 1.2 : 0;
+      // HDR 环境贴图强度归零，关灯时移除环境贴图避免残余反射
       if (T.scene.environmentIntensity !== undefined) {
-        T.scene.environmentIntensity = s.enabled ? 0.15 : 0.05;
+        T.scene.environmentIntensity = s.enabled ? 0.15 : 0;
       }
-      // 曝光：关灯时降低曝光让场景明显变暗
-      T.renderer.toneMappingExposure = s.enabled ? 1.0 + b * 0.2 : 0.4;
+      if (!s.enabled) {
+        T.scene.environment = null;
+      } else if (T.envTexture && !T.scene.environment) {
+        T.scene.environment = T.envTexture;
+      }
+      // 曝光：关灯时极低
+      T.renderer.toneMappingExposure = s.enabled ? 1.0 + b * 0.2 : 0.1;
       updateStatus(T);
     }
 
@@ -977,21 +991,21 @@ export default function BuildingScene() {
   const onLightingToggle = () => {
     const v = !lightingOn; setLightingOn(v);
     const T = threeRef.current;
-    if (T.applyLighting) { applyLightingClosure(T, v, brightness / 100); }
+    if (T.rectLights) { applyLightingClosure(T, v, brightness / 100); }
     setShowList(true);
     showToast(v ? '照明系统已开启' : '照明系统已关闭');
     pushAlertUI(v ? 'info' : 'warning', `照明系统已${v ? '开启' : '关闭'}`);
   };
-  const onBrightness = (e: any) => { const v = parseInt(e.target.value); setBrightness(v); const T = threeRef.current; if (T.applyLighting) applyLightingClosure(T, lightingOn, v / 100); };
+  const onBrightness = (e: any) => { const v = parseInt(e.target.value); setBrightness(v); const T = threeRef.current; if (T.rectLights) applyLightingClosure(T, lightingOn, v / 100); };
   const onAcToggle = () => {
     const v = !acOn; setAcOn(v);
     const T = threeRef.current;
-    if (T.applyAC) applyACClosure(T, v, temperature);
+    if (T.airflowSystems) applyACClosure(T, v, temperature);
     setShowList(true);
     showToast(v ? '空调系统已开启' : '空调系统已关闭');
     pushAlertUI(v ? 'info' : 'warning', `空调系统已${v ? '开启' : '关闭'}`);
   };
-  const onTemperature = (e: any) => { const v = parseInt(e.target.value); setTemperature(v); const T = threeRef.current; if (T.applyAC) applyACClosure(T, acOn, v); };
+  const onTemperature = (e: any) => { const v = parseInt(e.target.value); setTemperature(v); const T = threeRef.current; if (T.airflowSystems) applyACClosure(T, acOn, v); };
   const onAutoRotate = () => { const v = !autoRotate; setAutoRotate(v); const T = threeRef.current; if (T.controls) { T.controls.autoRotate = v; T.controls.autoRotateSpeed = 0.8; } showToast(v ? '自动旋转已开启' : '自动旋转已关闭'); };
   const onResetView = () => { const T = threeRef.current; if (T.initialCamera) { T.cameraTween = { startPos: T.camera.position.clone(), endPos: T.initialCamera.pos.clone(), startTarget: T.controls.target.clone(), endTarget: T.initialCamera.target.clone(), time: 0, duration: 0.8 }; showToast('视角已重置'); } };
   const onTopView = () => { const T = threeRef.current; if (T.modelRoot) { const box = new THREE.Box3().setFromObject(T.modelRoot); const c = box.getCenter(new THREE.Vector3()); const s = box.getSize(new THREE.Vector3()); const d = Math.max(s.x, s.z) * 1.1; T.cameraTween = { startPos: T.camera.position.clone(), endPos: new THREE.Vector3(c.x, c.y + d, c.z + 0.01), startTarget: T.controls.target.clone(), endTarget: c.clone(), time: 0, duration: 0.8 }; showToast('已切换至俯视视角'); } };
@@ -1004,19 +1018,31 @@ export default function BuildingScene() {
     T.rectLights.forEach((light: any) => { light.intensity = enabled ? b * 30 : 0; });
     T.lightFixtures.forEach((mesh: any) => {
       if (mesh.material && !mesh.userData._hlEmissive) {
-        mesh.material.emissiveIntensity = enabled ? 3 + b * 4 : 0.05;
+        mesh.material.emissiveIntensity = enabled ? 3 + b * 4 : 0;
+      }
+    });
+    // 关灯时：所有非灯具 mesh 的自发光也归零
+    T.modelRoot.traverse((child: any) => {
+      if (child.isMesh && child.material && child.userData.deviceType !== 'light' && !child.userData._hlEmissive) {
+        child.userData._origEmissiveInt = child.userData._origEmissiveInt ?? child.material.emissiveIntensity;
+        child.material.emissiveIntensity = enabled ? child.userData._origEmissiveInt : 0;
       }
     });
     const ambient = T.scene.getObjectByName('__ambient');
-    if (ambient) ambient.intensity = enabled ? 0.15 + b * 0.1 : 0.03;
+    if (ambient) ambient.intensity = enabled ? 0.15 + b * 0.1 : 0;
     const hemi = T.scene.getObjectByName('__hemi');
-    if (hemi) hemi.intensity = enabled ? 0.2 : 0.05;
+    if (hemi) hemi.intensity = enabled ? 0.2 : 0;
     const dirLight = T.scene.getObjectByName('__directional');
-    if (dirLight) dirLight.intensity = enabled ? 1.2 : 0.15;
+    if (dirLight) dirLight.intensity = enabled ? 1.2 : 0;
     if (T.scene.environmentIntensity !== undefined) {
-      T.scene.environmentIntensity = enabled ? 0.15 : 0.05;
+      T.scene.environmentIntensity = enabled ? 0.15 : 0;
     }
-    T.renderer.toneMappingExposure = enabled ? 1.0 + b * 0.2 : 0.4;
+    if (!enabled) {
+      T.scene.environment = null;
+    } else if (T.envTexture && !T.scene.environment) {
+      T.scene.environment = T.envTexture;
+    }
+    T.renderer.toneMappingExposure = enabled ? 1.0 + b * 0.2 : 0.1;
     setDeviceList((prev) => prev.map((it) => it.type === 'light' ? { ...it, meta: `${deviceDB.light.power}W · ${deviceDB.light.colorTemp}` } : it));
     updateStatusClosure(T);
   }
