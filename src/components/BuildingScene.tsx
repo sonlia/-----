@@ -514,10 +514,10 @@ export default function BuildingScene() {
         });
         const height = maxProj - minProj;
 
-        // 6. 中心点 = 凸包顶点平均
+        // 6. 中心点 = 所有原始顶点平均（最接近几何中心，凸包顶点分布不均时更准）
         const center = new THREE.Vector3();
-        hull.forEach(p => center.add(p.v));
-        center.divideScalar(hull.length);
+        worldVerts.forEach(v => center.add(v));
+        center.divideScalar(worldVerts.length);
 
         // RectAreaLight: X轴=长边, Y轴=短边, Z轴=法线
         const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
