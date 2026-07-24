@@ -1,2 +1,56 @@
-skills/
+# dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# next.js
+.next/
+out/
+build/
+dist/
+
+# production
+*.production
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+
+# env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# misc
+.DS_Store
+*.pem
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# internal skills / tooling
+skills/
+tool-results/
+_vite_backup/
+repo-test/
+repo-test2/
+upload/
+
+# logs
+dev.log
+*.log
+
+# 大文件/中间产物（保留 public/scene.glb 和 public/studio_small.hdr）
+download/
