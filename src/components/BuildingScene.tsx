@@ -447,7 +447,8 @@ export default function BuildingScene() {
 
       fixtures.forEach((f, i) => {
         const { mesh } = f;
-        // === 基于灯具4个顶点世界坐标精确计算 RectAreaLight ===
+        // === 基于灯具顶点世界坐标精确计算 RectAreaLight ===
+        // 灯具可能有4/6/9个顶点(细分面板)，需用凸包算法找出外轮廓4个角
         mesh.updateWorldMatrix(true, false);
         const posAttr = mesh.geometry.attributes.position;
         const worldVerts: THREE.Vector3[] = [];
@@ -466,39 +467,57 @@ export default function BuildingScene() {
         ).normalize();
         if (normal.y > 0) normal.negate();
 
-        // 2. 用凸包排序4个顶点（按法线平面投影后排序），得到正确的相邻边
-        // 选两个与法线垂直的基向量
+        // 2. 构造面板平面的2D基向量
         const ref = Math.abs(normal.x) > 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
         const basisU = new THREE.Vector3().crossVectors(normal, ref).normalize();
         const basisV = new THREE.Vector3().crossVectors(normal, basisU).normalize();
-        // 投影到 2D 并按角度排序
-        const sorted = worldVerts.map(v => {
+        // 投影到2D
+        const pts2d = worldVerts.map(v => {
           const d = new THREE.Vector3().subVectors(v, v0);
-          return { v, u: d.dot(basisU), w: d.dot(basisV), angle: Math.atan2(d.dot(basisV), d.dot(basisU)) };
-        }).sort((a, b) => a.angle - b.angle);
+          return { v, u: d.dot(basisU), w: d.dot(basisV) };
+        });
 
-        // 3. 计算4条边长度，找最长边作为长边方向
+        // 3. 凸包算法(Andrew单调链)找出外轮廓顶点
+        const sorted2d = pts2d.slice().sort((a, b) => a.u - b.u || a.w - b.w);
+        const cross2d = (o: any, a: any, b: any) => (a.u - o.u) * (b.w - o.w) - (a.w - o.w) * (b.u - o.u);
+        const lower: any[] = [];
+        for (const p of sorted2d) {
+          while (lower.length >= 2 && cross2d(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+          lower.push(p);
+        }
+        const upper: any[] = [];
+        for (let k = sorted2d.length - 1; k >= 0; k--) {
+          const p = sorted2d[k];
+          while (upper.length >= 2 && cross2d(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+          upper.push(p);
+        }
+        const hull = lower.slice(0, -1).concat(upper.slice(0, -1)); // 凸包顶点(按顺序)
+
+        // 4. 在凸包边中找最长边作为长边方向
         let maxLen = 0, longDir = new THREE.Vector3(1, 0, 0), longIdx = 0;
-        for (let k = 0; k < sorted.length; k++) {
-          const a = sorted[k].v;
-          const b = sorted[(k + 1) % sorted.length].v;
+        for (let k = 0; k < hull.length; k++) {
+          const a = hull[k].v;
+          const b = hull[(k + 1) % hull.length].v;
           const d = new THREE.Vector3().subVectors(b, a);
           const len = d.length();
           if (len > maxLen) { maxLen = len; longDir = d.clone().normalize(); longIdx = k; }
         }
         const width = maxLen;
 
-        // 4. 短边方向 = 法线 × 长边方向（垂直于长边，在面板平面内）
+        // 5. 短边方向 = 法线 × 长边方向，短边长度 = 凸包在短边方向的投影范围
         const shortDir = new THREE.Vector3().crossVectors(normal, longDir).normalize();
-        // 短边长度 = 相邻于长边的下一条边的长度
-        const shortA = sorted[(longIdx + 1) % sorted.length].v;
-        const shortB = sorted[(longIdx + 2) % sorted.length].v;
-        const height = new THREE.Vector3().subVectors(shortB, shortA).length();
+        let minProj = Infinity, maxProj = -Infinity;
+        hull.forEach(p => {
+          const proj = new THREE.Vector3().subVectors(p.v, v0).dot(shortDir);
+          if (proj < minProj) minProj = proj;
+          if (proj > maxProj) maxProj = proj;
+        });
+        const height = maxProj - minProj;
 
-        // 5. 中心点 = 4顶点平均
+        // 6. 中心点 = 凸包顶点平均
         const center = new THREE.Vector3();
-        worldVerts.forEach(v => center.add(v));
-        center.divideScalar(worldVerts.length);
+        hull.forEach(p => center.add(p.v));
+        center.divideScalar(hull.length);
 
         // RectAreaLight: X轴=长边, Y轴=短边, Z轴=法线
         const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
