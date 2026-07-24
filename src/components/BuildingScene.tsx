@@ -434,19 +434,12 @@ export default function BuildingScene() {
       });
       if (fixtures.length === 0) return;
 
-      // 投影灯数量限制（SpotLight 投影开销大，取空间分散的若干个）
-      const maxShadowLights = 12;
-      const positions = fixtures.map((f) => f.center);
-      const sampled = farthestPointSampling(positions, Math.min(maxShadowLights, positions.length));
-      const sampleIdx: number[] = [];
-      fixtures.forEach((f, i) => { if (sampled.includes(f.center)) sampleIdx.push(i); });
-
-      T.pointLights = [];   // 所有灯的 SpotLight（投影+照亮）
+      T.pointLights = [];   // SpotLight（少量，仅负责投影）
       T.shadowLights = [];  // 投影灯（子集）
-      T.rectLights = [];    // RectAreaLight 面光源（部分灯，大小=灯具面板）
+      T.rectLights = [];    // RectAreaLight 面光源（大小=灯具面板，向下照亮）
 
-      // RectAreaLight 数量限制（性能：面光源开销大，取空间分散的若干个）
-      const maxRectLights = 10;
+      // RectAreaLight 数量限制（性能+纹理限制：面光源采样纹理，控制在 8 个以内）
+      const maxRectLights = 8;
       const rectPositions = fixtures.map((f) => f.center);
       const rectSampled = farthestPointSampling(rectPositions, Math.min(maxRectLights, rectPositions.length));
       const rectSampleIdx: number[] = [];
@@ -465,27 +458,34 @@ export default function BuildingScene() {
           T.scene.add(rectLight);
           T.rectLights.push(rectLight);
         }
+      });
 
-        // === SpotLight：所有灯，负责投影+定向照亮 ===
-        const spot = new THREE.SpotLight(0xffe8b0, 0, 22, Math.PI / 4, 0.4, 1.5);
-        spot.position.set(center.x, center.y - 0.05, center.z);
-        spot.target.position.set(center.x, center.y - 8, center.z);
-        const willShadow = sampleIdx.includes(i);
-        spot.castShadow = willShadow;
-        if (willShadow) {
+      // === SpotLight：仅少量投影灯（RectAreaLight 不投影，用少量 SpotLight 补阴影） ===
+      const maxShadowLights = 4;
+      const shadowSampled = farthestPointSampling(fixtures.map((f) => f.center), Math.min(maxShadowLights, fixtures.length));
+      const shadowSampleIdx: number[] = [];
+      fixtures.forEach((f, i) => { if (shadowSampled.includes(f.center)) shadowSampleIdx.push(i); });
+
+      fixtures.forEach((f, i) => {
+        if (shadowSampleIdx.includes(i)) {
+          const { center } = f;
+          const spot = new THREE.SpotLight(0xffe8b0, 0, 22, Math.PI / 4, 0.4, 1.5);
+          spot.position.set(center.x, center.y - 0.05, center.z);
+          spot.target.position.set(center.x, center.y - 8, center.z);
+          spot.castShadow = true;
           spot.shadow.mapSize.set(1024, 1024);
           spot.shadow.camera.near = 0.2;
           spot.shadow.camera.far = 14;
           spot.shadow.bias = -0.0002;
           spot.shadow.normalBias = 0.015;
+          spot.name = `__spotLight_${i}`;
+          T.scene.add(spot);
+          T.scene.add(spot.target);
+          T.pointLights.push(spot);
           T.shadowLights.push(spot);
         }
-        spot.name = `__spotLight_${i}`;
-        T.scene.add(spot);
-        T.scene.add(spot.target);
-        T.pointLights.push(spot);
       });
-      console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight, ${T.pointLights.length} 个 SpotLight, ${T.shadowLights.length} 个投影灯`);
+      console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight, ${T.pointLights.length} 个 SpotLight(投影)`);
     }
 
     function farthestPointSampling(points: any[], n: number) {
@@ -716,13 +716,13 @@ export default function BuildingScene() {
     function applyLighting(T: any) {
       const s = stateRef.current.lighting;
       const b = s.brightness;
-      // RectAreaLight 面光源（大小=灯具面板，向下柔和照亮下方区域）
+      // RectAreaLight 面光源（主照明，大小=灯具面板，向下柔和照亮下方区域）
       T.rectLights.forEach((light: any) => {
-        light.intensity = s.enabled ? b * 40 : 0;
+        light.intensity = s.enabled ? b * 80 : 0;
       });
-      // SpotLight 灯具主光源（投影+定向照亮）
+      // SpotLight 投影灯（少量，产生阴影）
       T.pointLights.forEach((light: any) => {
-        light.intensity = s.enabled ? b * 60 : 0;
+        light.intensity = s.enabled ? b * 50 : 0;
       });
       // 灯具自发光（灯罩明亮发光）
       T.lightFixtures.forEach((mesh: any) => {
@@ -1030,8 +1030,8 @@ export default function BuildingScene() {
   function applyLightingClosure(T: any, enabled: boolean, b: number) {
     stateRef.current.lighting.enabled = enabled;
     stateRef.current.lighting.brightness = b;
-    T.rectLights.forEach((light: any) => { light.intensity = enabled ? b * 40 : 0; });
-    T.pointLights.forEach((light: any) => { light.intensity = enabled ? b * 60 : 0; });
+    T.rectLights.forEach((light: any) => { light.intensity = enabled ? b * 80 : 0; });
+    T.pointLights.forEach((light: any) => { light.intensity = enabled ? b * 50 : 0; });
     T.lightFixtures.forEach((mesh: any) => {
       if (mesh.material && !mesh.userData._hlEmissive) {
         mesh.material.emissiveIntensity = enabled ? 3 + b * 4 : 0.05;
