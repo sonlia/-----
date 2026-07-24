@@ -522,7 +522,8 @@ export default function BuildingScene() {
         // RectAreaLight: X轴=长边, Y轴=短边, Z轴=法线
         const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
         const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
-        rectLight.position.copy(center);
+        // 位置下移一点，避免被天花板/墙体遮挡光线
+        rectLight.position.copy(center).add(normal.clone().multiplyScalar(0.15));
         rectLight.quaternion.setFromRotationMatrix(rotMatrix);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
