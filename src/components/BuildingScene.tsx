@@ -447,50 +447,59 @@ export default function BuildingScene() {
 
       fixtures.forEach((f, i) => {
         const { mesh } = f;
-        // === 用灯具几何体的4个顶点世界坐标精确计算 RectAreaLight ===
+        // === 基于灯具4个顶点世界坐标精确计算 RectAreaLight ===
         mesh.updateWorldMatrix(true, false);
         const posAttr = mesh.geometry.attributes.position;
-        // 取所有顶点的世界坐标
         const worldVerts: THREE.Vector3[] = [];
         for (let v = 0; v < posAttr.count; v++) {
           const wv = new THREE.Vector3().fromBufferAttribute(posAttr, v);
           mesh.localToWorld(wv);
           worldVerts.push(wv);
         }
-        // 中心点 = 4顶点平均
+        if (worldVerts.length < 3) return;
+
+        // 1. 计算法线（前3顶点叉积），确保朝下
+        const v0 = worldVerts[0], v1 = worldVerts[1], v2 = worldVerts[2];
+        const normal = new THREE.Vector3().crossVectors(
+          new THREE.Vector3().subVectors(v1, v0),
+          new THREE.Vector3().subVectors(v2, v0)
+        ).normalize();
+        if (normal.y > 0) normal.negate();
+
+        // 2. 用凸包排序4个顶点（按法线平面投影后排序），得到正确的相邻边
+        // 选两个与法线垂直的基向量
+        const ref = Math.abs(normal.x) > 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+        const basisU = new THREE.Vector3().crossVectors(normal, ref).normalize();
+        const basisV = new THREE.Vector3().crossVectors(normal, basisU).normalize();
+        // 投影到 2D 并按角度排序
+        const sorted = worldVerts.map(v => {
+          const d = new THREE.Vector3().subVectors(v, v0);
+          return { v, u: d.dot(basisU), w: d.dot(basisV), angle: Math.atan2(d.dot(basisV), d.dot(basisU)) };
+        }).sort((a, b) => a.angle - b.angle);
+
+        // 3. 计算4条边长度，找最长边作为长边方向
+        let maxLen = 0, longDir = new THREE.Vector3(1, 0, 0), longIdx = 0;
+        for (let k = 0; k < sorted.length; k++) {
+          const a = sorted[k].v;
+          const b = sorted[(k + 1) % sorted.length].v;
+          const d = new THREE.Vector3().subVectors(b, a);
+          const len = d.length();
+          if (len > maxLen) { maxLen = len; longDir = d.clone().normalize(); longIdx = k; }
+        }
+        const width = maxLen;
+
+        // 4. 短边方向 = 法线 × 长边方向（垂直于长边，在面板平面内）
+        const shortDir = new THREE.Vector3().crossVectors(normal, longDir).normalize();
+        // 短边长度 = 相邻于长边的下一条边的长度
+        const shortA = sorted[(longIdx + 1) % sorted.length].v;
+        const shortB = sorted[(longIdx + 2) % sorted.length].v;
+        const height = new THREE.Vector3().subVectors(shortB, shortA).length();
+
+        // 5. 中心点 = 4顶点平均
         const center = new THREE.Vector3();
         worldVerts.forEach(v => center.add(v));
         center.divideScalar(worldVerts.length);
-        // 找最长边：计算相邻顶点间距离，取最长作为长边方向
-        // 假设顶点是按顺序排列的(三角形扇或四边形)，计算所有相邻边
-        let maxLen = 0;
-        let longDir = new THREE.Vector3(1, 0, 0);
-        for (let a = 0; a < worldVerts.length; a++) {
-          for (let b = a + 1; b < worldVerts.length; b++) {
-            const d = new THREE.Vector3().subVectors(worldVerts[b], worldVerts[a]);
-            const len = d.length();
-            if (len > maxLen) { maxLen = len; longDir = d.clone().normalize(); }
-          }
-        }
-        const width = maxLen; // 长边长度
-        // 短边方向：与长边垂直且在面板平面内，用另一对顶点计算
-        // 找与长边中点最近的另一顶点，计算短边长度
-        // 用叉积算法线，再算短边
-        const v0 = worldVerts[0], v1 = worldVerts[1], v2 = worldVerts[2];
-        const e1 = new THREE.Vector3().subVectors(v1, v0);
-        const e2 = new THREE.Vector3().subVectors(v2, v0);
-        const normal = new THREE.Vector3().crossVectors(e1, e2).normalize();
-        if (normal.y > 0) normal.negate(); // 法线朝下
-        // 短边方向 = 法线 × 长边方向
-        const shortDir = new THREE.Vector3().crossVectors(normal, longDir).normalize();
-        // 短边长度：投影任意顶点到短边方向的距离范围
-        let minProj = Infinity, maxProj = -Infinity;
-        worldVerts.forEach(v => {
-          const p = new THREE.Vector3().subVectors(v, center).dot(shortDir);
-          if (p < minProj) minProj = p;
-          if (p > maxProj) maxProj = p;
-        });
-        const height = maxProj - minProj;
+
         // RectAreaLight: X轴=长边, Y轴=短边, Z轴=法线
         const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
         const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
