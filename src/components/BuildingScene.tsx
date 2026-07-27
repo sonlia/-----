@@ -447,38 +447,85 @@ export default function BuildingScene() {
 
       fixtures.forEach((f, i) => {
         const { mesh } = f;
-        // === 直接复制 mesh 世界变换，确保位置/旋转与灯具完全一致 ===
+        // === 找出灯具矩形面板的4个角顶点，用角顶点计算位置/旋转/尺寸 ===
         mesh.updateWorldMatrix(true, false);
-        const meshQuat = mesh.getWorldQuaternion(new THREE.Quaternion());
-        const meshScale = mesh.getWorldScale(new THREE.Vector3());
+        const posAttr = mesh.geometry.attributes.position;
+        // 取所有顶点的世界坐标
+        const worldVerts: THREE.Vector3[] = [];
+        for (let v = 0; v < posAttr.count; v++) {
+          const wv = new THREE.Vector3().fromBufferAttribute(posAttr, v);
+          mesh.localToWorld(wv);
+          worldVerts.push(wv);
+        }
+        if (worldVerts.length < 3) return;
 
-        // 本地包围盒（精确面板尺寸和几何中心）
-        const localBox = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position);
-        const localSize = localBox.getSize(new THREE.Vector3());
-        const localCenter = localBox.getCenter(new THREE.Vector3());
+        // 1. 计算法线（前3顶点叉积），确保朝下
+        const v0 = worldVerts[0], v1 = worldVerts[1], v2 = worldVerts[2];
+        const normal = new THREE.Vector3().crossVectors(
+          new THREE.Vector3().subVectors(v1, v0),
+          new THREE.Vector3().subVectors(v2, v0)
+        ).normalize();
+        if (normal.y > 0) normal.negate();
 
-        // 尺寸：本地 X/Z × 世界缩放
-        const width = Math.abs(localSize.x) * Math.abs(meshScale.x);
-        const height = Math.abs(localSize.z) * Math.abs(meshScale.z);
+        // 2. 构造面板平面的2D基向量，投影顶点到2D
+        const ref = Math.abs(normal.x) > 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+        const basisU = new THREE.Vector3().crossVectors(normal, ref).normalize();
+        const basisV = new THREE.Vector3().crossVectors(normal, basisU).normalize();
+        const pts2d = worldVerts.map(v => {
+          const d = new THREE.Vector3().subVectors(v, v0);
+          return { v, u: d.dot(basisU), w: d.dot(basisV) };
+        });
 
-        // 位置：本地包围盒中心经世界变换（精确几何中心，非顶点平均）
-        const worldCenter = localCenter.clone().applyMatrix4(mesh.matrixWorld);
+        // 3. 凸包算法(Andrew单调链)找出外轮廓顶点（即矩形4个角）
+        const sorted2d = pts2d.slice().sort((a, b) => a.u - b.u || a.w - b.w);
+        const cross2d = (o: any, a: any, b: any) => (a.u - o.u) * (b.w - o.w) - (a.w - o.w) * (b.u - o.u);
+        const lower: any[] = [];
+        for (const p of sorted2d) {
+          while (lower.length >= 2 && cross2d(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+          lower.push(p);
+        }
+        const upper: any[] = [];
+        for (let k = sorted2d.length - 1; k >= 0; k--) {
+          const p = sorted2d[k];
+          while (upper.length >= 2 && cross2d(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+          upper.push(p);
+        }
+        const hull = lower.slice(0, -1).concat(upper.slice(0, -1)); // 凸包=矩形4个角(按顺序)
 
-        // 灯具三轴的世界方向
-        const meshX = new THREE.Vector3(1, 0, 0).applyQuaternion(meshQuat);
-        const meshY = new THREE.Vector3(0, 1, 0).applyQuaternion(meshQuat);
-        const meshZ = new THREE.Vector3(0, 0, 1).applyQuaternion(meshQuat);
-        // 法线朝下（灯具向下照）
-        const lightNormal = meshY.y > 0 ? meshY.clone().negate() : meshY.clone();
+        // 4. 位置 = 4个角顶点平均（精确几何中心）
+        const center = new THREE.Vector3();
+        hull.forEach(p => center.add(p.v));
+        center.divideScalar(hull.length);
 
-        // 旋转矩阵：RectLight X=灯具X(宽), Y=灯具Z(高), Z=法线
-        const rotMatrix = new THREE.Matrix4().makeBasis(meshX, meshZ, lightNormal);
+        // 5. 长边方向 = 凸包最长边的方向
+        let maxLen = 0, longDir = new THREE.Vector3(1, 0, 0);
+        for (let k = 0; k < hull.length; k++) {
+          const a = hull[k].v;
+          const b = hull[(k + 1) % hull.length].v;
+          const d = new THREE.Vector3().subVectors(b, a);
+          const len = d.length();
+          if (len > maxLen) { maxLen = len; longDir = d.clone().normalize(); }
+        }
+        const width = maxLen; // 长边长度
+
+        // 6. 短边方向 = 法线 × 长边方向，短边长度 = 凸包在短边方向投影范围
+        const shortDir = new THREE.Vector3().crossVectors(normal, longDir).normalize();
+        let minProj = Infinity, maxProj = -Infinity;
+        hull.forEach(p => {
+          const proj = new THREE.Vector3().subVectors(p.v, center).dot(shortDir);
+          if (proj < minProj) minProj = proj;
+          if (proj > maxProj) maxProj = proj;
+        });
+        const height = maxProj - minProj;
+
+        // 7. 旋转矩阵：RectLight X=长边, Y=短边, Z=法线
+        const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
         const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
         // 位置沿法线下移 0.5 远离天花板
-        rectLight.position.copy(worldCenter).add(lightNormal.clone().multiplyScalar(0.5));
+        rectLight.position.copy(center).add(normal.clone().multiplyScalar(0.5));
         rectLight.quaternion.setFromRotationMatrix(rotMatrix);
-        // 绕 RectLight X 轴翻转 180°：X 不变(长边对齐)，Y/Z 反转，-Z 从朝上变朝下，光朝下
-        const flipQuat = new THREE.Quaternion().setFromAxisAngle(meshX, Math.PI);
+        // 绕长边翻转180°让光朝下（-Z 从朝上变朝下）
+        const flipQuat = new THREE.Quaternion().setFromAxisAngle(longDir, Math.PI);
         rectLight.quaternion.multiply(flipQuat);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
