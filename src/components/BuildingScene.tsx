@@ -521,14 +521,16 @@ export default function BuildingScene() {
         worldVerts.forEach(v => center.add(v));
         center.divideScalar(worldVerts.length);
 
-        // RectAreaLight: 实测 Three.js 中照射方向是 -Z（不是+Z）
-        // normal 朝下(y<0)，要让光朝下照，需让 -Z = normal 朝下，即 +Z = -normal 朝上
-        // 所以 Z 轴用 -normal（朝上），实际照射方向 -Z = normal 朝下
-        const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal.clone().negate());
+        // RectAreaLight: makeBasis 保持面板朝向与灯具一致(长边/短边/法线对齐)
+        const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
         const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
         // 位置沿法线下移，远离天花板避免被遮挡
         rectLight.position.copy(center).add(normal.clone().multiplyScalar(0.5));
         rectLight.quaternion.setFromRotationMatrix(rotMatrix);
+        // RectAreaLight 沿本地 -Z 照射，normal 在 +Z 位置朝下，-Z=朝上，光朝上错了
+        // 绕长边轴(X)旋转180°，翻转面板让 -Z 朝下，同时保持长边方向不变
+        const flipQuat = new THREE.Quaternion().setFromAxisAngle(longDir, Math.PI);
+        rectLight.quaternion.multiply(flipQuat);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
