@@ -518,8 +518,9 @@ export default function BuildingScene() {
         });
         const height = maxProj - minProj;
 
-        // 旋转矩阵：RectLight X=长边, Y=短边, Z=-normal(朝上)
-        // 这样 -Z = normal 朝下，光垂直照射地面，且保持长边/短边方向不变
+        // 7. 旋转矩阵：RectLight X=长边, Y=短边, Z=normal*-1(朝上)
+        // RectAreaLight 沿 -Z 照射，-Z = normal 朝下，光垂直照射地面
+        // 保持 makeBasis 旋转与灯具完全一致，只用 normal*-1 反转照射方向
         const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal.clone().negate());
         const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
         // 位置沿法线下移 0.5 远离天花板
@@ -528,9 +529,9 @@ export default function BuildingScene() {
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
-        // 显示灯具 mesh(橙色线框) + Helper(品红) 对比位置和旋转
-        mesh.visible = true;
-        (mesh as any).material = new (THREE as any).MeshBasicMaterial({ color: 0xff8800, side: THREE.DoubleSide, wireframe: true });
+        // 隐藏原始灯具 mesh（用 RectAreaLight 面光源替代）
+        mesh.visible = false;
+        // 显示 RectAreaLightHelper 边框（品红色），方便查看旋转/位置
         const helper = new RectAreaLightHelper(rectLight, 0xff00ff);
         helper.name = `__rectHelper_${i}`;
         T.scene.add(helper);
