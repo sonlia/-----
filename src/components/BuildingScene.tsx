@@ -311,7 +311,7 @@ export default function BuildingScene() {
           setupPointLights(T);
           setupAirflow(T);
           setupGround(T);
-          setupDeviceMarkers(T);
+          // 空调脉冲标记光柱已移除（影响灯光选择和视觉）
           fitCameraToModel(T);
           applyLighting(T);
           applyAC(T);
@@ -534,6 +534,10 @@ export default function BuildingScene() {
         T.rectLights.push(rectLight);
         // 隐藏原始灯具 mesh（用 RectAreaLight 面光源替代）
         mesh.visible = false;
+        // 显示 RectAreaLightHelper 边框（品红色），方便查看旋转/位置是否与模型一致
+        const helper = new RectAreaLightHelper(rectLight, 0xff00ff);
+        helper.name = `__rectHelper_${i}`;
+        T.scene.add(helper);
       });
       T.rectHelpers = T.rectLights.map((l: any) => T.scene.getObjectByName(`__rectHelper_${T.rectLights.indexOf(l)}`));
       console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (已隐藏原始模型，显示 Helper)`);
