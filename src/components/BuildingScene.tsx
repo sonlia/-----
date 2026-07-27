@@ -527,9 +527,11 @@ export default function BuildingScene() {
         // 位置沿法线下移，远离天花板避免被遮挡
         rectLight.position.copy(center).add(normal.clone().multiplyScalar(0.5));
         rectLight.quaternion.setFromRotationMatrix(rotMatrix);
-        // RectAreaLight 照射方向需朝下(法线方向)，用 lookAt 让 -Z 指向下方
-        // lookAt 会让物体的 -Z 朝向目标点，目标=位置+normal(下方)
-        rectLight.lookAt(rectLight.position.clone().add(normal));
+        // RectAreaLight 沿 -Z 照射，normal 在 +Z 朝下，-Z 朝上(错)
+        // 绕长边轴(longDir)旋转180°：长边不变，短边和法线翻转
+        // 翻转后 +Z=-normal 朝上，-Z=normal 朝下，光朝下照地面
+        const flipQuat = new THREE.Quaternion().setFromAxisAngle(longDir, Math.PI);
+        rectLight.quaternion.multiply(flipQuat);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
