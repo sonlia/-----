@@ -459,12 +459,14 @@ export default function BuildingScene() {
         }
         if (worldVerts.length < 3) return;
 
-        // 1. 计算法线（前3顶点叉积），确保朝下
+        // 1. 计算法线（前3顶点叉积）
         const v0 = worldVerts[0], v1 = worldVerts[1], v2 = worldVerts[2];
         const normal = new THREE.Vector3().crossVectors(
           new THREE.Vector3().subVectors(v1, v0),
           new THREE.Vector3().subVectors(v2, v0)
         ).normalize();
+        // Blender 导出模型 Z 轴朝上，Three.js Y 轴朝上，法线方向可能反
+        // 确保法线朝下（y < 0），灯具向下照
         if (normal.y > 0) normal.negate();
 
         // 2. 构造面板平面的2D基向量
@@ -519,8 +521,10 @@ export default function BuildingScene() {
         worldVerts.forEach(v => center.add(v));
         center.divideScalar(worldVerts.length);
 
-        // RectAreaLight: X轴=长边, Y轴=短边, Z轴=法线
-        const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
+        // RectAreaLight: 实测 Three.js 中照射方向是 -Z（不是+Z）
+        // normal 朝下(y<0)，要让光朝下照，需让 -Z = normal 朝下，即 +Z = -normal 朝上
+        // 所以 Z 轴用 -normal（朝上），实际照射方向 -Z = normal 朝下
+        const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal.clone().negate());
         const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
         // 位置沿法线下移，远离天花板避免被遮挡
         rectLight.position.copy(center).add(normal.clone().multiplyScalar(0.5));
