@@ -495,56 +495,41 @@ export default function BuildingScene() {
         }
         const hull = lower.slice(0, -1).concat(upper.slice(0, -1)); // 凸包顶点(按顺序)
 
-        // 4. 在凸包边中找最长边作为长边方向
-        let maxLen = 0, longDir = new THREE.Vector3(1, 0, 0), longIdx = 0;
-        for (let k = 0; k < hull.length; k++) {
-          const a = hull[k].v;
-          const b = hull[(k + 1) % hull.length].v;
-          const d = new THREE.Vector3().subVectors(b, a);
-          const len = d.length();
-          if (len > maxLen) { maxLen = len; longDir = d.clone().normalize(); longIdx = k; }
-        }
-        const width = maxLen;
-
-        // 5. 短边方向 = 法线 × 长边方向，短边长度 = 凸包在短边方向的投影范围
-        const shortDir = new THREE.Vector3().crossVectors(normal, longDir).normalize();
-        let minProj = Infinity, maxProj = -Infinity;
-        hull.forEach(p => {
-          const proj = new THREE.Vector3().subVectors(p.v, v0).dot(shortDir);
-          if (proj < minProj) minProj = proj;
-          if (proj > maxProj) maxProj = proj;
-        });
-        const height = maxProj - minProj;
-
-        // 尺寸用本地包围盒×世界缩放（更精确）
+        // 4. 长边方向：用本地包围盒判断（本地X大则长边沿meshX，本地Z大则沿meshZ）
+        // 比凸包最长边更稳定（凸包对正方形面板会选错）
+        const meshQuat = mesh.getWorldQuaternion(new THREE.Quaternion());
         const meshScale = mesh.getWorldScale(new THREE.Vector3());
-        const localBox2 = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position);
-        const localSize2 = localBox2.getSize(new THREE.Vector3());
-        const finalWidth = Math.abs(localSize2.x) * Math.abs(meshScale.x);
-        const finalHeight = Math.abs(localSize2.z) * Math.abs(meshScale.z);
+        const localBox = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position);
+        const localSize = localBox.getSize(new THREE.Vector3());
+        const meshX = new THREE.Vector3(1, 0, 0).applyQuaternion(meshQuat);
+        const meshZ = new THREE.Vector3(0, 0, 1).applyQuaternion(meshQuat);
+        // 本地尺寸 × 世界缩放 = 世界尺寸
+        const worldSizeX = Math.abs(localSize.x) * Math.abs(meshScale.x);
+        const worldSizeZ = Math.abs(localSize.z) * Math.abs(meshScale.z);
+        const longDir = worldSizeX >= worldSizeZ ? meshX.clone() : meshZ.clone();
+        const width = Math.max(worldSizeX, worldSizeZ);   // 长边长度
 
-        // 6. 中心点 = 所有原始顶点平均（最接近几何中心，凸包顶点分布不均时更准）
+        // 5. 短边方向 = 法线 × 长边方向
+        const shortDir = new THREE.Vector3().crossVectors(normal, longDir).normalize();
+        const height = Math.min(worldSizeX, worldSizeZ);  // 短边长度
+
+        // 6. 中心点 = 所有原始顶点平均
         const center = new THREE.Vector3();
         worldVerts.forEach(v => center.add(v));
         center.divideScalar(worldVerts.length);
 
-        // RectAreaLight: 直接复制灯具 mesh 的世界旋转，确保朝向完全一致
-        // 灯具面板在本地 XZ 平面(法线沿 Y)，RectAreaLight 发光面在本地 XY 平面(法线沿 Z)
-        // 需建立轴映射：灯具X→RectLight X, 灯具Z→RectLight Y, 灯具Y(法线)→RectLight Z
-        const meshQuat = mesh.getWorldQuaternion(new THREE.Quaternion());
-        const meshX = new THREE.Vector3(1, 0, 0).applyQuaternion(meshQuat);
-        const meshY = new THREE.Vector3(0, 1, 0).applyQuaternion(meshQuat);
-        const meshZ = new THREE.Vector3(0, 0, 1).applyQuaternion(meshQuat);
-        // 法线朝下
-        const lightNormal = meshY.y > 0 ? meshY.clone().negate() : meshY.clone();
-        // 旋转矩阵：X=灯具X(宽), Y=灯具Z(高), Z=法线
-        const rotMatrix = new THREE.Matrix4().makeBasis(meshX, meshZ, lightNormal);
-        const rectLight = new THREE.RectAreaLight(0xffcc44, 0, finalWidth, finalHeight);
+        // RectAreaLight: 回到 makeBasis(longDir, shortDir, normal) 旋转(之前验证正确)
+        // 灯具面板在本地 XZ 平面，RectAreaLight 发光面在 XY 平面
+        // 轴映射：长边→X, 短边→Y, 法线→Z
+        const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
+        const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
         // 位置沿法线下移
-        rectLight.position.copy(center).add(lightNormal.clone().multiplyScalar(0.5));
+        rectLight.position.copy(center).add(normal.clone().multiplyScalar(0.5));
         rectLight.quaternion.setFromRotationMatrix(rotMatrix);
-        // 绕长边(meshX)翻转180°让光朝下
-        const flipQuat = new THREE.Quaternion().setFromAxisAngle(meshX, Math.PI);
+        // RectAreaLight 沿 -Z 照射，normal 在 +Z 朝下，-Z 朝上(错)
+        // 同时反转 Y 和 Z（等价于绕 X 轴翻转180°，保持右手系）：
+        // 短边 Y→-Y, 法线 Z→-Z(朝上)，-Z→朝下，光朝下
+        const flipQuat = new THREE.Quaternion().setFromAxisAngle(longDir, Math.PI);
         rectLight.quaternion.multiply(flipQuat);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
