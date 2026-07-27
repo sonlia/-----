@@ -518,14 +518,13 @@ export default function BuildingScene() {
         });
         const height = maxProj - minProj;
 
-        // 7. 旋转矩阵：RectLight X=长边, Y=短边, Z=法线
-        const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
+        // 旋转矩阵：RectLight X=长边, Y=短边, Z=-normal(朝上)
+        // 这样 -Z = normal 朝下，光垂直照射地面，且保持长边/短边方向不变
+        const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal.clone().negate());
         const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
         // 位置沿法线下移 0.5 远离天花板
         rectLight.position.copy(center).add(normal.clone().multiplyScalar(0.5));
         rectLight.quaternion.setFromRotationMatrix(rotMatrix);
-        // 用 lookAt 让 -Z 朝向下方(法线方向)，光垂直照射地面
-        rectLight.lookAt(rectLight.position.clone().add(normal));
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
