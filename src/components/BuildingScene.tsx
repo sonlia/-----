@@ -524,9 +524,8 @@ export default function BuildingScene() {
         // 位置沿法线下移 0.5 远离天花板
         rectLight.position.copy(center).add(normal.clone().multiplyScalar(0.5));
         rectLight.quaternion.setFromRotationMatrix(rotMatrix);
-        // 绕长边翻转180°让光朝下（-Z 从朝上变朝下）
-        const flipQuat = new THREE.Quaternion().setFromAxisAngle(longDir, Math.PI);
-        rectLight.quaternion.multiply(flipQuat);
+        // 用 lookAt 让 -Z 朝向下方(法线方向)，光垂直照射地面
+        rectLight.lookAt(rectLight.position.clone().add(normal));
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
