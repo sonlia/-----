@@ -522,12 +522,14 @@ export default function BuildingScene() {
         center.divideScalar(worldVerts.length);
 
         // RectAreaLight: makeBasis 保持面板朝向与灯具一致(长边/短边/法线对齐)
-        // RectAreaLight 沿 +Z 照射，+Z=normal 朝下，光朝下照亮地面
         const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
         const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
         // 位置沿法线下移，远离天花板避免被遮挡
         rectLight.position.copy(center).add(normal.clone().multiplyScalar(0.5));
         rectLight.quaternion.setFromRotationMatrix(rotMatrix);
+        // RectAreaLight 照射方向需朝下(法线方向)，用 lookAt 让 -Z 指向下方
+        // lookAt 会让物体的 -Z 朝向目标点，目标=位置+normal(下方)
+        rectLight.lookAt(rectLight.position.clone().add(normal));
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
