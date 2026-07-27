@@ -516,21 +516,35 @@ export default function BuildingScene() {
         });
         const height = maxProj - minProj;
 
+        // 尺寸用本地包围盒×世界缩放（更精确）
+        const meshScale = mesh.getWorldScale(new THREE.Vector3());
+        const localBox2 = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position);
+        const localSize2 = localBox2.getSize(new THREE.Vector3());
+        const finalWidth = Math.abs(localSize2.x) * Math.abs(meshScale.x);
+        const finalHeight = Math.abs(localSize2.z) * Math.abs(meshScale.z);
+
         // 6. 中心点 = 所有原始顶点平均（最接近几何中心，凸包顶点分布不均时更准）
         const center = new THREE.Vector3();
         worldVerts.forEach(v => center.add(v));
         center.divideScalar(worldVerts.length);
 
-        // RectAreaLight: makeBasis 保持面板朝向与灯具一致(长边/短边/法线对齐)
-        const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
-        const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
-        // 位置沿法线下移，远离天花板避免被遮挡
-        rectLight.position.copy(center).add(normal.clone().multiplyScalar(0.5));
+        // RectAreaLight: 直接复制灯具 mesh 的世界旋转，确保朝向完全一致
+        // 灯具面板在本地 XZ 平面(法线沿 Y)，RectAreaLight 发光面在本地 XY 平面(法线沿 Z)
+        // 需建立轴映射：灯具X→RectLight X, 灯具Z→RectLight Y, 灯具Y(法线)→RectLight Z
+        const meshQuat = mesh.getWorldQuaternion(new THREE.Quaternion());
+        const meshX = new THREE.Vector3(1, 0, 0).applyQuaternion(meshQuat);
+        const meshY = new THREE.Vector3(0, 1, 0).applyQuaternion(meshQuat);
+        const meshZ = new THREE.Vector3(0, 0, 1).applyQuaternion(meshQuat);
+        // 法线朝下
+        const lightNormal = meshY.y > 0 ? meshY.clone().negate() : meshY.clone();
+        // 旋转矩阵：X=灯具X(宽), Y=灯具Z(高), Z=法线
+        const rotMatrix = new THREE.Matrix4().makeBasis(meshX, meshZ, lightNormal);
+        const rectLight = new THREE.RectAreaLight(0xffcc44, 0, finalWidth, finalHeight);
+        // 位置沿法线下移
+        rectLight.position.copy(center).add(lightNormal.clone().multiplyScalar(0.5));
         rectLight.quaternion.setFromRotationMatrix(rotMatrix);
-        // RectAreaLight 沿 -Z 照射，normal 在 +Z 朝下，-Z 朝上(错)
-        // 绕长边轴(longDir)旋转180°：长边不变，短边和法线翻转
-        // 翻转后 +Z=-normal 朝上，-Z=normal 朝下，光朝下照地面
-        const flipQuat = new THREE.Quaternion().setFromAxisAngle(longDir, Math.PI);
+        // 绕长边(meshX)翻转180°让光朝下
+        const flipQuat = new THREE.Quaternion().setFromAxisAngle(meshX, Math.PI);
         rectLight.quaternion.multiply(flipQuat);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
