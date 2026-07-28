@@ -675,9 +675,17 @@ export default function BuildingScene() {
       const center = box.getCenter(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = T.camera.fov * Math.PI / 180;
-      let dist = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-      dist *= 1.5;
+      // 计算视窗宽高比，适配横屏大屏
+      const aspect = window.innerWidth / window.innerHeight;
+      // 水平 FOV（根据垂直 FOV 和宽高比换算）
+      const fovH = 2 * Math.atan(Math.tan(fov / 2) * aspect);
+      // 取垂直和水平方向所需距离的较小值，确保模型完全可见且尽量充满视窗
+      const distV = Math.abs(size.y / 2 / Math.tan(fov / 2));
+      const distH = Math.abs(size.x / 2 / Math.tan(fovH / 2));
+      let dist = Math.max(distV, distH);
+      dist *= 1.08; // 留少量边距，模型尽量充满视窗
       T.camera.position.set(center.x + dist * 0.7, center.y + dist * 0.45, center.z + dist * 0.9);
+      T.camera.lookAt(center);
       T.controls.target.set(center.x, center.y, center.z);
       T.controls.update();
     }
