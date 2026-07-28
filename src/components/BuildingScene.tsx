@@ -132,15 +132,15 @@ export default function BuildingScene() {
       animate();
     };
 
-    // ===== 环境（弱环境光 + 方向光投影，HDR 仅用于微反射） =====
+    // ===== 环境（白膜效果：适当环境光 + 方向光投影 + HDR 反射） =====
     function setupEnvironment(T: any) {
-      // 极弱环境光（仅防止全黑，RectAreaLight 主导照明）
-      const ambient = new THREE.AmbientLight(0x445577, 0.05);
+      // 环境光（白膜需要适当环境光体现立体感）
+      const ambient = new THREE.AmbientLight(0xb0c4de, 0.4);
       ambient.name = '__ambient';
       T.scene.add(ambient);
 
-      // 弱方向光（仅投影，不抢 RectAreaLight 主光源）
-      const dirLight = new THREE.DirectionalLight(0xfff5e0, 0.3);
+      // 方向光（投影 + 主照明）
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
       dirLight.position.set(30, 45, 18);
       dirLight.target.position.set(0, 0, 0);
       dirLight.castShadow = true;
@@ -157,8 +157,8 @@ export default function BuildingScene() {
       T.scene.add(dirLight.target);
       dirLight.name = '__directional';
 
-      // 半球光（极弱）
-      const hemi = new THREE.HemisphereLight(0x334455, 0x111122, 0.08);
+      // 半球光（天空/地面反射，让白膜有冷暖变化）
+      const hemi = new THREE.HemisphereLight(0xc4d8f0, 0x808890, 0.35);
       hemi.name = '__hemi';
       T.scene.add(hemi);
 
@@ -171,7 +171,7 @@ export default function BuildingScene() {
       rgbeLoader.load('/studio_small.hdr', (envTexture: any) => {
         envTexture.mapping = THREE.EquirectangularReflectionMapping;
         T.scene.environment = envTexture;
-        T.scene.environmentIntensity = 0.15; // 很低，仅微反射
+        T.scene.environmentIntensity = 0.4; // 适当反射，白膜有质感不发灰
         T.envTexture = envTexture;
         console.log('HDR 环境贴图加载完成');
       }, undefined, (err: any) => {
@@ -381,19 +381,18 @@ export default function BuildingScene() {
     // 配色：深青蓝主体 + 金属质感，与 UI 青色主题呼应
     function makeThemeMaterial(type: 'wall' | 'furniture' | 'logo' | 'light' | 'ac' | 'default') {
       const presets: Record<string, any> = {
-        // 墙体：纯漫反射，无反射，清晰投影
-        // 墙体：中性灰蓝，纯漫反射，调亮便于看清细节
-        wall: { color: 0x4a5870, metalness: 0.0, roughness: 1.0, emissive: 0x1a2238, emissiveIntensity: 0.15, envMapIntensity: 0.0 },
-        // 桌椅：中青蓝，调亮
-        furniture: { color: 0x3a5878, metalness: 0.25, roughness: 0.55, emissive: 0x1a2840, emissiveIntensity: 0.1, envMapIntensity: 0.6 },
+        // 墙体：白膜效果，纯白漫反射，干净有光影
+        wall: { color: 0xe8eef5, metalness: 0.0, roughness: 0.85, emissive: 0x000000, emissiveIntensity: 0.0, envMapIntensity: 0.3 },
+        // 桌椅：浅灰白，略带反射
+        furniture: { color: 0xd8e0e8, metalness: 0.1, roughness: 0.7, emissive: 0x000000, emissiveIntensity: 0.0, envMapIntensity: 0.4 },
         // logo 装饰：亮青色，高金属反射
         logo: { color: 0x3a6a9a, metalness: 0.6, roughness: 0.3, emissive: 0x00d4ff, emissiveIntensity: 0.15, envMapIntensity: 1.0 },
         // 灯具：暖白发光灯罩 + 青色外壳
         light: { color: 0x4a6080, metalness: 0.5, roughness: 0.35, emissive: 0xffcc44, emissiveIntensity: 0.8, envMapIntensity: 0.8 },
         // 空调：冷青蓝金属，干净反光
         ac: { color: 0x4a8ab8, metalness: 0.7, roughness: 0.25, emissive: 0x103040, emissiveIntensity: 0.05, envMapIntensity: 1.0 },
-        // 默认：通用科技青
-        default: { color: 0x2a4a6a, metalness: 0.3, roughness: 0.6, emissive: 0x081830, emissiveIntensity: 0.08, envMapIntensity: 0.6 },
+        // 默认：白膜
+        default: { color: 0xe0e6ed, metalness: 0.0, roughness: 0.8, emissive: 0x000000, emissiveIntensity: 0.0, envMapIntensity: 0.3 },
       };
       const p = presets[type] || presets.default;
       return new THREE.MeshStandardMaterial({
@@ -817,14 +816,14 @@ export default function BuildingScene() {
       }
       // 关灯时：所有光源全部归零，空间完全变黑
       const ambient = T.scene.getObjectByName('__ambient');
-      if (ambient) ambient.intensity = s.enabled ? 0.05 : 0;
+      if (ambient) ambient.intensity = s.enabled ? 0.4 : 0;
       const hemi = T.scene.getObjectByName('__hemi');
-      if (hemi) hemi.intensity = s.enabled ? 0.08 : 0;
+      if (hemi) hemi.intensity = s.enabled ? 0.35 : 0;
       const dirLight = T.scene.getObjectByName('__directional');
-      if (dirLight) dirLight.intensity = s.enabled ? 0.3 : 0;
+      if (dirLight) dirLight.intensity = s.enabled ? 0.8 : 0;
       // HDR 环境贴图强度归零，关灯时移除环境贴图避免残余反射
       if (T.scene.environmentIntensity !== undefined) {
-        T.scene.environmentIntensity = s.enabled ? 0.15 : 0;
+        T.scene.environmentIntensity = s.enabled ? 0.4 : 0;
       }
       if (!s.enabled) {
         T.scene.environment = null;
@@ -1151,13 +1150,13 @@ export default function BuildingScene() {
       T.rectHelpers.forEach((h: any) => { if (h) h.visible = enabled; });
     }
     const ambient = T.scene.getObjectByName('__ambient');
-    if (ambient) ambient.intensity = enabled ? 0.05 : 0;
+    if (ambient) ambient.intensity = enabled ? 0.4 : 0;
     const hemi = T.scene.getObjectByName('__hemi');
-    if (hemi) hemi.intensity = enabled ? 0.08 : 0;
+    if (hemi) hemi.intensity = enabled ? 0.35 : 0;
     const dirLight = T.scene.getObjectByName('__directional');
-    if (dirLight) dirLight.intensity = enabled ? 0.3 : 0;
+    if (dirLight) dirLight.intensity = enabled ? 0.8 : 0;
     if (T.scene.environmentIntensity !== undefined) {
-      T.scene.environmentIntensity = enabled ? 0.15 : 0;
+      T.scene.environmentIntensity = enabled ? 0.4 : 0;
     }
     if (!enabled) {
       T.scene.environment = null;
@@ -1399,6 +1398,17 @@ export default function BuildingScene() {
             <span style={{ color: 'var(--text-dim)', marginLeft: 'auto' }}>较昨日</span>
           </div>
           <canvas className="kpi-chart" ref={powerChartRef} width={280} height={36}></canvas>
+          {/* 碳排放转换：中国电网平均碳排放因子 0.5810 kgCO₂/kWh */}
+          <div style={{ marginTop: '8px', padding: '6px 10px', background: 'rgba(0, 255, 204, 0.06)', borderLeft: '2px solid var(--cyan-glow)', borderRadius: '3px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-dim)', letterSpacing: '1px' }}>碳排放量</span>
+            <span style={{ fontFamily: 'Orbitron, monospace', fontSize: '14px', color: 'var(--cyan-glow)', fontWeight: 600 }}>
+              {(parseFloat(kpiPower || '0') * 0.5810).toFixed(2)} <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>kgCO₂/h</span>
+            </span>
+          </div>
+          <div style={{ marginTop: '4px', fontSize: '10px', color: 'var(--text-dim)', display: 'flex', justifyContent: 'space-between' }}>
+            <span>日累计</span>
+            <span style={{ fontFamily: 'Orbitron, monospace', color: 'var(--text-mid)' }}>{(parseFloat(kpiPower || '0') * 0.5810 * 24).toFixed(1)} kgCO₂</span>
+          </div>
         </div>
 
         <div className="control-group">
@@ -1553,7 +1563,7 @@ export default function BuildingScene() {
           <div className="fi-item"><div className="fi-label">楼层</div><div className="fi-value">F1<span className="sub">/1F</span></div></div>
           <div className="fi-item"><div className="fi-label">工位数量</div><div className="fi-value">86<span className="sub">个</span></div></div>
           <div className="fi-item"><div className="fi-label">在线人数</div><div className="fi-value">{onlinePeople}<span className="sub">人</span></div></div>
-          <div className="fi-item"><div className="fi-label">CO₂ 浓度</div><div className="fi-value">420<span className="sub">ppm</span></div></div>
+          <div className="fi-item"><div className="fi-label">碳排放速率</div><div className="fi-value" style={{color:'var(--cyan-glow)'}}>{(totalPowerVal * 0.5810).toFixed(2)}<span className="sub">kg/h</span></div></div>
           <div className="fi-item"><div className="fi-label">空气湿度</div><div className="fi-value">52<span className="sub">%</span></div></div>
         </div>
       </div>
@@ -1563,6 +1573,7 @@ export default function BuildingScene() {
         <div className="status-item"><div className="label">设备总数</div><div className="value">{totalDevices}<span className="unit">台</span></div></div>
         <div className="status-item"><div className="label">运行设备</div><div className="value good">{activeDevices}<span className="unit">台</span></div></div>
         <div className="status-item"><div className="label">总功率</div><div className="value">{totalPowerVal.toFixed(1)}<span className="unit">kW</span></div></div>
+        <div className="status-item"><div className="label">碳排放量</div><div className="value" style={{color:'var(--cyan-glow)'}}>{(totalPowerVal * 0.5810).toFixed(2)}<span className="unit">kgCO₂/h</span></div></div>
         <div className="status-item"><div className="label">平均温度</div><div className="value">{avgTemp}<span className="unit">°C</span></div></div>
         <div className="status-item"><div className="label">环境照度</div><div className="value">{luxVal}<span className="unit">lx</span></div></div>
         <div className="status-item"><div className="label">能耗等级</div><div className={'value ' + energyClass} style={{ fontSize: '20px' }}>{energyLevel}</div></div>
