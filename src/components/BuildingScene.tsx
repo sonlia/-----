@@ -310,7 +310,7 @@ export default function BuildingScene() {
 
           setupPointLights(T);
           setupAirflow(T);
-          setupGround(T);
+          // 地面平面已移除（用户要求去掉大平面正方形）
           // 空调脉冲标记光柱已移除（影响灯光选择和视觉）
           fitCameraToModel(T);
           applyLighting(T);
