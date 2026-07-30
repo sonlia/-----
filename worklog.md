@@ -265,3 +265,48 @@ Stage Summary:
 - 代码更简洁：从凸包算法(70+行)简化为直接矩阵变换(40行)
 - RectAreaLight 与灯具模型位置/旋转/大小完全匹配
 - GitHub 已同步
+
+---
+Task ID: cockpit-echarts-subsystems
+Agent: Super Z (main)
+Task: 升级能源总览为综合能源驾驶舱 - 5子系统三维度+ ECharts
+
+Work Log:
+- 用户反馈：
+  1. 部分Canvas图表可改用ECharts显示
+  2. 能源总览除配电网外，还要展示光伏/充电桩/空调节能/楼宇控制数据
+  3. 用于展示现状、发现问题、发现价值
+  4. 达到"结果导向、风险预警、价值呈现"
+
+- 安装依赖：echarts@6.1.0 + echarts-for-react@3.0.6
+
+- 新增 EChart 组件 (src/components/EChart.tsx):
+  · 统一包装器，暗色科技主题
+  · 通用配置：commonGrid/commonTooltip/commonAxis/PALETTE
+
+- CockpitPanel 完全重写，三层结构：
+  · 顶层 6 KPI: 总供电/能效/资产/消纳/风险/减碳
+  · 中层 5 子系统卡片(配电网/光伏/充电桩/空调节能/楼宇控制)
+    每张卡片含：现状数值 + spark趋势 + 风险预警 + 价值量化
+    风险预警按 ok/warn/danger 三色编码
+  · 主图区(ECharts):
+    - 24h 多源负荷堆叠面积图（电网+光伏+储能）
+    - 风险预警矩阵（散点图，概率×影响，颜色编码等级）
+    - 多源能源流向桑基图（源→负载流向）
+  · 价值区(ECharts):
+    - 子系统综合价值雷达（现状 vs 行业基准）
+    - 能效与潜力对比柱状图（5子系统）
+    - 减碳贡献构成环形饼图
+
+- VLM 视觉评价：
+  · 5子系统卡片清晰展示现状/问题/价值
+  · ECharts渲染质量良好，科技感强
+  · 完整体现结果导向+风险预警+价值呈现
+  · 1920×1080布局无溢出
+
+Stage Summary:
+- 提交 ID: 96d25bd（普通 push，未 force）
+- 改动：4 文件，+404 / -332
+- 能源总览从单一图表升级为5子系统综合驾驶舱
+- ECharts替代部分Canvas，图表能力大幅提升
+- GitHub 已同步
