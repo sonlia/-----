@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import CockpitPanel from './CockpitPanel';
+import SolarPanel from './SolarPanel';
+import CarbonPanel from './CarbonPanel';
 import * as THREE from 'three';
 import { WebGPURenderer, RectAreaLightNode } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -54,6 +57,7 @@ export default function BuildingScene() {
   const [temperature, setTemperature] = useState(24);
   const [autoRotate, setAutoRotate] = useState(false);
   const [showList, setShowList] = useState(true);
+  const [activeModule, setActiveModule] = useState<'overview' | 'building' | 'solar' | 'charging' | 'carbon'>('building');
 
   const [deviceList, setDeviceList] = useState<DeviceListItem[]>([]);
   const [activeDeviceIdx, setActiveDeviceIdx] = useState(-1);
@@ -1119,6 +1123,20 @@ export default function BuildingScene() {
   const onTopView = () => { const T = threeRef.current; if (T.modelRoot) { const box = new THREE.Box3().setFromObject(T.modelRoot); const c = box.getCenter(new THREE.Vector3()); const s = box.getSize(new THREE.Vector3()); const d = Math.max(s.x, s.z) * 1.1; T.cameraTween = { startPos: T.camera.position.clone(), endPos: new THREE.Vector3(c.x, c.y + d, c.z + 0.01), startTarget: T.controls.target.clone(), endTarget: c.clone(), time: 0, duration: 0.8 }; showToast('已切换至俯视视角'); } };
   const onToggleList = () => { setShowList(!showList); if (!showList) { const T = threeRef.current; if (T.selectedObject) deselectClosure(T); } };
 
+  // 模块切换
+  const onSwitchModule = (mod: 'overview' | 'building' | 'solar' | 'charging' | 'carbon') => {
+    setActiveModule(mod);
+    const T = threeRef.current;
+    if (!T.scene) return;
+    if (T.modelRoot) T.modelRoot.visible = (mod === 'building');
+    T.rectLights?.forEach((l: any) => { l.visible = (mod === 'building'); });
+    T.rectHelpers?.forEach((h: any) => { if (h) h.visible = (mod === 'building'); });
+    T.deviceMarkers?.forEach((m: any) => { m.group.visible = (mod === 'building'); });
+    T.airflowSystems?.forEach((s: any) => { s.points.visible = (mod === 'building'); });
+    if (mod === 'building') { T.fitCameraToModel?.(T); showToast('已切换至楼宇管理'); }
+    else { showToast('已切换至' + (mod === 'overview' ? '能源总览' : mod === 'solar' ? '光伏发电' : mod === 'charging' ? '充电桩' : '碳监测')); }
+  };
+
   // 闭包版状态应用（避免依赖 effect 内函数）
   function applyLightingClosure(T: any, enabled: boolean, b: number) {
     stateRef.current.lighting.enabled = enabled;
@@ -1370,7 +1388,28 @@ export default function BuildingScene() {
         </div>
       </div>
 
-      {/* 操作提示 */}
+      {/* 顶部模块导航栏 */}
+      <div style={{ position: 'absolute', top: '72px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '4px', background: 'var(--bg-panel)', border: '1px solid var(--border-line)', borderRadius: '6px', padding: '4px', backdropFilter: 'blur(14px)', zIndex: 45 }}>
+        {[
+          { id: 'overview', label: '能源总览', icon: '📊' },
+          { id: 'building', label: '楼宇管理', icon: '🏢' },
+          { id: 'solar', label: '光伏发电', icon: '☀' },
+          { id: 'charging', label: '充电桩', icon: '🔌' },
+          { id: 'carbon', label: '碳监测', icon: '🌱' },
+        ].map((mod) => (
+          <button key={mod.id} onClick={() => onSwitchModule(mod.id as any)} style={{ padding: '8px 18px', fontSize: '13px', fontWeight: 600, letterSpacing: '1px', border: '1px solid ' + (activeModule === mod.id ? 'var(--primary)' : 'transparent'), background: activeModule === mod.id ? 'var(--primary-bg)' : 'transparent', color: activeModule === mod.id ? 'var(--primary)' : 'var(--text-mid)', borderRadius: '4px', cursor: 'pointer', transition: 'all 0.25s', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: activeModule === mod.id ? '0 0 12px rgba(0,212,255,0.3)' : 'none' }}>
+            <span style={{ fontSize: '15px' }}>{mod.icon}</span><span>{mod.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* 各模块面板 */}
+      {activeModule === 'overview' && <CockpitPanel kpiPower={kpiPower} lightingOn={lightingOn} acOn={acOn} />}
+      {activeModule === 'solar' && <SolarPanel kpiPower={kpiPower} />}
+      {activeModule === 'carbon' && <CarbonPanel kpiPower={kpiPower} />}
+
+      {/* 操作提示 - 仅楼宇模块显示 */}
+      {activeModule === 'building' && (
       <div className="help-hint">
         <span><span className="key">L-DRAG</span> 旋转</span>
         <span><span className="key">R-DRAG</span> 平移</span>
@@ -1378,8 +1417,10 @@ export default function BuildingScene() {
         <span><span className="key">CLICK</span> 设备详情</span>
         <span><span className="key">DBL-CLICK</span> 聚焦</span>
       </div>
+      )}
 
-      {/* 左侧主面板 */}
+      {/* 左侧主面板 - 仅楼宇模块 */}
+      {activeModule === 'building' && (
       <div className="panel left-panel">
         <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
         <div className="panel-title">系统控制中心<span className="title-en">CTRL CENTER</span></div>
@@ -1466,9 +1507,10 @@ export default function BuildingScene() {
           </div>
         </div>
       </div>
+      )}
 
-      {/* 右侧设备列表面板 */}
-      {showList && (
+      {/* 右侧设备列表面板 - 仅楼宇模块 */}
+      {activeModule === 'building' && showList && (
         <div className="panel right-panel">
           <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
           <div className="panel-title">设备状态总览<span className="title-en">{totalDevices} UNITS</span></div>
@@ -1568,7 +1610,8 @@ export default function BuildingScene() {
         </div>
       </div>
 
-      {/* 底部状态栏 */}
+      {/* 底部状态栏 - 仅楼宇模块 */}
+      {activeModule === 'building' && (
       <div className="status-bar">
         <div className="status-item"><div className="label">设备总数</div><div className="value">{totalDevices}<span className="unit">台</span></div></div>
         <div className="status-item"><div className="label">运行设备</div><div className="value good">{activeDevices}<span className="unit">台</span></div></div>
@@ -1579,6 +1622,7 @@ export default function BuildingScene() {
         <div className="status-item"><div className="label">能耗等级</div><div className={'value ' + energyClass} style={{ fontSize: '20px' }}>{energyLevel}</div></div>
         <div className="status-item"><div className="label">系统状态</div><div className="value good" style={{ fontSize: '14px', letterSpacing: '2px' }}>NORMAL</div></div>
       </div>
+      )}
 
       {/* Toast */}
       {toastMsg && <div className="toast show">{toastMsg}</div>}
