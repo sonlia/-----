@@ -503,13 +503,13 @@ export default function BuildingScene() {
         // -Z = 法线(朝下) → 光垂直照射地面，无需额外翻转
         const rotMatrix = new THREE.Matrix4().makeBasis(meshWidth, meshHeight, lightNormal.clone().negate());
         const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
-        // 位置沿法线下移 0.5 远离天花板
-        rectLight.position.copy(worldCenter).add(lightNormal.clone().multiplyScalar(0.5));
+        // 位置 = 灯具包围盒中心（精确与灯具重合，不再加偏移）
+        rectLight.position.copy(worldCenter);
         rectLight.quaternion.setFromRotationMatrix(rotMatrix);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
-        // 隐藏原始灯具 mesh（用 RectAreaLight 面光源替代）
+        // 隐藏原始灯具 mesh（用 RectAreaLight 面光源替代，位置/旋转/尺寸与原灯具完全一致）
         mesh.visible = false;
         // 显示 RectAreaLightHelper 边框（品红色），方便查看旋转/位置
         const helper = new RectAreaLightHelper(rectLight, 0xff00ff);
