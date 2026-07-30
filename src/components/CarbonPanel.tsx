@@ -1,15 +1,8 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useMemo } from 'react';
+import EChart, { PALETTE, commonGrid, commonTooltip, commonAxis } from './EChart';
 
 interface CarbonPanelProps { kpiPower: string; }
-
-function setupHiDPI(canvas: HTMLCanvasElement, w: number, h: number) {
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = w * dpr; canvas.height = h * dpr;
-  canvas.style.width = '100%'; canvas.style.height = h + 'px';
-  const ctx = canvas.getContext('2d')!; ctx.scale(dpr, dpr);
-  return ctx;
-}
 
 export default function CarbonPanel({ kpiPower }: CarbonPanelProps) {
   const power = parseFloat(kpiPower || '0');
@@ -22,154 +15,107 @@ export default function CarbonPanel({ kpiPower }: CarbonPanelProps) {
   const riskLevel = pct < 0.6 ? { label: '低风险', color: '#00ff88' } : pct < 0.85 ? { label: '中风险', color: '#ffcc44' } : { label: '高风险', color: '#ff4d6d' };
   const panelStyle: React.CSSProperties = { position: 'relative', padding: '14px 16px' };
 
-  const pieRef = useRef<HTMLCanvasElement>(null);      // Scope 饼图
-  const barRef = useRef<HTMLCanvasElement>(null);      // 12 月趋势
-  const progRef = useRef<HTMLCanvasElement>(null);     // 碳中和进度环
-  const srcRef = useRef<HTMLCanvasElement>(null);      // 排放源条形图
+  // 1. Scope 饼图
+  const scopeOption = useMemo(() => ({
+    tooltip: { ...commonTooltip, trigger: 'item', formatter: '{b}: {c}% ({d}%)' },
+    legend: { orient: 'vertical', right: 4, top: 'middle', textStyle: { color: PALETTE.textMid, fontSize: 10 }, itemWidth: 8, itemHeight: 8 },
+    series: [{
+      type: 'pie',
+      radius: ['48%', '72%'],
+      center: ['35%', '50%'],
+      itemStyle: { borderColor: '#02070f', borderWidth: 2 },
+      label: { color: PALETTE.textMain, fontSize: 10, fontFamily: 'Orbitron' },
+      data: [
+        { value: 85, name: 'Scope 2 电力', itemStyle: { color: PALETTE.primary } },
+        { value: 8, name: 'Scope 1 直排', itemStyle: { color: PALETTE.warn } },
+        { value: 7, name: 'Scope 3 间接', itemStyle: { color: '#ff8844' } },
+      ],
+    }],
+  }), []);
 
-  // Scope 饼图
-  useEffect(() => {
-    const c = pieRef.current; if (!c) return;
-    const W = 130, H = 130, ctx = setupHiDPI(c, W, H);
-    ctx.clearRect(0, 0, W, H);
-    const cx = W / 2, cy = H / 2, R = 48;
-    const slices = [
-      { v: 85, col: '#00d4ff', lbl: 'Scope2' },
-      { v: 8, col: '#ffcc44', lbl: 'Scope1' },
-      { v: 7, col: '#ff8844', lbl: 'Scope3' },
-    ];
-    let start = -Math.PI / 2;
-    slices.forEach(s => {
-      const ang = (s.v / 100) * Math.PI * 2;
-      ctx.fillStyle = s.col; ctx.shadowColor = s.col; ctx.shadowBlur = 8;
-      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, start, start + ang); ctx.closePath(); ctx.fill();
-      start += ang;
-    });
-    ctx.shadowBlur = 0;
-    // 镂空
-    ctx.fillStyle = '#02070f'; ctx.beginPath(); ctx.arc(cx, cy, R * 0.6, 0, Math.PI * 2); ctx.fill();
-    // 中央
-    ctx.fillStyle = '#00ffcc'; ctx.font = 'bold 16px Orbitron'; ctx.textAlign = 'center';
-    ctx.fillText(hourlyCarbon.toFixed(1), cx, cy);
-    ctx.fillStyle = '#4a6485'; ctx.font = '8px Rajdhani';
-    ctx.fillText('kg/h', cx, cy + 12);
-  }, [hourlyCarbon]);
-
-  // 12 月趋势柱状图（去年 vs 今年）
-  useEffect(() => {
-    const c = barRef.current; if (!c) return;
-    const W = 340, H = 160, ctx = setupHiDPI(c, W, H);
-    ctx.clearRect(0, 0, W, H);
+  // 2. 12月趋势柱状图（去年vs今年）
+  const trendOption = useMemo(() => {
     const months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
     const baseVal = hourlyCarbon * 24 * 30 / 1000;
-    const data = months.map((_, i) => baseVal * (0.85 + Math.sin(i / 2) * 0.15));
-    const lastYear = data.map(v => v * 1.17);
-    const mx = Math.max(...lastYear) * 1.15;
-    // 网格
-    ctx.strokeStyle = 'rgba(0,255,204,0.06)'; ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) { ctx.beginPath(); ctx.moveTo(0, H - 20 - (H - 24) / 4 * i); ctx.lineTo(W, H - 20 - (H - 24) / 4 * i); ctx.stroke(); }
-    const bw = W / months.length * 0.32;
-    months.forEach((m, i) => {
-      const x = i * (W / months.length) + (W / months.length - bw * 2) / 2;
-      // 去年（浅色）
-      const hLast = lastYear[i] / mx * (H - 24);
-      ctx.fillStyle = 'rgba(138,165,196,0.18)';
-      ctx.fillRect(x, H - 20 - hLast, bw, hLast);
-      // 今年（实色 + 渐变）
-      const hNow = data[i] / mx * (H - 24);
-      const g = ctx.createLinearGradient(0, H - 20 - hNow, 0, H - 20);
-      g.addColorStop(0, '#00ffcc'); g.addColorStop(1, 'rgba(0,255,204,0.2)');
-      ctx.fillStyle = g; ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 4;
-      ctx.fillRect(x + bw + 2, H - 20 - hNow, bw, hNow); ctx.shadowBlur = 0;
-      // 标签
-      ctx.fillStyle = '#4a6485'; ctx.font = '8px Rajdhani'; ctx.textAlign = 'center';
-      ctx.fillText(m, x + bw + 1, H - 6);
-    });
-    // 图例
-    ctx.font = '9px Rajdhani'; ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(138,165,196,0.5)'; ctx.fillRect(4, 4, 8, 6);
-    ctx.fillStyle = '#8aa5c4'; ctx.fillText('去年', 16, 10);
-    ctx.fillStyle = '#00ffcc'; ctx.fillRect(50, 4, 8, 6);
-    ctx.fillStyle = '#e8f4ff'; ctx.fillText('今年', 62, 10);
-    // 同比下降
-    ctx.fillStyle = '#00ff88'; ctx.font = 'bold 9px Orbitron'; ctx.textAlign = 'right';
-    ctx.fillText('⬇ 14.3%', W - 4, 10);
+    const thisYear = months.map((_, i) => +(baseVal * (0.85 + Math.sin(i / 2) * 0.15)).toFixed(2));
+    const lastYear = thisYear.map(v => +(v * 1.17).toFixed(2));
+    return {
+      tooltip: { ...commonTooltip, trigger: 'axis' },
+      legend: { data: ['去年', '今年'], textStyle: { color: PALETTE.textMid, fontSize: 10 }, top: 0, right: 0, itemWidth: 10, itemHeight: 6 },
+      grid: { ...commonGrid, left: 32, right: 12, top: 26, bottom: 22 },
+      xAxis: { type: 'category', data: months, ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 9 } },
+      yAxis: { type: 'value', name: 'tCO₂', ...commonAxis, nameTextStyle: { color: PALETTE.textDim, fontSize: 9 } },
+      series: [
+        { name: '去年', type: 'bar', barWidth: 8, data: lastYear, itemStyle: { color: 'rgba(138,165,196,0.25)', borderRadius: [3, 3, 0, 0] } },
+        { name: '今年', type: 'bar', barWidth: 8, data: thisYear, itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: PALETTE.cyanGlow }, { offset: 1, color: PALETTE.cyanGlow + '40' }] }, borderRadius: [3, 3, 0, 0] } },
+      ],
+    };
   }, [hourlyCarbon]);
 
-  // 碳中和进度环（双层环 + 中央百分比）
-  useEffect(() => {
-    const c = progRef.current; if (!c) return;
-    const W = 150, H = 150, ctx = setupHiDPI(c, W, H);
-    ctx.clearRect(0, 0, W, H);
-    const cx = W / 2, cy = H / 2, R = 56;
-    // 外环背景
-    ctx.lineWidth = 10; ctx.strokeStyle = 'rgba(0,255,204,0.08)';
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
-    // 外环值（渐变 + 阴影）
-    const grad = ctx.createConicGradient(-Math.PI / 2, cx, cy);
-    grad.addColorStop(0, '#00ff88');
-    grad.addColorStop(0.5, '#00ffcc');
-    grad.addColorStop(1, '#00d4ff');
-    ctx.strokeStyle = grad; ctx.lineCap = 'round';
-    ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 12;
-    ctx.beginPath(); ctx.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct); ctx.stroke();
-    ctx.shadowBlur = 0;
-    // 内环（CCER 抵消 25%）
-    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,204,68,0.1)';
-    ctx.beginPath(); ctx.arc(cx, cy, R - 14, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = '#ffcc44';
-    ctx.beginPath(); ctx.arc(cx, cy, R - 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * 0.25); ctx.stroke();
-    // 中央百分比
-    ctx.fillStyle = '#00ffcc'; ctx.font = 'bold 22px Orbitron'; ctx.textAlign = 'center';
-    ctx.fillText((pct * 100).toFixed(1) + '%', cx, cy + 2);
-    ctx.fillStyle = '#4a6485'; ctx.font = '9px Rajdhani';
-    ctx.fillText('配额使用', cx, cy + 16);
-    // 刻度
-    ctx.strokeStyle = 'rgba(138,165,196,0.3)'; ctx.lineWidth = 1;
-    for (let i = 0; i <= 10; i++) {
-      const a = -Math.PI / 2 + (Math.PI * 2) * (i / 10);
-      const x1 = cx + Math.cos(a) * (R + 6), y1 = cy + Math.sin(a) * (R + 6);
-      const x2 = cx + Math.cos(a) * (R + 10), y2 = cy + Math.sin(a) * (R + 10);
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    }
-  }, [pct]);
+  // 3. 碳中和进度仪表盘（双层环）
+  const progressOption = useMemo(() => ({
+    series: [
+      {
+        type: 'gauge', radius: '92%', center: ['50%', '55%'], startAngle: 90, endAngle: -270,
+        min: 0, max: 100,
+        axisLine: { lineStyle: { width: 10, color: [[pct, { type: 'linear', x: 0, y: 0, x2: 1, y2: 1, colorStops: [{ offset: 0, color: PALETTE.success }, { offset: 0.5, color: PALETTE.cyanGlow }, { offset: 1, color: PALETTE.primary }] }], [1, 'rgba(0,255,204,0.08)']] } },
+        pointer: { show: false },
+        axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
+        anchor: { show: false },
+        detail: { formatter: '{value}%', offsetCenter: [0, '-5%'], color: PALETTE.cyanGlow, fontSize: 24, fontFamily: 'Orbitron', fontWeight: 700 },
+        title: { offsetCenter: [0, '20%'], color: PALETTE.textDim, fontSize: 10, fontFamily: 'Rajdhani' },
+        data: [{ value: +(pct * 100).toFixed(1), name: '配额使用率' }],
+      },
+      {
+        type: 'gauge', radius: '72%', center: ['50%', '55%'], startAngle: 90, endAngle: -270,
+        min: 0, max: 100,
+        axisLine: { lineStyle: { width: 5, color: [[0.25, PALETTE.warn], [1, 'rgba(255,204,68,0.1)']] } },
+        pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
+        anchor: { show: false }, detail: { show: false }, title: { show: false },
+        data: [{ value: 25 }],
+      },
+    ],
+  }), [pct]);
 
-  // 重点排放源条形图
-  useEffect(() => {
-    const c = srcRef.current; if (!c) return;
-    const W = 240, H = 110, ctx = setupHiDPI(c, W, H);
-    ctx.clearRect(0, 0, W, H);
+  // 4. 重点排放源条形图
+  const sourceOption = useMemo(() => {
     const data = [
-      { n: '楼宇空调', v: power * 0.6 * carbonFactor, col: '#0088ff' },
-      { n: '楼宇照明', v: power * 0.4 * carbonFactor, col: '#00d4ff' },
-      { n: '充电桩', v: 18.6 * carbonFactor, col: '#00ff88' },
+      { n: '楼宇空调', v: power * 0.6 * carbonFactor, col: PALETTE.primaryDeep },
+      { n: '楼宇照明', v: power * 0.4 * carbonFactor, col: PALETTE.primary },
+      { n: '充电桩', v: 18.6 * carbonFactor, col: PALETTE.success },
       { n: '其他', v: 3.2 * carbonFactor, col: '#ff8844' },
     ];
-    const mx = Math.max(...data.map(d => d.v)) * 1.15;
-    const barH = (H - 4) / data.length - 4;
-    data.forEach((d, i) => {
-      const y = i * (barH + 4) + 2;
-      const w = d.v / mx * (W - 90);
-      // 背景
-      ctx.fillStyle = 'rgba(0,212,255,0.05)';
-      ctx.fillRect(60, y, W - 70, barH);
-      // 实际值
-      const g = ctx.createLinearGradient(60, 0, 60 + w, 0);
-      g.addColorStop(0, d.col + '60'); g.addColorStop(1, d.col);
-      ctx.fillStyle = g; ctx.shadowColor = d.col; ctx.shadowBlur = 4;
-      ctx.fillRect(60, y, w, barH); ctx.shadowBlur = 0;
-      ctx.strokeStyle = d.col + '60'; ctx.lineWidth = 1; ctx.strokeRect(60, y, w, barH);
-      // 标签
-      ctx.fillStyle = '#8aa5c4'; ctx.font = '10px Rajdhani'; ctx.textAlign = 'right';
-      ctx.fillText(d.n, 55, y + barH / 2 + 3);
-      // 数值
-      ctx.fillStyle = d.col; ctx.font = 'bold 10px Orbitron'; ctx.textAlign = 'left';
-      ctx.fillText(d.v.toFixed(2), 65 + w, y + barH / 2 + 3);
-    });
-    // 单位
-    ctx.fillStyle = '#4a6485'; ctx.font = '8px Rajdhani'; ctx.textAlign = 'right';
-    ctx.fillText('kgCO₂/h', W - 2, H - 1);
+    return {
+      tooltip: { ...commonTooltip, trigger: 'axis', formatter: '{b}: {c} kgCO₂/h' },
+      grid: { ...commonGrid, left: 56, right: 36, top: 10, bottom: 18 },
+      xAxis: { type: 'value', ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 9 } },
+      yAxis: { type: 'category', data: data.map(d => d.n), ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 10 } },
+      series: [{
+        type: 'bar', barWidth: 12,
+        data: data.map(d => ({ value: +d.v.toFixed(2), itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: d.col + '60' }, { offset: 1, color: d.col }] }, borderRadius: [0, 4, 4, 0] } })),
+        label: { show: true, position: 'right', formatter: '{c}', color: PALETTE.textMain, fontSize: 10, fontFamily: 'Orbitron', fontWeight: 600 },
+      }],
+    };
   }, [power]);
+
+  // 5. 近12月碳排放趋势线图（同比曲线）
+  const lineOption = useMemo(() => {
+    const months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+    const baseVal = hourlyCarbon * 24 * 30 / 1000;
+    const thisYear = months.map((_, i) => +(baseVal * (0.85 + Math.sin(i / 2) * 0.15)).toFixed(2));
+    const lastYear = thisYear.map(v => +(v * 1.17).toFixed(2));
+    return {
+      tooltip: { ...commonTooltip, trigger: 'axis' },
+      legend: { data: ['今年累计', '配额上限'], textStyle: { color: PALETTE.textMid, fontSize: 10 }, top: 0, right: 0, itemWidth: 10, itemHeight: 6 },
+      grid: { ...commonGrid, left: 32, right: 12, top: 26, bottom: 22 },
+      xAxis: { type: 'category', data: months, ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 9 } },
+      yAxis: { type: 'value', name: 'tCO₂', ...commonAxis, nameTextStyle: { color: PALETTE.textDim, fontSize: 9 } },
+      series: [
+        { name: '今年累计', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6, data: thisYear.reduce((acc: number[], v: number, i: number) => { acc.push(+(acc[i - 1] || 0) + v); return acc; }, []), lineStyle: { color: PALETTE.cyanGlow, width: 2.5 }, itemStyle: { color: PALETTE.cyanGlow, borderColor: '#02070f', borderWidth: 2 }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(0,255,204,0.3)' }, { offset: 1, color: 'rgba(0,255,204,0)' }] } } },
+        { name: '配额上限', type: 'line', smooth: true, symbol: 'none', data: months.map((_, i) => +(annualQuota / 12 * (i + 1)).toFixed(2)), lineStyle: { color: PALETTE.danger, type: 'dashed', width: 2 }, itemStyle: { color: PALETTE.danger } },
+      ],
+    };
+  }, [hourlyCarbon, annualQuota]);
 
   return (
     <div style={{ position: 'absolute', top: '120px', left: '20px', right: '20px', bottom: '20px', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 40, overflow: 'hidden' }}>
@@ -195,46 +141,35 @@ export default function CarbonPanel({ kpiPower }: CarbonPanelProps) {
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '10px', minHeight: 0 }}>
         {/* 左侧 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div className="panel" style={{ ...panelStyle, flex: 1 }}>
+          <div className="panel" style={{ ...panelStyle, flex: '0 0 auto' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-            <div style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, marginBottom: '6px', letterSpacing: '1px' }}>排放源构成 (Scope)</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <canvas ref={pieRef} width={130} height={130} style={{ width: '110px', height: '110px', flexShrink: 0 }}></canvas>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {[
-                  { label: 'Scope 2 电力', pct: 85, color: '#00d4ff' },
-                  { label: 'Scope 1 直排', pct: 8, color: '#ffcc44' },
-                  { label: 'Scope 3 间接', pct: 7, color: '#ff8844' },
-                ].map((d, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: d.color, boxShadow: `0 0 4px ${d.color}` }}></span>
-                    <span style={{ color: 'var(--text-mid)' }}>{d.label}</span>
-                    <span style={{ marginLeft: 'auto', fontFamily: 'Orbitron, monospace', color: d.color, fontWeight: 600 }}>{d.pct}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <div style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>排放源构成 (Scope)</div>
+            <EChart option={scopeOption} height={150} />
           </div>
-          <div className="panel" style={{ ...panelStyle }}>
+          <div className="panel" style={{ ...panelStyle, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-            <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, marginBottom: '6px', letterSpacing: '1px' }}>重点排放源</div>
-            <canvas ref={srcRef} width={240} height={110} style={{ width: '100%', height: '110px' }}></canvas>
+            <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>重点排放源 (kgCO₂/h)</div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <EChart option={sourceOption} height="100%" style={{ height: '100%' }} />
+            </div>
           </div>
         </div>
 
         {/* 中间 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div className="panel" style={{ ...panelStyle, flex: 1 }}>
+          <div className="panel" style={{ ...panelStyle, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
               <span style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, letterSpacing: '1px' }}>近12月碳排放趋势 (tCO₂)</span>
               <span style={{ fontSize: '10px', color: 'var(--success)' }}>同比 ⬇️ 14.3%</span>
             </div>
-            <canvas ref={barRef} width={340} height={160} style={{ width: '100%', height: '160px' }}></canvas>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <EChart option={trendOption} height="100%" style={{ height: '100%' }} />
+            </div>
           </div>
-          <div className="panel" style={{ ...panelStyle }}>
+          <div className="panel" style={{ ...panelStyle, flex: '0 0 auto' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-            <div style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 600, marginBottom: '8px', letterSpacing: '1px' }}>🌱 绿色贡献与价值转化</div>
+            <div style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>🌱 绿色贡献与价值转化</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px' }}>
               {[
                 { label: '等效植树', val: Math.round(50 * carbonFactor * 24 * 365 / 5.8), unit: '棵/年', color: '#00ff88' },
@@ -254,16 +189,25 @@ export default function CarbonPanel({ kpiPower }: CarbonPanelProps) {
 
         {/* 右侧 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div className="panel" style={{ ...panelStyle, textAlign: 'center' }}>
+          <div className="panel" style={{ ...panelStyle, textAlign: 'center', flex: '0 0 auto' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-            <div style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, marginBottom: '6px', letterSpacing: '1px' }}>碳中和进度</div>
-            <canvas ref={progRef} width={150} height={150} style={{ width: '140px', height: '140px', display: 'block', margin: '0 auto' }}></canvas>
-            <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '4px' }}>{usedQuota.toFixed(0)} / {annualQuota} kg · CCER抵消 25%</div>
+            <div style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, marginBottom: '2px', letterSpacing: '1px' }}>碳中和进度</div>
+            <EChart option={progressOption} height={170} />
+            <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '4px' }}>
+              {usedQuota.toFixed(0)} / {annualQuota} kg · CCER抵消 25%
+            </div>
           </div>
-          <div className="panel" style={{ ...panelStyle, flex: 1 }}>
+          <div className="panel" style={{ ...panelStyle, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+            <div style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>累计排放 vs 配额上限</div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <EChart option={lineOption} height="100%" style={{ height: '100%' }} />
+            </div>
+          </div>
+          <div className="panel" style={{ ...panelStyle, flex: '0 0 auto' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
             <div style={{ fontSize: '13px', color: 'var(--warn)', fontWeight: 600, marginBottom: '8px', letterSpacing: '1px' }}>📋 碳资产管理</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               {[
                 { label: '碳配额余额', val: (annualQuota - usedQuota).toFixed(0) + ' kg', color: 'var(--primary)' },
                 { label: 'CCER余额', val: '1,250 tCO₂', color: 'var(--cyan-glow)' },
@@ -271,9 +215,9 @@ export default function CarbonPanel({ kpiPower }: CarbonPanelProps) {
                 { label: '履约状态', val: '✓ 达标', color: 'var(--success)' },
                 { label: '下次核查', val: '2026-12-31', color: 'var(--text-mid)' },
               ].map((d, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', background: 'rgba(255,204,68,0.04)', borderRadius: '3px', borderLeft: '2px solid ' + d.color }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-mid)' }}>{d.label}</span>
-                  <span style={{ fontFamily: 'Orbitron, monospace', fontSize: '12px', color: d.color, fontWeight: 600 }}>{d.val}</span>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', background: 'rgba(255,204,68,0.04)', borderRadius: '3px', borderLeft: '2px solid ' + d.color }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-mid)' }}>{d.label}</span>
+                  <span style={{ fontFamily: 'Orbitron, monospace', fontSize: '11px', color: d.color, fontWeight: 600 }}>{d.val}</span>
                 </div>
               ))}
             </div>

@@ -1,15 +1,8 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useMemo } from 'react';
+import EChart, { PALETTE, commonGrid, commonTooltip, commonAxis } from './EChart';
 
 interface SolarPanelProps { kpiPower: string; }
-
-function setupHiDPI(canvas: HTMLCanvasElement, w: number, h: number) {
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = w * dpr; canvas.height = h * dpr;
-  canvas.style.width = '100%'; canvas.style.height = h + 'px';
-  const ctx = canvas.getContext('2d')!; ctx.scale(dpr, dpr);
-  return ctx;
-}
 
 export default function SolarPanel({ kpiPower }: SolarPanelProps) {
   const pvOutput = 32.5;
@@ -19,185 +12,98 @@ export default function SolarPanel({ kpiPower }: SolarPanelProps) {
   const carbonReduce = pvOutput * 0.5810;
   const panelStyle: React.CSSProperties = { position: 'relative', padding: '14px 16px' };
 
-  const trendRef = useRef<HTMLCanvasElement>(null);     // 24h 发电趋势
-  const gaugeRef = useRef<HTMLCanvasElement>(null);     // 逆变器效率仪表盘
-  const costRef = useRef<HTMLCanvasElement>(null);      // 度电成本对比
-  const irrRef = useRef<HTMLCanvasElement>(null);       // 各区域辐照度
-  const healthRef = useRef<HTMLCanvasElement>(null);    // 资产健康环
-
-  // 24h 发电趋势（带填充 + 峰值标记）
-  useEffect(() => {
-    const c = trendRef.current; if (!c) return;
-    const W = 320, H = 130, ctx = setupHiDPI(c, W, H);
-    ctx.clearRect(0, 0, W, H);
-    // 网格
-    ctx.strokeStyle = 'rgba(0,255,136,0.06)'; ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) { ctx.beginPath(); ctx.moveTo(0, H / 4 * i); ctx.lineTo(W, H / 4 * i); ctx.stroke(); }
-    // 曲线点：6:00-18:00 钟形
-    const pts: [number, number][] = [];
-    for (let i = 0; i <= 24; i++) {
-      const x = i / 24 * W;
-      let v = 0;
-      if (i >= 6 && i <= 18) {
-        const t = (i - 6) / 12;
-        v = Math.sin(t * Math.PI) * 48 * (0.95 + Math.sin(i) * 0.05);
-      }
-      const y = H - 14 - v / 60 * (H - 18);
-      pts.push([x, y]);
-    }
-    // 填充
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, 'rgba(0,255,136,0.45)'); grad.addColorStop(1, 'rgba(0,255,136,0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.moveTo(pts[0][0], H); pts.forEach(p => ctx.lineTo(p[0], p[1])); ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
-    // 折线
-    ctx.strokeStyle = '#00ff88'; ctx.lineWidth = 2; ctx.shadowColor = '#00ff88'; ctx.shadowBlur = 6;
-    ctx.beginPath(); pts.forEach((p, i) => i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1])); ctx.stroke();
-    ctx.shadowBlur = 0;
-    // 当前点 (16:00)
-    const nowIdx = 16;
-    ctx.fillStyle = '#00ffcc'; ctx.beginPath(); ctx.arc(pts[nowIdx][0], pts[nowIdx][1], 4, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#00ffcc'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(pts[nowIdx][0], pts[nowIdx][1], 8, 0, Math.PI * 2); ctx.stroke();
-    // 峰值标记 (12:00)
-    const peakIdx = 12;
-    ctx.fillStyle = '#ffcc44'; ctx.beginPath(); ctx.arc(pts[peakIdx][0], pts[peakIdx][1], 3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ffcc44'; ctx.font = '9px Orbitron'; ctx.textAlign = 'center';
-    ctx.fillText('峰值 48.2kW', pts[peakIdx][0], pts[peakIdx][1] - 8);
-    // x 轴
-    ctx.fillStyle = '#4a6485'; ctx.font = '8px Rajdhani';
-    [0, 6, 12, 18, 24].forEach(h => ctx.fillText(h + ':00', h / 24 * W, H - 2));
-    // y 轴单位
-    ctx.fillStyle = '#4a6485'; ctx.font = '8px Rajdhani'; ctx.textAlign = 'left';
-    ctx.fillText('kW', 2, 10);
-  }, []);
-
-  // 逆变器效率仪表盘
-  useEffect(() => {
-    const c = gaugeRef.current; if (!c) return;
-    const W = 140, H = 140, ctx = setupHiDPI(c, W, H);
-    ctx.clearRect(0, 0, W, H);
-    const cx = W / 2, cy = H / 2 + 6, R = 50;
-    const eff = 96.2;
-    // 背景弧
-    ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(0,255,136,0.1)';
-    ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI * 0.75, Math.PI * 0.25); ctx.stroke();
-    // 刻度
-    ctx.strokeStyle = 'rgba(138,165,196,0.3)'; ctx.lineWidth = 1;
-    for (let i = 0; i <= 10; i++) {
-      const a = Math.PI * 0.75 + (Math.PI * 1.5) * (i / 10);
-      const x1 = cx + Math.cos(a) * (R + 6), y1 = cy + Math.sin(a) * (R + 6);
-      const x2 = cx + Math.cos(a) * (R + 10), y2 = cy + Math.sin(a) * (R + 10);
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    }
-    // 值弧
-    const endAng = Math.PI * 0.75 + (Math.PI * 1.5) * (eff / 100);
-    const grad = ctx.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0, '#00ff88'); grad.addColorStop(1, '#00ffcc');
-    ctx.strokeStyle = grad; ctx.lineWidth = 8; ctx.lineCap = 'round';
-    ctx.shadowColor = '#00ff88'; ctx.shadowBlur = 10;
-    ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI * 0.75, endAng); ctx.stroke();
-    ctx.shadowBlur = 0;
-    // 中央
-    ctx.fillStyle = '#00ff88'; ctx.font = 'bold 22px Orbitron'; ctx.textAlign = 'center';
-    ctx.fillText(eff.toFixed(1) + '%', cx, cy + 2);
-    ctx.fillStyle = '#4a6485'; ctx.font = '9px Rajdhani';
-    ctx.fillText('逆变器效率', cx, cy + 16);
-  }, []);
-
-  // 资产健康环（多环组合）
-  useEffect(() => {
-    const c = healthRef.current; if (!c) return;
-    const W = 130, H = 130, ctx = setupHiDPI(c, W, H);
-    ctx.clearRect(0, 0, W, H);
-    const cx = W / 2, cy = H / 2;
-    const rings = [
-      { r: 50, v: 96.2, col: '#00ff88', lbl: '效率' },
-      { r: 40, v: 88, col: '#00d4ff', lbl: '清洁' },
-      { r: 30, v: 100, col: '#ffcc44', lbl: '在线' },
-    ];
-    rings.forEach(ring => {
-      // 背景环
-      ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,212,255,0.08)';
-      ctx.beginPath(); ctx.arc(cx, cy, ring.r, 0, Math.PI * 2); ctx.stroke();
-      // 值环
-      ctx.strokeStyle = ring.col; ctx.lineCap = 'round';
-      ctx.shadowColor = ring.col; ctx.shadowBlur = 6;
-      ctx.beginPath(); ctx.arc(cx, cy, ring.r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (ring.v / 100)); ctx.stroke();
-      ctx.shadowBlur = 0;
+  // 1. 24h 发电功率趋势（面积+峰值标记）
+  const trendOption = useMemo(() => {
+    const hours = Array.from({ length: 25 }, (_, i) => i + ':00');
+    const data = hours.map((_, i) => {
+      if (i < 6 || i > 18) return 0;
+      const t = (i - 6) / 12;
+      return Math.sin(t * Math.PI) * 48 * (0.95 + Math.sin(i) * 0.05);
     });
-    // 中央
-    ctx.fillStyle = '#00ff88'; ctx.font = 'bold 18px Orbitron'; ctx.textAlign = 'center';
-    ctx.fillText('96.2%', cx, cy + 2);
-    ctx.fillStyle = '#4a6485'; ctx.font = '9px Rajdhani';
-    ctx.fillText('综合健康度', cx, cy + 16);
-  }, []);
+    return {
+      tooltip: { ...commonTooltip, trigger: 'axis', formatter: (p: any) => `${p[0].name}:00<br/>功率: <b style="color:${PALETTE.success}">${p[0].value.toFixed(1)} kW</b>` },
+      grid: { ...commonGrid, left: 36, right: 16, top: 18, bottom: 24 },
+      xAxis: { type: 'category', data: hours, ...commonAxis, axisLabel: { ...commonAxis.axisLabel, interval: 4 } },
+      yAxis: { type: 'value', name: 'kW', max: 60, ...commonAxis, nameTextStyle: { color: PALETTE.textDim, fontSize: 9 } },
+      series: [{
+        type: 'line', smooth: true, symbol: 'none', data,
+        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(0,255,136,0.55)' }, { offset: 1, color: 'rgba(0,255,136,0)' }] } },
+        lineStyle: { color: PALETTE.success, width: 2.5, shadowColor: PALETTE.success, shadowBlur: 8 },
+        markPoint: {
+          symbol: 'pin', symbolSize: 36,
+          data: [
+            { name: '峰值', coord: ['12', 48.2], value: '48.2kW', itemStyle: { color: PALETTE.warn }, label: { color: '#fff', fontSize: 9, fontFamily: 'Orbitron' } },
+            { name: '当前', coord: ['16', pvOutput], value: pvOutput + 'kW', itemStyle: { color: PALETTE.cyanGlow }, label: { color: '#02070f', fontSize: 9, fontFamily: 'Orbitron' } },
+          ],
+        },
+        markLine: { silent: true, symbol: 'none', lineStyle: { color: PALETTE.warn, type: 'dashed', opacity: 0.4 }, data: [{ yAxis: 48.2, label: { formatter: '峰值', color: PALETTE.warn, fontSize: 9 } }] },
+      }],
+    };
+  }, [pvOutput]);
 
-  // 度电成本对比柱状图
-  useEffect(() => {
-    const c = costRef.current; if (!c) return;
-    const W = 240, H = 110, ctx = setupHiDPI(c, W, H);
-    ctx.clearRect(0, 0, W, H);
-    const data = [
-      { n: '电网购电', v: 78, col: '#0088ff' },
-      { n: '光伏自用', v: 52, col: '#00ff88' },
-      { n: '储能放电', v: 61, col: '#ffcc44' },
-    ];
-    const mx = 100, bw = W / data.length * 0.55;
-    // 网格
-    ctx.strokeStyle = 'rgba(0,212,255,0.06)'; ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) { ctx.beginPath(); ctx.moveTo(0, H - 18 - (H - 22) / 4 * i); ctx.lineTo(W, H - 18 - (H - 22) / 4 * i); ctx.stroke(); }
-    data.forEach((d, i) => {
-      const x = i * (W / data.length) + (W / data.length - bw) / 2;
-      const h = d.v / mx * (H - 22);
-      const g = ctx.createLinearGradient(0, H - 18 - h, 0, H - 18);
-      g.addColorStop(0, d.col); g.addColorStop(1, d.col + '20');
-      ctx.fillStyle = g; ctx.shadowColor = d.col; ctx.shadowBlur = 6;
-      ctx.fillRect(x, H - 18 - h, bw, h); ctx.shadowBlur = 0;
-      // 顶部值
-      ctx.fillStyle = d.col; ctx.font = 'bold 11px Orbitron'; ctx.textAlign = 'center';
-      ctx.fillText(d.v + '分', x + bw / 2, H - 18 - h - 4);
-      // 标签
-      ctx.fillStyle = '#8aa5c4'; ctx.font = '10px Rajdhani';
-      ctx.fillText(d.n, x + bw / 2, H - 6);
-    });
-    // 节约指数
-    ctx.fillStyle = '#00ff88'; ctx.font = 'bold 10px Orbitron'; ctx.textAlign = 'right';
-    ctx.fillText('节约 +33.3%', W - 4, 12);
-  }, []);
+  // 2. 逆变器效率仪表盘
+  const gaugeOption = useMemo(() => ({
+    series: [{
+      type: 'gauge', radius: '95%', center: ['50%', '60%'],
+      startAngle: 210, endAngle: -30,
+      min: 0, max: 100,
+      progress: { show: true, width: 10, itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: PALETTE.success }, { offset: 1, color: PALETTE.cyanGlow }] } } },
+      axisLine: { lineStyle: { width: 10, color: [[1, 'rgba(0,255,136,0.1)']] } },
+      axisTick: { distance: -16, length: 4, lineStyle: { color: 'rgba(138,165,196,0.4)' } },
+      splitLine: { distance: -16, length: 8, lineStyle: { color: 'rgba(138,165,196,0.5)' } },
+      axisLabel: { distance: -22, color: PALETTE.textDim, fontSize: 8 },
+      pointer: { width: 3, length: '60%', itemStyle: { color: PALETTE.success } },
+      anchor: { show: true, size: 8, itemStyle: { color: PALETTE.success } },
+      title: { show: false },
+      detail: { valueAnimation: true, offsetCenter: [0, '20%'], formatter: '{value}%', color: PALETTE.success, fontSize: 22, fontFamily: 'Orbitron', fontWeight: 700 },
+      data: [{ value: 96.2 }],
+    }],
+  }), []);
 
-  // 各区域辐照度条形图
-  useEffect(() => {
-    const c = irrRef.current; if (!c) return;
-    const W = 240, H = 110, ctx = setupHiDPI(c, W, H);
-    ctx.clearRect(0, 0, W, H);
-    const data = [
-      { z: '屋顶东', v: 820, col: '#ffcc44' },
-      { z: '屋顶西', v: 780, col: '#ffaa44' },
-      { z: '车棚', v: 650, col: '#ff8844' },
-      { z: '地面', v: 590, col: '#ff6644' },
-    ];
-    const mx = 1000, barH = (H - 4) / data.length - 4;
-    data.forEach((d, i) => {
-      const y = i * (barH + 4) + 2;
-      const w = d.v / mx * (W - 70);
-      // 背景
-      ctx.fillStyle = 'rgba(255,204,68,0.05)';
-      ctx.fillRect(55, y, W - 70, barH);
-      // 实际值
-      const g = ctx.createLinearGradient(55, 0, 55 + w, 0);
-      g.addColorStop(0, d.col + '60'); g.addColorStop(1, d.col);
-      ctx.fillStyle = g; ctx.shadowColor = d.col; ctx.shadowBlur = 4;
-      ctx.fillRect(55, y, w, barH); ctx.shadowBlur = 0;
-      // 边框
-      ctx.strokeStyle = d.col + '60'; ctx.lineWidth = 1; ctx.strokeRect(55, y, w, barH);
-      // 标签
-      ctx.fillStyle = '#8aa5c4'; ctx.font = '10px Rajdhani'; ctx.textAlign = 'right';
-      ctx.fillText(d.z, 50, y + barH / 2 + 3);
-      // 数值
-      ctx.fillStyle = d.col; ctx.font = 'bold 10px Orbitron'; ctx.textAlign = 'left';
-      ctx.fillText(d.v + ' W/m²', 60 + w, y + barH / 2 + 3);
-    });
-  }, []);
+  // 3. 资产健康三环（多仪表盘叠加）
+  const healthOption = useMemo(() => ({
+    series: [
+      { type: 'gauge', radius: '90%', center: ['50%', '55%'], startAngle: 90, endAngle: -270, min: 0, max: 100, splitNumber: 0, axisLine: { lineStyle: { width: 6, color: [[0.962, PALETTE.success], [1, 'rgba(0,255,136,0.1)']] } }, pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false }, detail: { show: false }, data: [{ value: 96.2 }] },
+      { type: 'gauge', radius: '70%', center: ['50%', '55%'], startAngle: 90, endAngle: -270, min: 0, max: 100, splitNumber: 0, axisLine: { lineStyle: { width: 5, color: [[0.88, PALETTE.primary], [1, 'rgba(0,212,255,0.1)']] } }, pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false }, detail: { show: false }, data: [{ value: 88 }] },
+      { type: 'gauge', radius: '50%', center: ['50%', '55%'], startAngle: 90, endAngle: -270, min: 0, max: 100, splitNumber: 0, axisLine: { lineStyle: { width: 4, color: [[1.0, PALETTE.warn], [1, 'rgba(255,204,68,0.1)']] } }, pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false }, detail: { formatter: '{value}%', color: PALETTE.success, fontSize: 18, fontFamily: 'Orbitron', fontWeight: 700, offsetCenter: [0, '5%'] }, data: [{ value: 96.2 }] },
+    ],
+  }), []);
+
+  // 4. 度电成本对比柱状图
+  const costOption = useMemo(() => ({
+    tooltip: { ...commonTooltip, trigger: 'axis', formatter: '{b}: {c} 分/kWh' },
+    grid: { ...commonGrid, left: 32, right: 12, top: 16, bottom: 22 },
+    xAxis: { type: 'category', data: ['电网购电', '光伏自用', '储能放电'], ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 9 } },
+    yAxis: { type: 'value', name: '分', max: 100, ...commonAxis, nameTextStyle: { color: PALETTE.textDim, fontSize: 9 } },
+    series: [{
+      type: 'bar', barWidth: 22,
+      data: [
+        { value: 78, itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: PALETTE.primaryDeep }, { offset: 1, color: PALETTE.primaryDeep + '40' }] }, borderRadius: [4, 4, 0, 0] } },
+        { value: 52, itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: PALETTE.success }, { offset: 1, color: PALETTE.success + '40' }] }, borderRadius: [4, 4, 0, 0] } },
+        { value: 61, itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: PALETTE.warn }, { offset: 1, color: PALETTE.warn + '40' }] }, borderRadius: [4, 4, 0, 0] } },
+      ],
+      label: { show: true, position: 'top', formatter: '{c}分', color: PALETTE.textMain, fontSize: 11, fontFamily: 'Orbitron', fontWeight: 700 },
+      markLine: { symbol: 'none', lineStyle: { color: PALETTE.success, type: 'dashed' }, data: [{ yAxis: 52, label: { formatter: '光伏成本', color: PALETTE.success, fontSize: 9 } }] },
+    }],
+  }), []);
+
+  // 5. 各区域辐照度水平条形图
+  const irrOption = useMemo(() => ({
+    tooltip: { ...commonTooltip, trigger: 'axis', formatter: '{b}: {c} W/m²' },
+    grid: { ...commonGrid, left: 56, right: 36, top: 10, bottom: 18 },
+    xAxis: { type: 'value', max: 1000, ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 9 } },
+    yAxis: { type: 'category', data: ['屋顶东侧', '屋顶西侧', '车棚', '地面'], ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 10 } },
+    series: [{
+      type: 'bar', barWidth: 12,
+      data: [
+        { value: 820, itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: PALETTE.warn + '60' }, { offset: 1, color: PALETTE.warn }] }, borderRadius: [0, 4, 4, 0] } },
+        { value: 780, itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#ffaa4460' }, { offset: 1, color: '#ffaa44' }] }, borderRadius: [0, 4, 4, 0] } },
+        { value: 650, itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#ff884460' }, { offset: 1, color: '#ff8844' }] }, borderRadius: [0, 4, 4, 0] } },
+        { value: 590, itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#ff664460' }, { offset: 1, color: '#ff6644' }] }, borderRadius: [0, 4, 4, 0] } },
+      ],
+      label: { show: true, position: 'right', formatter: '{c} W/m²', color: PALETTE.textMain, fontSize: 10, fontFamily: 'Orbitron', fontWeight: 600 },
+    }],
+  }), []);
 
   return (
     <div style={{ position: 'absolute', top: '120px', left: '20px', right: '20px', bottom: '20px', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 40, overflow: 'hidden' }}>
@@ -223,25 +129,20 @@ export default function SolarPanel({ kpiPower }: SolarPanelProps) {
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1.4fr 1fr', gap: '10px', minHeight: 0 }}>
         {/* 左侧 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div className="panel" style={{ ...panelStyle, textAlign: 'center' }}>
+          <div className="panel" style={{ ...panelStyle, textAlign: 'center', flex: '0 0 auto' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-            <div style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 600, marginBottom: '6px', letterSpacing: '1px' }}>资产健康度</div>
-            <canvas ref={healthRef} width={130} height={130} style={{ width: '130px', height: '130px', display: 'block', margin: '0 auto' }}></canvas>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '6px' }}>
-              <div style={{ padding: '5px', background: 'rgba(0,255,136,0.06)', borderRadius: '4px' }}>
-                <div style={{ fontSize: '10px', color: 'var(--text-dim)' }}>面板清洁度</div>
-                <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '14px', color: 'var(--success)', fontWeight: 600 }}>88%</div>
-              </div>
-              <div style={{ padding: '5px', background: 'rgba(0,212,255,0.06)', borderRadius: '4px' }}>
-                <div style={{ fontSize: '10px', color: 'var(--text-dim)' }}>逆变器在线率</div>
-                <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '14px', color: 'var(--primary)', fontWeight: 600 }}>100%</div>
-              </div>
+            <div style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 600, marginBottom: '2px', letterSpacing: '1px' }}>资产健康度（三环）</div>
+            <EChart option={healthOption} height={160} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px', marginTop: '4px', fontSize: '9px' }}>
+              <div style={{ color: PALETTE.success }}>● 效率 96.2%</div>
+              <div style={{ color: PALETTE.primary }}>● 清洁 88%</div>
+              <div style={{ color: PALETTE.warn }}>● 在线 100%</div>
             </div>
           </div>
-          <div className="panel" style={{ ...panelStyle, flex: 1 }}>
+          <div className="panel" style={{ ...panelStyle, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-            <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, marginBottom: '8px', letterSpacing: '1px' }}>故障预警分布</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, marginBottom: '6px', letterSpacing: '1px' }}>故障预警分布</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', overflowY: 'auto' }}>
               {[
                 { zone: '屋顶东侧', issue: '面板积灰', level: 'warn', pct: '12%' },
                 { zone: '屋顶西侧', issue: '正常', level: 'ok', pct: '0%' },
@@ -261,40 +162,44 @@ export default function SolarPanel({ kpiPower }: SolarPanelProps) {
 
         {/* 中间 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div className="panel" style={{ ...panelStyle, flex: 1 }}>
+          <div className="panel" style={{ ...panelStyle, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-            <div style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 600, marginBottom: '6px', letterSpacing: '1px' }}>24小时发电功率趋势</div>
-            <canvas ref={trendRef} width={320} height={130} style={{ width: '100%', height: '130px' }}></canvas>
-            <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-dim)' }}>
-              <span>当前功率 <span style={{ color: 'var(--success)', fontFamily: 'Orbitron, monospace' }}>{pvOutput} kW</span></span>
+            <div style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>24小时发电功率趋势</div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <EChart option={trendOption} height="100%" style={{ height: '100%' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-dim)', marginTop: '4px' }}>
+              <span>当前 <span style={{ color: 'var(--success)', fontFamily: 'Orbitron, monospace' }}>{pvOutput} kW</span></span>
               <span>峰值 <span style={{ color: 'var(--warn)', fontFamily: 'Orbitron, monospace' }}>48.2 kW</span></span>
               <span>日照 <span style={{ color: 'var(--primary)', fontFamily: 'Orbitron, monospace' }}>8.2h</span></span>
             </div>
           </div>
-          <div className="panel" style={{ ...panelStyle }}>
+          <div className="panel" style={{ ...panelStyle, flex: '0 0 auto' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-            <div style={{ fontSize: '13px', color: 'var(--warn)', fontWeight: 600, marginBottom: '6px', letterSpacing: '1px' }}>☀ 各区域辐照度</div>
-            <canvas ref={irrRef} width={240} height={110} style={{ width: '100%', height: '110px' }}></canvas>
+            <div style={{ fontSize: '13px', color: 'var(--warn)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>☀ 各区域辐照度</div>
+            <EChart option={irrOption} height={140} />
           </div>
         </div>
 
         {/* 右侧 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div className="panel" style={{ ...panelStyle, textAlign: 'center' }}>
+          <div className="panel" style={{ ...panelStyle, textAlign: 'center', flex: '0 0 auto' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-            <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>逆变器效率</div>
-            <canvas ref={gaugeRef} width={140} height={140} style={{ width: '120px', height: '120px', display: 'block', margin: '0 auto' }}></canvas>
+            <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, marginBottom: '2px', letterSpacing: '1px' }}>逆变器效率</div>
+            <EChart option={gaugeOption} height={150} />
           </div>
-          <div className="panel" style={{ ...panelStyle, flex: 1 }}>
+          <div className="panel" style={{ ...panelStyle, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-            <div style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, marginBottom: '6px', letterSpacing: '1px' }}>度电成本对比</div>
-            <canvas ref={costRef} width={240} height={110} style={{ width: '100%', height: '110px' }}></canvas>
-            <div style={{ marginTop: '6px', padding: '6px', background: 'rgba(0,255,136,0.06)', borderRadius: '4px', textAlign: 'center' }}>
+            <div style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>度电成本对比</div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <EChart option={costOption} height="100%" style={{ height: '100%' }} />
+            </div>
+            <div style={{ marginTop: '4px', padding: '6px', background: 'rgba(0,255,136,0.06)', borderRadius: '4px', textAlign: 'center' }}>
               <div style={{ fontSize: '10px', color: 'var(--text-dim)' }}>年成本节约指数</div>
               <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '18px', fontWeight: 700, color: 'var(--success)', textShadow: '0 0 10px rgba(0,255,136,0.4)' }}>+33.3%</div>
             </div>
           </div>
-          <div className="panel" style={{ ...panelStyle }}>
+          <div className="panel" style={{ ...panelStyle, flex: '0 0 auto' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
             <div style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, marginBottom: '6px', letterSpacing: '1px' }}>🌱 环保价值</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
