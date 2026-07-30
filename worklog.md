@@ -570,3 +570,57 @@ Stage Summary:
 - 改动：1 文件，+3 / -3 行
 - RectAreaLight 现在与灯具模型完全1:1重合（位置/旋转/尺寸）
 - GitHub 已同步
+
+---
+Task ID: rectlight-as-child-node
+Agent: Super Z (main)
+Task: RectAreaLight 改为灯具子节点，完全继承位置/旋转/尺寸
+
+Work Log:
+- 用户反馈：
+  1. 当前灯光偏大
+  2. 旋转不对
+  3. 可以先去掉'灯光朝下'的逻辑实现
+  4. 让 RectAreaLight 大小/旋转跟模型一致
+
+- 根因诊断：
+  · 尺寸偏大：widthAxis.dot(localSize) * widthAxis.dot(meshScale) 在某些情况下重复计算
+  · 旋转不对：'normal.y>0 取反' + 'makeBasis(...,-normal)' 逻辑混乱
+  · 灯光朝下逻辑：normal.y>0 ? -normal : normal 判断 + negate 翻转
+
+- 修复方案：将 RectAreaLight 作为 mesh 的子节点添加（mesh.add(rectLight)）
+  自动继承 mesh 的世界变换（position/rotation/scale），无需手动复制
+
+- 核心算法：
+  1. 本地包围盒尺寸自适应：
+     - 找最薄轴=法线
+     - 剩余较长轴=宽(width)，较短轴=高(height)
+  2. 设置 RectLight 本地 width/height = localSize 对应轴值
+  3. 本地位置 = localBox.center（相对于 mesh）
+  4. 本地四元数：根据法线轴选择旋转，使 RectLight 默认 Z 法线对齐 mesh 法线
+     · Y 法线：绕 X 轴旋转 90°
+     · X 法线：绕 Y 轴旋转 90°
+     · Z 法线：无需旋转（RectAreaLight 默认就是 Z 法线）
+  5. 宽轴<高轴时：再绕法线轴旋转 90° 交换 width/height
+
+- 移除所有'灯光朝下'逻辑：
+  · 不再有 normal.y > 0 ? -normal : normal 判断
+  · 不再有 lightNormal.negate() 翻转
+  · 完全使用 mesh 原始三轴方向
+
+- VLM 双视角验证:
+  · 默认视角：橙色mesh线框与青色Helper线框完全重合，无旋转偏差，尺寸完全匹配
+  · 俯视视角：无90度旋转偏差，尺寸完全匹配
+  · 最终状态：品红色Helper线框与灯具模型完全对齐
+
+- 技术细节：
+  · RectAreaLight 作为 mesh 子节点，自动跟随 mesh 变换
+  · RectAreaLightHelper 必须加到 scene（不是 mesh）才能正确渲染
+  · 不再需要手动计算 worldScale/worldCenter/meshQuat 等
+
+Stage Summary:
+- 提交 ID: 7e57953（普通 push，未 force）
+- 改动：1 文件，+46 / -40 行
+- RectAreaLight 与灯具模型位置/旋转/尺寸完全1:1重合
+- 移除了所有灯光朝下的逻辑实现
+- GitHub 已同步
