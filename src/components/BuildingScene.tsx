@@ -453,8 +453,12 @@ export default function BuildingScene() {
 
       fixtures.forEach((f, i) => {
         const { mesh } = f;
-        // === RectAreaLight 作为 mesh 的子节点，完全继承 mesh 的世界变换（position/rotation/scale）===
+        // === RectAreaLight 作为 mesh 的子节点，完全继承 mesh 的世界变换（position/rotation）===
+        // 注意：RectAreaLight 的 width/height 是世界尺寸，不会被 transform 层级缩放
+        // 所以需要手动乘以 mesh 的世界缩放
         mesh.updateWorldMatrix(true, false);
+        const meshWorldScale = mesh.getWorldScale(new THREE.Vector3());
+        const sx = Math.abs(meshWorldScale.x), sy = Math.abs(meshWorldScale.y), sz = Math.abs(meshWorldScale.z);
 
         // 本地包围盒（精确面板尺寸和几何中心）
         const localBox = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position);
@@ -462,7 +466,8 @@ export default function BuildingScene() {
         const localCenter = localBox.getCenter(new THREE.Vector3());
 
         // 自适应判断：最薄的轴=法线，剩余两轴中较长的=宽(width)，较短的=高(height)
-        const ax = Math.abs(localSize.x), ay = Math.abs(localSize.y), az = Math.abs(localSize.z);
+        // width/height 需要乘以对应轴的世界缩放（因为 RectAreaLight.width/height 是绝对值）
+        const ax = Math.abs(localSize.x) * sx, ay = Math.abs(localSize.y) * sy, az = Math.abs(localSize.z) * sz;
         let width: number, height: number;
         let localQuat: THREE.Quaternion; // 让 RectLight 的本地 X/Y/Z 对齐到 width/height/normal
         let normalAxis: THREE.Vector3; // 本地空间的法线方向（最薄轴）
@@ -514,16 +519,15 @@ export default function BuildingScene() {
         // 计算灯具本地空间下的法线方向（最薄轴），用于让 RectAreaLight 沿法线方向偏移
         const normalLocalDir = normalAxis.clone(); // 本地空间的法线方向（如 (0,1,0)）
 
-        // 法线方向在 RectAreaLight 本地坐标系下的方向（rectLight 本地 Z 就是法线）
-        // rectLight 已通过 localQuat 旋转，所以本地 (0,0,1) 在 rectLight 局部就是法线方向
-
         const rectLight = new THREE.RectAreaLight(0xff8800, 0, width, height);  // 桔黄色
-        // 本地位置 = 包围盒中心 + 法线方向偏移（沿法线方向下移 0.3，让光从模型下方发出，避免被模型挡住）
-        // rectLight 已通过 localQuat 旋转，其本地 +Z 就是法线方向（朝外）
-        // 我们让光向法线方向偏移一点点（半个面板厚度 + 0.3），确保不被模型挡住
-        const halfThickness = Math.abs(normalLocalDir.dot(localSize)) / 2;
-        const offset = halfThickness + 0.3; // 沿法线方向偏移
-        rectLight.position.copy(localCenter).add(normalLocalDir.clone().multiplyScalar(offset));
+        // 本地位置 = 包围盒中心 + 法线方向偏移（让光从模型下方发出，避免被模型挡住）
+        // 偏移量需要换算到本地空间（因为 rectLight 是 mesh 子节点，mesh.localScale=1，但父节点有缩放）
+        // 半个面板厚度（本地）+ 世界空间 5 单位偏移换算到本地
+        const halfThicknessLocal = Math.abs(normalLocalDir.dot(localSize)) / 2;
+        const normalWorldScale = Math.abs(normalLocalDir.x) * sx + Math.abs(normalLocalDir.y) * sy + Math.abs(normalLocalDir.z) * sz;
+        const worldOffset = 5; // 世界空间偏移 5 个单位
+        const offsetLocal = halfThicknessLocal + worldOffset / normalWorldScale; // 换算到本地
+        rectLight.position.copy(localCenter).add(normalLocalDir.clone().multiplyScalar(offsetLocal));
         rectLight.quaternion.copy(localQuat);
         rectLight.name = `__rectLight_${i}`;
         // 作为 mesh 的子节点添加，自动继承 mesh 的世界变换
@@ -538,11 +542,11 @@ export default function BuildingScene() {
         // 显示 RectAreaLightHelper 边框（青色），作为 mesh 子节点跟随灯具变换
         const helper = new RectAreaLightHelper(rectLight, 0x00ffff);
         helper.name = `__rectHelper_${i}`;
-        helper.position.copy(localCenter).add(normalLocalDir.clone().multiplyScalar(offset));
+        helper.position.copy(localCenter).add(normalLocalDir.clone().multiplyScalar(offsetLocal));
         helper.quaternion.copy(localQuat);
         mesh.add(helper);
       });
-      T.rectHelpers = T.rectLights.map((l: any) => T.scene.getObjectByName(`__rectHelper_${T.rectLights.indexOf(l)}`));
+      T.rectHelpers = T.rectLights.map((l: any) => l.parent?.getObjectByName(`__rectHelper_${T.rectLights.indexOf(l)}`));
       console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (已隐藏原始模型，显示 Helper)`);
     }
 
