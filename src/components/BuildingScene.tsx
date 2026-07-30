@@ -507,9 +507,19 @@ export default function BuildingScene() {
           }
         }
 
+        // 计算灯具本地空间下的法线方向（最薄轴），用于让 RectAreaLight 沿法线方向偏移
+        const normalLocalDir = normalAxis.clone(); // 本地空间的法线方向（如 (0,1,0)）
+
+        // 法线方向在 RectAreaLight 本地坐标系下的方向（rectLight 本地 Z 就是法线）
+        // rectLight 已通过 localQuat 旋转，所以本地 (0,0,1) 在 rectLight 局部就是法线方向
+
         const rectLight = new THREE.RectAreaLight(0xff8800, 0, width, height);  // 桔黄色
-        // 本地位置 = 包围盒中心（相对于 mesh）
-        rectLight.position.copy(localCenter);
+        // 本地位置 = 包围盒中心 + 法线方向偏移（沿法线方向下移 0.3，让光从模型下方发出，避免被模型挡住）
+        // rectLight 已通过 localQuat 旋转，其本地 +Z 就是法线方向（朝外）
+        // 我们让光向法线方向偏移一点点（半个面板厚度 + 0.3），确保不被模型挡住
+        const halfThickness = Math.abs(normalLocalDir.dot(localSize)) / 2;
+        const offset = halfThickness + 0.3; // 沿法线方向偏移
+        rectLight.position.copy(localCenter).add(normalLocalDir.clone().multiplyScalar(offset));
         rectLight.quaternion.copy(localQuat);
         rectLight.name = `__rectLight_${i}`;
         // 作为 mesh 的子节点添加，自动继承 mesh 的世界变换
@@ -524,7 +534,7 @@ export default function BuildingScene() {
         // 显示 RectAreaLightHelper 边框（青色），作为 mesh 子节点跟随灯具变换
         const helper = new RectAreaLightHelper(rectLight, 0x00ffff);
         helper.name = `__rectHelper_${i}`;
-        helper.position.copy(localCenter);
+        helper.position.copy(localCenter).add(normalLocalDir.clone().multiplyScalar(offset));
         helper.quaternion.copy(localQuat);
         mesh.add(helper);
       });
@@ -1476,7 +1486,7 @@ export default function BuildingScene() {
               <span>亮度调节 · BRIGHTNESS</span>
               <span className="slider-value">{brightness}%</span>
             </div>
-            <input type="range" min="0" max="100" value={brightness} onChange={onBrightness} style={{ ['--pct' as any]: brightness + '%' }} />
+            <input type="range" min="0" max="100" value={brightness} onChange={onBrightness} onInput={onBrightness as any} style={{ ['--pct' as any]: brightness + '%' }} />
           </div>
         </div>
 
