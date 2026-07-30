@@ -465,8 +465,10 @@ export default function BuildingScene() {
         const ax = Math.abs(localSize.x), ay = Math.abs(localSize.y), az = Math.abs(localSize.z);
         let width: number, height: number;
         let localQuat: THREE.Quaternion; // 让 RectLight 的本地 X/Y/Z 对齐到 width/height/normal
+        let normalAxis: THREE.Vector3; // 本地空间的法线方向（最薄轴）
         if (ay <= ax && ay <= az) {
           // Y 是法线（最薄），RectAreaLight 默认 Z 是法线，需要把 Y 旋转到 Z
+          normalAxis = new THREE.Vector3(0, 1, 0);
           if (ax >= az) {
             // X=长边(width), Z=短边(height), Y=法线
             width = ax; height = az;
@@ -482,6 +484,7 @@ export default function BuildingScene() {
           }
         } else if (ax <= ay && ax <= az) {
           // X 是法线
+          normalAxis = new THREE.Vector3(1, 0, 0);
           if (ay >= az) {
             // Y=长边(width), Z=短边(height), X=法线
             width = ay; height = az;
@@ -496,6 +499,7 @@ export default function BuildingScene() {
           }
         } else {
           // Z 是法线（RectAreaLight 默认就是 Z 法线，无需旋转）
+          normalAxis = new THREE.Vector3(0, 0, 1);
           if (ax >= ay) {
             // X=长边(width), Y=短边(height)
             width = ax; height = ay;
@@ -786,36 +790,26 @@ export default function BuildingScene() {
     function applyLighting(T: any) {
       const s = stateRef.current.lighting;
       const b = s.brightness;
-      // RectAreaLight 黄色面光源（全局开关 + 单灯开关 individualOn 优先）
+      // RectAreaLight 桔黄色面光源（全局开关 + 单灯开关 individualOn 优先）
+      // 不再使用 mesh 自发光，完全依靠 RectAreaLight 真实照明
       T.rectLights.forEach((light: any, i: number) => {
         const fixture = T.lightFixtures[i];
         const indOn = fixture?.userData?.individualOn;
         const finalOn = s.enabled && (indOn !== false);
-        light.intensity = finalOn ? b * 150 : 0;
-      });
-      // 灯具自发光（关灯时归零，即使 mesh 隐藏也要关闭 emissive）
-      T.lightFixtures.forEach((mesh: any) => {
-        if (mesh.material && !mesh.userData._hlEmissive) {
-          mesh.material.emissiveIntensity = s.enabled ? 3 + b * 4 : 0;
-        }
+        light.intensity = finalOn ? b * 300 : 0;  // 提高强度，确保真实照明可见
       });
       // 关灯时：所有 mesh 的自发光归零（墙/桌椅/logo/空调等），避免残余亮度
       T.modelRoot.traverse((child: any) => {
         if (child.isMesh && child.material && !child.userData._hlEmissive) {
-          if (child.userData.deviceType !== 'light') {
-            child.userData._origEmissiveInt = child.userData._origEmissiveInt ?? child.material.emissiveIntensity;
-            child.material.emissiveIntensity = s.enabled ? child.userData._origEmissiveInt : 0;
-          }
+          child.userData._origEmissiveInt = child.userData._origEmissiveInt ?? child.material.emissiveIntensity;
+          child.material.emissiveIntensity = s.enabled ? child.userData._origEmissiveInt : 0;
         }
       });
       // 关灯时隐藏空调脉冲标记光柱（避免蓝色光柱干扰）
       if (T.deviceMarkers) {
         T.deviceMarkers.forEach((m: any) => { m.group.visible = s.enabled; });
       }
-      // 关灯时隐藏 RectAreaLightHelper 线框
-      if (T.rectHelpers) {
-        T.rectHelpers.forEach((h: any) => { if (h) h.visible = s.enabled; });
-      }
+      // RectAreaLightHelper 始终显示（用于检查位置），不随开关灯变化
       // 关灯时：所有光源全部归零，空间完全变黑
       const ambient = T.scene.getObjectByName('__ambient');
       if (ambient) ambient.intensity = s.enabled ? 0.4 : 0;
@@ -1157,30 +1151,23 @@ export default function BuildingScene() {
     stateRef.current.lighting.enabled = enabled;
     stateRef.current.lighting.brightness = b;
     // RectAreaLight：全局开关 + 单灯开关（individualOn 优先，未设置则跟随全局）
+    // 不再使用 mesh 自发光，完全依靠 RectAreaLight 真实照明
     T.rectLights.forEach((light: any, i: number) => {
       const fixture = T.lightFixtures[i];
       const indOn = fixture?.userData?.individualOn;
       const finalOn = enabled && (indOn !== false);
-      light.intensity = finalOn ? b * 150 : 0;
+      light.intensity = finalOn ? b * 300 : 0;
     });
-    T.lightFixtures.forEach((mesh: any) => {
-      if (mesh.material && !mesh.userData._hlEmissive) {
-        mesh.material.emissiveIntensity = enabled ? 3 + b * 4 : 0;
-      }
-    });
-    // 关灯时：所有非灯具 mesh 的自发光也归零
+    // 关灯时：所有 mesh 的自发光归零
     T.modelRoot.traverse((child: any) => {
-      if (child.isMesh && child.material && child.userData.deviceType !== 'light' && !child.userData._hlEmissive) {
+      if (child.isMesh && child.material && !child.userData._hlEmissive) {
         child.userData._origEmissiveInt = child.userData._origEmissiveInt ?? child.material.emissiveIntensity;
         child.material.emissiveIntensity = enabled ? child.userData._origEmissiveInt : 0;
       }
     });
-    // 关灯时隐藏空调脉冲标记光柱 + RectAreaLightHelper
+    // 关灯时隐藏空调脉冲标记光柱（RectAreaLightHelper 始终显示）
     if (T.deviceMarkers) {
       T.deviceMarkers.forEach((m: any) => { m.group.visible = enabled; });
-    }
-    if (T.rectHelpers) {
-      T.rectHelpers.forEach((h: any) => { if (h) h.visible = enabled; });
     }
     const ambient = T.scene.getObjectByName('__ambient');
     if (ambient) ambient.intensity = enabled ? 0.4 : 0;
