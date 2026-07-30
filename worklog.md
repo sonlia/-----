@@ -699,3 +699,47 @@ Stage Summary:
 - 移除所有 mesh 自发光依赖，完全依靠 RectAreaLight 真实照明
 - 亮度调节/开关灯/单灯开关效果均可见
 - GitHub 已同步
+
+---
+Task ID: fix-rectlight-size-invisible
+Agent: Super Z (main)
+Task: 修复 RectAreaLight 尺寸偏小不可见问题
+
+Work Log:
+- 用户反馈：没有看到 RectAreaLight，只看到了灯光模型
+
+- 诊断：
+  · rectLights.length = 54 ✓（已创建）
+  · rectLight[0].width = 0.006, height = 0.006（极小！）
+  · mesh worldScale = 297.7（模型父节点有缩放）
+  · 之前重构时把 worldScale 乘法移除了
+  · 导致 RectAreaLight width/height 比实际灯具小297倍
+  · Helper 边框也随之变得极小，肉眼不可见
+
+- 修复：
+  1. width/height 计算重新加入 worldScale:
+     - ax = |localSize.x| * sx (sx = worldScale.x)
+     - ay = |localSize.y| * sy
+     - az = |localSize.z| * sz
+     - 现在 width=1.9, height=1.85（世界单位，与灯具实际尺寸一致）
+  2. 法线方向偏移换算到本地空间:
+     - halfThicknessLocal = |normalLocalDir·localSize| / 2
+     - normalWorldScale = |nx|*sx + |ny|*sy + |nz|*sz
+     - offsetLocal = halfThicknessLocal + 5 / normalWorldScale
+     - (世界空间偏移5单位，换算到本地)
+  3. rectHelpers 查找改为从 rectLight.parent 查找
+     （之前从 scene 查找，但 helper 现在是 mesh 子节点）
+
+- 验证：
+  · rectLight[0].width: 0.006 → 1.9 ✓
+  · rectLight[0].height: 0.006 → 1.85 ✓
+  · VLM 默认视角：青色Helper边框清晰可见 + 橙色mesh线框清晰可见
+  · VLM 俯视视角：两者完全重合
+  · 灯光强度 240，真实照明效果可见
+
+Stage Summary:
+- 提交 ID: 9a3c5b7（普通 push，未 force）
+- 改动：1 文件，+17 / -13 行
+- RectAreaLight 现在尺寸正确（1.9×1.85 世界单位），与灯具模型完全重合
+- 青色Helper边框清晰可见
+- GitHub 已同步
