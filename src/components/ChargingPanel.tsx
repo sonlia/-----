@@ -1,6 +1,7 @@
 'use client';
 import { useMemo } from 'react';
 import EChart, { PALETTE, commonGrid, commonTooltip, commonAxis } from './EChart';
+import ShenzhenMap from './ShenzhenMap';
 
 interface ChargingPanelProps { kpiPower: string; }
 
@@ -189,52 +190,21 @@ export default function ChargingPanel({ kpiPower }: ChargingPanelProps) {
           <div className="panel" style={{ ...panelStyle, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, letterSpacing: '1px' }}>站点分布</span>
+              <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, letterSpacing: '1px' }}>深圳站点分布</span>
               <div style={{ display: 'flex', gap: '10px', fontSize: '10px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)' }}></span>充电中</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 6px var(--success)' }}></span>充电中</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary)' }}></span>闲置</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--danger)' }}></span>异常</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--danger)', boxShadow: '0 0 6px var(--danger)' }}></span>异常</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--text-dim)' }}></span>未启用</span>
               </div>
             </div>
-            {/* 深圳SVG地图 */}
-            <div style={{ position: 'relative', width: '100%', flex: 1, minHeight: '180px', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border-line)', background: 'radial-gradient(ellipse at center, rgba(0,30,60,0.6) 0%, rgba(2,7,15,0.9) 70%)' }}>
-              <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(0,212,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.05) 1px, transparent 1px)', backgroundSize: '25px 25px' }}></div>
-              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} viewBox="0 0 400 250" preserveAspectRatio="xMidYMid meet">
-                <path d="M 0,0 L 400,0 L 400,250 L 0,250 Z" fill="rgba(0,20,40,0.3)" />
-                <path d="M 60,180 L 80,150 L 100,140 L 120,120 L 140,110 L 160,90 L 180,80 L 200,70 L 230,65 L 260,60 L 290,55 L 320,50 L 350,45 L 370,40 L 380,60 L 375,90 L 360,110 L 340,130 L 320,145 L 300,155 L 280,165 L 260,175 L 240,185 L 220,195 L 200,205 L 180,210 L 160,215 L 140,218 L 120,220 L 100,218 L 80,210 L 60,200 Z" fill="rgba(0,40,80,0.3)" stroke="rgba(0,212,255,0.3)" strokeWidth="1.5" />
-                <path d="M 60,180 L 80,150 L 100,140 L 120,120 L 120,220 L 100,218 L 80,210 L 60,200 Z" fill="rgba(0,136,255,0.06)" stroke="rgba(0,136,255,0.2)" strokeWidth="0.8" />
-                <path d="M 120,120 L 140,110 L 160,90 L 160,215 L 140,218 L 120,220 Z" fill="rgba(0,212,255,0.06)" stroke="rgba(0,212,255,0.2)" strokeWidth="0.8" />
-                <path d="M 160,90 L 180,80 L 200,70 L 200,205 L 180,210 L 160,215 Z" fill="rgba(0,255,204,0.06)" stroke="rgba(0,255,204,0.2)" strokeWidth="0.8" />
-                <path d="M 200,70 L 230,65 L 230,195 L 200,205 Z" fill="rgba(255,204,68,0.06)" stroke="rgba(255,204,68,0.2)" strokeWidth="0.8" />
-                <path d="M 230,65 L 250,62 L 250,190 L 230,195 Z" fill="rgba(0,255,136,0.06)" stroke="rgba(0,255,136,0.2)" strokeWidth="0.8" />
-                <path d="M 250,62 L 270,58 L 270,180 L 250,190 Z" fill="rgba(0,212,255,0.06)" stroke="rgba(0,212,255,0.2)" strokeWidth="0.8" />
-                <path d="M 270,58 L 290,55 L 290,160 L 270,180 Z" fill="rgba(255,136,68,0.06)" stroke="rgba(255,136,68,0.2)" strokeWidth="0.8" />
-                <path d="M 290,55 L 320,50 L 330,140 L 300,155 L 290,160 Z" fill="rgba(0,136,255,0.06)" stroke="rgba(0,136,255,0.2)" strokeWidth="0.8" />
-                <path d="M 320,50 L 350,45 L 360,110 L 340,130 L 330,140 Z" fill="rgba(0,255,204,0.06)" stroke="rgba(0,255,204,0.2)" strokeWidth="0.8" />
-                <path d="M 350,45 L 370,40 L 380,60 L 375,90 L 360,110 Z" fill="rgba(255,204,68,0.06)" stroke="rgba(255,204,68,0.2)" strokeWidth="0.8" />
-                {[['85','175','宝安'],['130','165','光明'],['175','145','南山'],['205','130','龙华'],['232','125','福田'],['253','120','罗湖'],['275','100','盐田'],['300','100','龙岗'],['335','85','坪山'],['365','75','大鹏']].map((t, i) => (
-                  <text key={i} x={t[0]} y={t[1]} fill="rgba(138,165,196,0.6)" fontSize="9" fontFamily="Rajdhani" fontWeight="600">{t[2]}</text>
-                ))}
-                <text x="20" y="100" fill="rgba(0,100,150,0.5)" fontSize="10" fontFamily="Rajdhani">珠江口</text>
-                <text x="340" y="220" fill="rgba(0,100,150,0.5)" fontSize="10" fontFamily="Rajdhani">大鹏湾</text>
-              </svg>
-              {[
-                { x: '50%', y: '38%', s: 'charging', n: '南山站' }, { x: '56%', y: '48%', s: 'idle', n: '福田站' },
-                { x: '64%', y: '40%', s: 'charging', n: '罗湖站' }, { x: '25%', y: '68%', s: 'error', n: '宝安站' },
-                { x: '47%', y: '56%', s: 'charging', n: '龙华站' }, { x: '37%', y: '64%', s: 'idle', n: '光明站' },
-                { x: '78%', y: '38%', s: 'disabled', n: '龙岗站' }, { x: '87%', y: '32%', s: 'charging', n: '坪山站' },
-                { x: '71%', y: '30%', s: 'idle', n: '盐田站' }, { x: '93%', y: '48%', s: 'charging', n: '大鹏站' },
-              ].map((p, i) => {
-                const cs: any = { charging: '#00ff88', idle: '#00d4ff', error: '#ff4d6d', disabled: '#4a6485' };
-                return (
-                  <div key={i} style={{ position: 'absolute', left: p.x, top: p.y, transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: cs[p.s], boxShadow: `0 0 12px ${cs[p.s]}`, animation: 'pulse 2s infinite' }}></div>
-                    <div style={{ width: '2px', height: '18px', background: `linear-gradient(180deg, ${cs[p.s]}, transparent)`, marginTop: '-2px' }}></div>
-                    <div style={{ fontSize: '9px', color: '#e8f4ff', marginTop: '2px', whiteSpace: 'nowrap', textShadow: '0 0 6px rgba(0,0,0,0.9)', fontWeight: 600 }}>{p.n}</div>
-                  </div>
-                );
-              })}
+            {/* 深圳真实地图（ECharts geo + 散点） */}
+            <div style={{ flex: 1, minHeight: '180px', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border-line)', background: 'radial-gradient(ellipse at center, rgba(0,30,60,0.6) 0%, rgba(2,7,15,0.9) 70%)' }}>
+              <ShenzhenMap height="100%" />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', fontSize: '10px', color: 'var(--text-dim)' }}>
+              <span>● 区域颜色深浅 = 充电桩数量</span>
+              <span>● 鼠标悬停查看详情</span>
             </div>
           </div>
           <div className="panel" style={{ ...panelStyle, flex: '0 0 auto' }}>
