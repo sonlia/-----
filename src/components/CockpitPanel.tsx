@@ -351,6 +351,50 @@ export default function CockpitPanel({ kpiPower, lightingOn, acOn }: CockpitPane
         </div>
       </div>
 
+      {/* 负荷管理总览行 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1.6fr', gap: '10px', minHeight: '90px' }}>
+        {[
+          { label: '当前总负荷', value: totalLoad.toFixed(1), unit: 'kW', sub: `负载率 ${(totalLoad / 200 * 100).toFixed(1)}%`, color: PALETTE.warn, icon: '⚡' },
+          { label: '可控负荷', value: (totalLoad * 0.35).toFixed(1), unit: 'kW', sub: `占比 35.0%`, color: PALETTE.success, icon: '🎛' },
+          { label: '快调容量', value: (totalLoad * 0.18).toFixed(1), unit: 'kW', sub: '< 5 分钟响应', color: PALETTE.primary, icon: '⚡' },
+          { label: '调节日收益', value: '633', unit: '元', sub: '削峰填谷+补贴', color: PALETTE.warn, icon: '💰' },
+        ].map((k, i) => (
+          <div key={i} className="panel" style={{ ...panelStyle, borderLeft: `3px solid ${k.color}` }}>
+            <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+            <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '14px' }}>{k.icon}</span>{k.label}
+            </div>
+            <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '22px', fontWeight: 700, color: k.color, textShadow: `0 0 8px ${k.color}60`, lineHeight: 1.1 }}>
+              {k.value}<span style={{ fontSize: '11px', color: 'var(--text-dim)', marginLeft: '3px' }}>{k.unit}</span>
+            </div>
+            <div style={{ fontSize: '9px', color: k.color, marginTop: '3px', opacity: 0.8 }}>{k.sub}</div>
+          </div>
+        ))}
+        {/* 4 段母线负载条 */}
+        <div className="panel" style={{ ...panelStyle }}>
+          <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+          <div style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 600, marginBottom: '6px', letterSpacing: '1px' }}>🎛 母线负载与可调容量</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {[
+              { n: 'I段', load: 38.5, cap: 60, ctrl: 18.2, col: PALETTE.primary },
+              { n: 'II段', load: 25.2, cap: 50, ctrl: 12.4, col: PALETTE.cyanGlow },
+              { n: 'III段', load: 18.6, cap: 40, ctrl: 8.5, col: PALETTE.warn },
+              { n: '光伏', load: pvOutput, cap: 50, ctrl: 25.0, col: '#ff8844' },
+            ].map((b, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '9px' }}>
+                <span style={{ color: 'var(--text-mid)', width: '32px', flexShrink: 0 }}>{b.n}</span>
+                <div style={{ flex: 1, height: '10px', background: 'rgba(0,212,255,0.06)', borderRadius: '2px', overflow: 'hidden', display: 'flex' }}>
+                  <div style={{ width: `${b.load / b.cap * 100}%`, background: b.col, boxShadow: `0 0 4px ${b.col}` }}></div>
+                  <div style={{ width: `${b.ctrl / b.cap * 100}%`, background: `${PALETTE.success}80`, borderLeft: `1px solid ${PALETTE.success}` }}></div>
+                </div>
+                <span style={{ color: b.col, fontFamily: 'Orbitron, monospace', width: '40px', textAlign: 'right', flexShrink: 0 }}>{b.load}/{b.cap}</span>
+                <span style={{ color: PALETTE.success, fontFamily: 'Orbitron, monospace', width: '28px', textAlign: 'right', flexShrink: 0 }}>+{b.ctrl}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* 底部：价值呈现 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 1fr', gap: '10px', minHeight: '170px' }}>
         <div className="panel" style={{ ...panelStyle }}>

@@ -5,6 +5,7 @@ import CockpitPanel from './CockpitPanel';
 import SolarPanel from './SolarPanel';
 import CarbonPanel from './CarbonPanel';
 import ChargingPanel from './ChargingPanel';
+import LoadManagementPanel from './LoadManagementPanel';
 import * as THREE from 'three';
 import { WebGPURenderer, RectAreaLightNode } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -58,7 +59,7 @@ export default function BuildingScene() {
   const [temperature, setTemperature] = useState(24);
   const [autoRotate, setAutoRotate] = useState(false);
   const [showList, setShowList] = useState(true);
-  const [activeModule, setActiveModule] = useState<'overview' | 'building' | 'solar' | 'charging' | 'carbon'>('building');
+  const [activeModule, setActiveModule] = useState<'overview' | 'building' | 'solar' | 'charging' | 'carbon' | 'load'>('building');
   const [activeFloor, setActiveFloor] = useState(0);
 
   const [deviceList, setDeviceList] = useState<DeviceListItem[]>([]);
@@ -1116,7 +1117,7 @@ export default function BuildingScene() {
   const floorBtnStyle = (active: boolean): React.CSSProperties => ({ padding: '6px 4px', fontSize: '11px', fontWeight: 600, border: '1px solid ' + (active ? 'var(--primary)' : 'var(--border-line)'), background: active ? 'var(--primary-bg)' : 'transparent', color: active ? 'var(--primary)' : 'var(--text-mid)', borderRadius: '3px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: active ? '0 0 8px rgba(0,212,255,0.3)' : 'none', textAlign: 'center' as const });
 
   // 模块切换
-  const onSwitchModule = (mod: 'overview' | 'building' | 'solar' | 'charging' | 'carbon') => {
+  const onSwitchModule = (mod: 'overview' | 'building' | 'solar' | 'charging' | 'carbon' | 'load') => {
     setActiveModule(mod);
     const T = threeRef.current;
     if (!T.scene) return;
@@ -1126,7 +1127,7 @@ export default function BuildingScene() {
     T.deviceMarkers?.forEach((m: any) => { m.group.visible = (mod === 'building'); });
     T.airflowSystems?.forEach((s: any) => { s.points.visible = (mod === 'building'); });
     if (mod === 'building') { T.fitCameraToModel?.(T); showToast('已切换至楼宇管理'); }
-    else { showToast('已切换至' + (mod === 'overview' ? '能源总览' : mod === 'solar' ? '光伏发电' : mod === 'charging' ? '充电桩' : '碳监测')); }
+    else { showToast('已切换至' + (mod === 'overview' ? '能源总览' : mod === 'solar' ? '光伏发电' : mod === 'charging' ? '充电桩' : mod === 'load' ? '负荷管理' : '碳监测')); }
   };
 
   // 闭包版状态应用（避免依赖 effect 内函数）
@@ -1387,6 +1388,7 @@ export default function BuildingScene() {
           { id: 'building', label: '楼宇管理', icon: '🏢' },
           { id: 'solar', label: '光伏发电', icon: '☀' },
           { id: 'charging', label: '充电桩', icon: '🔌' },
+          { id: 'load', label: '负荷管理', icon: '🎛' },
           { id: 'carbon', label: '碳监测', icon: '🌱' },
         ].map((mod) => (
           <button key={mod.id} onClick={() => onSwitchModule(mod.id as any)} style={{ padding: '8px 18px', fontSize: '13px', fontWeight: 600, letterSpacing: '1px', border: '1px solid ' + (activeModule === mod.id ? 'var(--primary)' : 'transparent'), background: activeModule === mod.id ? 'var(--primary-bg)' : 'transparent', color: activeModule === mod.id ? 'var(--primary)' : 'var(--text-mid)', borderRadius: '4px', cursor: 'pointer', transition: 'all 0.25s', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: activeModule === mod.id ? '0 0 12px rgba(0,212,255,0.3)' : 'none' }}>
@@ -1400,6 +1402,7 @@ export default function BuildingScene() {
       {activeModule === 'solar' && <SolarPanel kpiPower={kpiPower} />}
       {activeModule === 'carbon' && <CarbonPanel kpiPower={kpiPower} />}
       {activeModule === 'charging' && <ChargingPanel kpiPower={kpiPower} />}
+      {activeModule === 'load' && <LoadManagementPanel kpiPower={kpiPower} />}
 
       {/* 操作提示 - 仅楼宇模块显示 */}
       {activeModule === 'building' && (
