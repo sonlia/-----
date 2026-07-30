@@ -164,3 +164,45 @@ Stage Summary:
 - 页面正常渲染：模型显示、灯具发光、UI 齐全
 - 交互正常：点击设备显示详情、照明开关影响运行设备数
 - 代码已推送 GitHub: sonlia/----- main 分支
+
+---
+Task ID: canvas-charts-upgrade
+Agent: Super Z (main)
+Task: 升级 CockpitPanel/SolarPanel/CarbonPanel 三大模块为 Canvas 图表
+
+Work Log:
+- 评估现状：5模块中充电桩和楼宇已具备完整功能，但 CockpitPanel/SolarPanel/CarbonPanel 使用 HTML/CSS/SVG 简易图表，缺乏大屏科技感
+- 升级 CockpitPanel（能源总览）:
+  · 配网负荷柱状图：4段母线对比，容量背景灰条+实际值渐变发光柱
+  · 需量仪表盘：半圆弧 + 10刻度 + 绿黄红渐变弧
+  · 供电构成饼图：双源镂空（电网蓝+光伏黄），中心显示总负荷
+  · 24h负荷趋势：钟形曲线+渐变填充+当前点脉冲+峰值标记
+  · 负荷响应能力5维雷达：调节/合格/速率/容量/柔性
+  · 潜力池漏斗图：总能耗→已节能→待挖掘三段渐变
+- 升级 SolarPanel（光伏发电）:
+  · 24h发电功率钟形曲线：6:00-18:00正弦，峰值48.2kW标记
+  · 逆变器效率仪表盘：96.2% 半圆+刻度
+  · 资产健康度三环图：效率/清洁/在线率同心圆
+  · 度电成本对比柱状图：电网/光伏/储能三分柱
+  · 各区域辐照度水平条形图：4区域W/m²
+- 升级 CarbonPanel（碳监测）:
+  · Scope 1/2/3 排放源构成饼图：85%/8%/7% 镂空
+  · 12月碳排放趋势柱状图：去年vs今年双柱对比
+  · 碳中和进度环：外环渐变+内环CCER抵消25%+刻度
+  · 重点排放源水平条形图：4源 kgCO₂/h
+- 统一技术规范：
+  · 所有 Canvas 使用 setupHiDPI 函数（DPR适配，高清渲染）
+  · 渐变填充 + 阴影发光 + Orbitron数字字体
+  · 网格线 rgba(0,212,255,0.06) 浅色，不干扰主数据
+  · 图表与 KPI 卡片、信息列表混合布局，flex:1 自适应
+- 视觉验证（agent-browser + VLM）:
+  · 截图4个模块大屏（cockpit/solar/carbon/charging）+ building
+  · VLM 评价：科技感强、Canvas图表清晰锐利、无溢出无截断、布局工整
+  · 仅 minor：个别 emoji 在 headless 浏览器显示为红叉（真实浏览器正常）
+
+Stage Summary:
+- 提交 ID: 98022bd（普通 push，未 force）
+- 3 个模块文件改动：+672 行 / -207 行
+- 5 大模块全部具备 Canvas 图表能力，统一科技感视觉
+- 1920×1080 布局完整无溢出
+- GitHub 已同步：sonlia/-----  main 分支
