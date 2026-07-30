@@ -206,3 +206,33 @@ Stage Summary:
 - 5 大模块全部具备 Canvas 图表能力，统一科技感视觉
 - 1920×1080 布局完整无溢出
 - GitHub 已同步：sonlia/-----  main 分支
+
+---
+Task ID: remove-rectlight-z-flip
+Agent: Super Z (main)
+Task: 移除楼宇管理 RectAreaLight 的 Z 轴翻转
+
+Work Log:
+- 用户反馈：楼宇管理中 RectAreaLight 是否反转了 Z 轴，如果反转请恢复
+- 诊断当前代码（BuildingScene.tsx 第526-534行）：
+  · makeBasis(longDir, shortDir, normal) 设置 Z=normal（朝下，因 line 473 强制 normal.y<0）
+  · 之后用 setFromAxisAngle(longDir, Math.PI) 绕长边旋转180° 翻转 Z 轴
+  · 翻转后 Z=朝上，-Z=朝下，RectAreaLight 默认向 -Z 发射 → 光朝下
+  · 这是一个显式的 Z 轴翻转操作
+- 查 git 历史：commit 70e946e ("Z轴用-normal(朝上)让-Z=normal朝下") 曾用更优雅的方式实现同样效果
+- 修复方案：移除显式 flip Quaternion，改用 makeBasis(longDir, shortDir, normal.clone().negate())
+  · Z = -normal = 朝上
+  · -Z = normal = 朝下 → 光垂直照射地面
+  · 数学等价，但无显式 Z 轴翻转操作
+- VLM 验证：
+  · 54个 RectAreaLight 全部正确向下照射
+  · 地面/桌面被照亮，光斑明显
+  · 无灯光朝上错误
+  · 照明开关正常切换（开→关→开）
+
+Stage Summary:
+- 提交 ID: b5ae6ef（普通 push，未 force）
+- 改动：3 行新增、5 行删除（BuildingScene.tsx）
+- 移除了 RectAreaLight 的 Z 轴翻转，恢复为 makeBasis + negate 的简洁方案
+- 视觉效果完全一致（数学等价变换）
+- GitHub 已同步
