@@ -658,3 +658,44 @@ Stage Summary:
 - RectAreaLight 边框可见，方便检查位置
 - 灯光颜色改为桔黄色
 - GitHub 已同步
+
+---
+Task ID: fix-rectlight-not-created
+Agent: Super Z (main)
+Task: 修复 RectAreaLight 未创建的bug + 移除mesh自发光依赖
+
+Work Log:
+- 用户反馈：之前的灯光效果只是 mesh 自发光，不是真正的 RectAreaLight
+  需要 RectAreaLight 在模型位置等大、旋转一致的真实灯光
+
+- 诊断：
+  · 检查 window.__three.rectLights.length = 0（应该是 54）
+  · 根因：normalAxis 变量未声明就使用，导致 ReferenceError 中断 forEach
+  · 之前重构时将 widthAxis/heightAxis/normalAxis 三变量改为 width/height 数字
+  · 但后续代码仍引用 normalAxis，导致整个 setupPointLights 在第一个灯具就抛错
+  · rectLights 数组为空，亮度调节无法生效
+  · 只能依靠 mesh.material.emissiveIntensity 自发光显示灯光
+
+- 修复：
+  1. 重新声明 normalAxis 变量（在 if/else 各分支中赋值）
+  2. 移除所有 mesh 自发光依赖：
+     - applyLighting: 不再设置 lightFixtures.material.emissiveIntensity
+     - applyLightingClosure: 同样移除
+  3. 提高强度：b * 150 → b * 300（确保真实照明可见）
+  4. RectAreaLightHelper 始终显示（不随开关灯变化），方便检查位置
+
+- 验证：
+  · rectLights.length: 0 → 54 ✓
+  · rectLight[0].intensity 20%→60, 100%→300 ✓
+  · VLM 验证亮度调节：20% vs 100% 光斑范围/亮度显著差异 ✓
+  · VLM 验证开关灯：关灯全黑，开灯有光斑 ✓
+  · VLM 确认：青色Helper边框可见、橙色半透明mesh线框可见
+  · VLM 确认：灯光为真实照明（有光斑投影），非mesh自发光
+
+Stage Summary:
+- 提交 ID: fef26b3（普通 push，未 force）
+- 改动：1 文件，+15 / -28 行
+- 核心bug修复：RectAreaLight 现在真正被创建（54个）
+- 移除所有 mesh 自发光依赖，完全依靠 RectAreaLight 真实照明
+- 亮度调节/开关灯/单灯开关效果均可见
+- GitHub 已同步
