@@ -82,6 +82,7 @@ function SubsystemCard({ title, icon, accent, status, problem, value, spark }: S
 export default function CockpitPanel({ kpiPower, lightingOn, acOn }: CockpitPanelProps) {
   const power = parseFloat(kpiPower || '0');
   const totalLoad = power + 18.6;
+  const totalControllable = totalLoad * 0.35; // 35% 可控
   const pvOutput = 32.5;
   const gridPower = Math.max(0, totalLoad - pvOutput);
   const pvSelfRate = pvOutput > 0 ? (Math.min(pvOutput, totalLoad * 0.3) / pvOutput * 100) : 0;
@@ -180,54 +181,73 @@ export default function CockpitPanel({ kpiPower, lightingOn, acOn }: CockpitPane
     }],
   }), []);
 
-  // 4. 价值雷达图 - 5个子系统综合评分
-  const valueRadarOption = useMemo(() => ({
-    tooltip: { ...commonTooltip },
-    legend: {
-      data: ['现状', '行业基准'],
-      textStyle: { color: PALETTE.textMid, fontSize: 10 },
-      top: 0, right: 0, itemWidth: 10, itemHeight: 6,
-    },
-    radar: {
-      indicator: [
-        { name: '配电网', max: 100 },
-        { name: '光伏', max: 100 },
-        { name: '充电桩', max: 100 },
-        { name: '空调节能', max: 100 },
-        { name: '楼宇控制', max: 100 },
+  // 4. 负荷曲线 + 响应曲线 + 响应收益曲线（5min 时间点，今日 96 点）
+  const loadCurveOption = useMemo(() => {
+    // 5 分钟一个点，今日 0:00~24:00 共 288 点；为可读性取每 30min 显示一个标签
+    const totalPoints = 288;
+    const labels: string[] = [];
+    const loadSeries: number[] = [];
+    const responseSeries: number[] = [];
+    const revenueSeries: number[] = [];
+    for (let i = 0; i < totalPoints; i++) {
+      const totalMin = i * 5;
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      // 每 30min 显示一个刻度
+      labels.push(m === 0 ? `${String(h).padStart(2, '0')}:00` : (m === 30 ? `${String(h).padStart(2, '0')}:30` : ''));
+      // 当前总负荷曲线：日间高夜间低（钟形）
+      const hourFrac = totalMin / 60;
+      const base = totalLoad * (0.35 + 0.65 * Math.max(0, Math.sin((hourFrac - 6) / 24 * Math.PI * 2 + Math.PI / 2)));
+      // 工作时段峰值波动
+      const peak = hourFrac >= 9 && hourFrac <= 18 ? 8 * Math.sin((hourFrac - 9) / 9 * Math.PI) : 0;
+      loadSeries.push(+(base + peak + (Math.random() * 2 - 1)).toFixed(2));
+      // 响应负荷曲线：跟随负荷但更平滑（晚峰/早峰响应）
+      const respBase = totalControllable * (0.4 + 0.6 * Math.max(0, Math.sin((hourFrac - 6) / 24 * Math.PI * 2 + Math.PI / 2)));
+      const respPeak = (hourFrac >= 17 && hourFrac <= 21) ? 6 * Math.sin((hourFrac - 17) / 4 * Math.PI) : 0;
+      responseSeries.push(+Math.max(0, respBase + respPeak + (Math.random() * 1 - 0.5)).toFixed(2));
+      // 响应收益（累计）：响应负荷 × 单价（元/kWh）按 5min 折算
+      const price = (hourFrac >= 8 && hourFrac <= 11) || (hourFrac >= 18 && hourFrac <= 21) ? 1.2 : 0.6; // 峰时1.2元 平时0.6元
+      const prev = i === 0 ? 0 : revenueSeries[i - 1];
+      revenueSeries.push(+(prev + responseSeries[i] * price * (5 / 60)).toFixed(2));
+    }
+    return {
+      tooltip: {
+        ...commonTooltip,
+        trigger: 'axis',
+        formatter: (params: any) => {
+          const idx = params[0].dataIndex;
+          const totalMin = idx * 5;
+          const h = String(Math.floor(totalMin / 60)).padStart(2, '0');
+          const m = String(totalMin % 60).padStart(2, '0');
+          return `<b style="color:${PALETTE.primary}">${h}:${m}</b><br/>` +
+            params.map((p: any) => `<span style="display:inline-block;width:10px;height:10px;background:${p.color};border-radius:50%;margin-right:6px"></span>${p.seriesName}: <b style="color:${p.color}">${p.value.toFixed(1)} ${p.seriesName === '响应收益' ? '元' : 'kW'}</b>`).join('<br/>');
+        },
+      },
+      legend: { data: ['当前负荷', '响应负荷', '响应收益'], textStyle: { color: PALETTE.textMid, fontSize: 10 }, top: 0, right: 0, itemWidth: 10, itemHeight: 6 },
+      grid: { ...commonGrid, left: 44, right: 50, top: 26, bottom: 24 },
+      xAxis: { type: 'category', data: labels, ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 9, interval: 29, rotate: 0 } },
+      yAxis: [
+        { type: 'value', name: 'kW', ...commonAxis, nameTextStyle: { color: PALETTE.textDim, fontSize: 9 } },
+        { type: 'value', name: '元', nameTextStyle: { color: PALETTE.textDim, fontSize: 9 }, axisLine: { lineStyle: { color: 'rgba(138,165,196,0.3)' } }, axisLabel: { color: PALETTE.textMid, fontSize: 9, fontFamily: 'Rajdhani' }, splitLine: { show: false } },
       ],
-      center: ['50%', '55%'],
-      radius: '62%',
-      axisName: { color: PALETTE.textMid, fontSize: 10, fontFamily: 'Rajdhani' },
-      splitLine: { lineStyle: { color: 'rgba(0,212,255,0.15)' } },
-      splitArea: { areaStyle: { color: ['rgba(0,212,255,0.02)', 'rgba(0,212,255,0.04)'] } },
-      axisLine: { lineStyle: { color: 'rgba(0,212,255,0.2)' } },
-    },
-    series: [{
-      type: 'radar',
-      data: [
-        { value: [82, 76, 88, 71, 85], name: '现状', areaStyle: { color: 'rgba(0,212,255,0.25)' }, lineStyle: { color: PALETTE.primary, width: 2 }, itemStyle: { color: PALETTE.primary } },
-        { value: [65, 60, 70, 60, 65], name: '行业基准', areaStyle: { color: 'rgba(255,170,68,0.15)' }, lineStyle: { color: PALETTE.warn, width: 1.5, type: 'dashed' }, itemStyle: { color: PALETTE.warn } },
+      series: [
+        {
+          name: '当前负荷', type: 'line', smooth: true, symbol: 'none', data: loadSeries, yAxisIndex: 0,
+          lineStyle: { color: PALETTE.warn, width: 2 }, itemStyle: { color: PALETTE.warn },
+          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(255,170,68,0.3)' }, { offset: 1, color: 'rgba(255,170,68,0)' }] } },
+        },
+        {
+          name: '响应负荷', type: 'line', smooth: true, symbol: 'none', data: responseSeries, yAxisIndex: 0,
+          lineStyle: { color: PALETTE.success, width: 2 }, itemStyle: { color: PALETTE.success },
+          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(0,255,136,0.35)' }, { offset: 1, color: 'rgba(0,255,136,0)' }] } },
+        },
+        {
+          name: '响应收益', type: 'line', smooth: true, symbol: 'none', data: revenueSeries, yAxisIndex: 1,
+          lineStyle: { color: PALETTE.cyanGlow, width: 2, type: 'dashed' }, itemStyle: { color: PALETTE.cyanGlow },
+        },
       ],
-    }],
-  }), []);
-
-  // 5. 子系统能效对比柱状图
-  const efficiencyOption = useMemo(() => ({
-    tooltip: { ...commonTooltip, trigger: 'axis' },
-    legend: {
-      data: ['能效', '潜力'],
-      textStyle: { color: PALETTE.textMid, fontSize: 10 },
-      top: 0, right: 0, itemWidth: 10, itemHeight: 6,
-    },
-    grid: { ...commonGrid, left: 36, right: 12, top: 26, bottom: 22 },
-    xAxis: { type: 'category', data: ['配电网', '光伏', '充电桩', '空调节能', '楼宇控制'], ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 9 } },
-    yAxis: { type: 'value', max: 100, ...commonAxis },
-    series: [
-      { name: '能效', type: 'bar', barWidth: 14, data: [82, 76, 88, 71, 85], itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: PALETTE.primary }, { offset: 1, color: PALETTE.primaryDeep }] }, borderRadius: [3, 3, 0, 0] }, label: { show: true, position: 'top', color: PALETTE.primary, fontSize: 10, fontFamily: 'Orbitron' } },
-      { name: '潜力', type: 'bar', barWidth: 14, data: [12, 24, 8, 19, 15], itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: PALETTE.cyanGlow }, { offset: 1, color: PALETTE.cyanGlow + '40' }] }, borderRadius: [3, 3, 0, 0] }, label: { show: true, position: 'top', color: PALETTE.cyanGlow, fontSize: 10, fontFamily: 'Orbitron' } },
-    ],
-  }), []);
+    };
+  }, [totalLoad, totalControllable]);
 
   // 6. 减碳贡献饼图
   const carbonOption = useMemo(() => ({
@@ -395,22 +415,24 @@ export default function CockpitPanel({ kpiPower, lightingOn, acOn }: CockpitPane
         </div>
       </div>
 
-      {/* 底部：价值呈现 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 1fr', gap: '10px', minHeight: '170px' }}>
-        <div className="panel" style={{ ...panelStyle }}>
+      {/* 底部：负荷曲线 + 减碳贡献（负荷/响应/收益 5min曲线 + 减碳饼图） */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr', gap: '10px', minHeight: '180px' }}>
+        <div className="panel" style={{ ...panelStyle, display: 'flex', flexDirection: 'column' }}>
           <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-          <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>🎯 子系统综合价值雷达</div>
-          <EChart option={valueRadarOption} height={140} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, letterSpacing: '1px' }}>📈 今日负荷曲线 + 响应负荷 + 响应收益（5min 时间点）</span>
+            <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>峰时 1.2 元/kWh · 平时 0.6 元/kWh</span>
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <EChart option={loadCurveOption} height="100%" style={{ height: '100%' }} />
+          </div>
         </div>
-        <div className="panel" style={{ ...panelStyle }}>
-          <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-          <div style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>💎 能效与潜力对比</div>
-          <EChart option={efficiencyOption} height={140} />
-        </div>
-        <div className="panel" style={{ ...panelStyle }}>
+        <div className="panel" style={{ ...panelStyle, display: 'flex', flexDirection: 'column' }}>
           <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
           <div style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>🌱 减碳贡献构成</div>
-          <EChart option={carbonOption} height={140} />
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <EChart option={carbonOption} height="100%" style={{ height: '100%' }} />
+          </div>
         </div>
       </div>
     </div>

@@ -32,21 +32,53 @@ export default function LoadManagementPanel({ kpiPower }: LoadManagementPanelPro
   const totalRevenue = BUSES.reduce((s, b) => s + b.revenue, 0);
   const panelStyle: React.CSSProperties = { position: 'relative', padding: '14px 16px' };
 
-  // 1. 母线负载与可调容量对比（堆叠柱状图）
-  const busBarOption = useMemo(() => ({
+  // 1a. 各母线当前负载（独立柱状图）+ 容量上限参考线
+  const busLoadOption = useMemo(() => ({
     tooltip: { ...commonTooltip, trigger: 'axis', formatter: (params: any) => {
       const bus = BUSES[params[0].dataIndex];
-      return `<b style="color:${PALETTE.primary}">${bus.name}</b><br/>当前负载: <b style="color:${PALETTE.warn}">${bus.load} kW</b> / 容量 ${bus.cap} kW (${(bus.load/bus.cap*100).toFixed(1)}%)<br/>可调容量: <b style="color:${PALETTE.success}">${bus.controllable} kW</b><br/>&nbsp;&nbsp;快调: ${bus.fast} kW · 慢调: ${bus.slow} kW<br/>调节收益: <b style="color:${PALETTE.warn}">¥${bus.revenue}/日</b>`;
+      return `<b style="color:${PALETTE.primary}">${bus.name}</b><br/>当前负载: <b style="color:${PALETTE.warn}">${bus.load} kW</b><br/>额定容量: <b style="color:${PALETTE.textMid}">${bus.cap} kW</b><br/>负载率: <b style="color:${bus.load / bus.cap > 0.8 ? PALETTE.danger : bus.load / bus.cap > 0.6 ? PALETTE.warn : PALETTE.success}">${(bus.load / bus.cap * 100).toFixed(1)}%</b>`;
     }},
-    legend: { data: ['负载', '快调容量', '慢调容量', '剩余容量'], textStyle: { color: PALETTE.textMid, fontSize: 10 }, top: 0, right: 0, itemWidth: 10, itemHeight: 6 },
-    grid: { ...commonGrid, left: 40, right: 16, top: 30, bottom: 24 },
+    grid: { ...commonGrid, left: 36, right: 16, top: 14, bottom: 24 },
     xAxis: { type: 'category', data: BUSES.map(b => b.name), ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 10 } },
-    yAxis: { type: 'value', name: 'kW', max: Math.max(...BUSES.map(b => b.cap)), ...commonAxis, nameTextStyle: { color: PALETTE.textDim, fontSize: 9 } },
+    yAxis: { type: 'value', name: 'kW', max: Math.max(...BUSES.map(b => b.cap)) * 1.1, ...commonAxis, nameTextStyle: { color: PALETTE.textDim, fontSize: 9 } },
+    series: [{
+      type: 'bar', barWidth: 32,
+      data: BUSES.map(b => ({
+        value: b.load,
+        itemStyle: {
+          color: {
+            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: b.load / b.cap > 0.8 ? PALETTE.danger : b.load / b.cap > 0.6 ? PALETTE.warn : PALETTE.primary },
+              { offset: 1, color: (b.load / b.cap > 0.8 ? PALETTE.danger : b.load / b.cap > 0.6 ? PALETTE.warn : PALETTE.primary) + '40' },
+            ],
+          },
+          borderRadius: [4, 4, 0, 0],
+        },
+      })),
+      label: { show: true, position: 'top', color: PALETTE.warn, fontSize: 11, fontFamily: 'Orbitron', fontWeight: 700, formatter: '{c}' },
+      markLine: {
+        symbol: 'none', silent: true,
+        lineStyle: { color: PALETTE.danger, type: 'dashed', width: 1 },
+        data: BUSES.map(b => ({ yAxis: b.cap, name: b.name + '容量' })),
+        label: { show: false },
+      },
+    }],
+  }), []);
+
+  // 1b. 各母线可调容量（独立柱状图，快调+慢调分组对比）
+  const busControllableOption = useMemo(() => ({
+    tooltip: { ...commonTooltip, trigger: 'axis', formatter: (params: any) => {
+      const bus = BUSES[params[0].dataIndex];
+      return `<b style="color:${PALETTE.success}">${bus.name}</b><br/>可调容量: <b style="color:${PALETTE.success}">${bus.controllable} kW</b><br/>&nbsp;&nbsp;快调: <b style="color:${PALETTE.success}">${bus.fast} kW</b> (&lt;5min)<br/>&nbsp;&nbsp;慢调: <b style="color:${PALETTE.cyanGlow}">${bus.slow} kW</b> (5~30min)<br/>调节收益: <b style="color:${PALETTE.warn}">¥${bus.revenue}/日</b>`;
+    }},
+    legend: { data: ['快调容量', '慢调容量'], textStyle: { color: PALETTE.textMid, fontSize: 10 }, top: 0, right: 0, itemWidth: 10, itemHeight: 6 },
+    grid: { ...commonGrid, left: 36, right: 16, top: 26, bottom: 24 },
+    xAxis: { type: 'category', data: BUSES.map(b => b.name), ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 10 } },
+    yAxis: { type: 'value', name: 'kW', max: Math.max(...BUSES.map(b => b.controllable)) * 1.25, ...commonAxis, nameTextStyle: { color: PALETTE.textDim, fontSize: 9 } },
     series: [
-      { name: '负载', type: 'bar', stack: 'a', barWidth: 28, data: BUSES.map(b => b.load), itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: PALETTE.warn }, { offset: 1, color: PALETTE.warn + '60' }] } }, label: { show: true, position: 'inside', color: '#fff', fontSize: 10, fontFamily: 'Orbitron', fontWeight: 700, formatter: '{c}' } },
-      { name: '快调容量', type: 'bar', stack: 'a', barWidth: 28, data: BUSES.map(b => b.fast), itemStyle: { color: PALETTE.success } },
-      { name: '慢调容量', type: 'bar', stack: 'a', barWidth: 28, data: BUSES.map(b => b.slow), itemStyle: { color: PALETTE.cyanGlow } },
-      { name: '剩余容量', type: 'bar', stack: 'a', barWidth: 28, data: BUSES.map(b => b.cap - b.load), itemStyle: { color: 'rgba(0,212,255,0.08)' } },
+      { name: '快调容量', type: 'bar', barWidth: 14, data: BUSES.map(b => b.fast), itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: PALETTE.success }, { offset: 1, color: PALETTE.success + '40' }] }, borderRadius: [4, 4, 0, 0] }, label: { show: true, position: 'top', color: PALETTE.success, fontSize: 9, fontFamily: 'Orbitron' } },
+      { name: '慢调容量', type: 'bar', barWidth: 14, data: BUSES.map(b => b.slow), itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: PALETTE.cyanGlow }, { offset: 1, color: PALETTE.cyanGlow + '40' }] }, borderRadius: [4, 4, 0, 0] }, label: { show: true, position: 'top', color: PALETTE.cyanGlow, fontSize: 9, fontFamily: 'Orbitron' } },
     ],
   }), []);
 
@@ -188,20 +220,30 @@ export default function LoadManagementPanel({ kpiPower }: LoadManagementPanelPro
         ))}
       </div>
 
-      {/* 主图区 */}
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '10px', minHeight: 0 }}>
-        {/* 左：母线负载与可调容量堆叠 */}
+      {/* 主图区：当前负载 / 可调容量 / 24h曲线 三栏并列 */}
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1.4fr', gap: '10px', minHeight: 0 }}>
+        {/* 1. 各母线当前负载（独立柱状图）+ 容量上限参考线 */}
         <div className="panel" style={{ ...panelStyle, display: 'flex', flexDirection: 'column' }}>
           <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-          <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>📊 各母线负载与可调容量构成 (kW)</div>
+          <div style={{ fontSize: '13px', color: 'var(--warn)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>📊 各母线当前负载 (kW)</div>
+          <div style={{ fontSize: '9px', color: 'var(--text-dim)', marginBottom: '4px' }}>虚线=额定容量 · 颜色编码负载率</div>
           <div style={{ flex: 1, minHeight: 0 }}>
-            <EChart option={busBarOption} height="100%" style={{ height: '100%' }} />
+            <EChart option={busLoadOption} height="100%" style={{ height: '100%' }} />
           </div>
         </div>
-        {/* 右：24h 负荷曲线 */}
+        {/* 2. 各母线可调容量（独立柱状图，快调+慢调分组） */}
         <div className="panel" style={{ ...panelStyle, display: 'flex', flexDirection: 'column' }}>
           <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-          <div style={{ fontSize: '13px', color: 'var(--warn)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>📈 24h 负荷曲线 + 可调容量 (kW)</div>
+          <div style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>🎛 各母线可调容量 (kW)</div>
+          <div style={{ fontSize: '9px', color: 'var(--text-dim)', marginBottom: '4px' }}>快调 &lt; 5min · 慢调 5~30min</div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <EChart option={busControllableOption} height="100%" style={{ height: '100%' }} />
+          </div>
+        </div>
+        {/* 3. 24h 负荷曲线 + 可调容量 */}
+        <div className="panel" style={{ ...panelStyle, display: 'flex', flexDirection: 'column' }}>
+          <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+          <div style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>📈 24h 负荷曲线 + 可调容量 (kW)</div>
           <div style={{ flex: 1, minHeight: 0 }}>
             <EChart option={dailyOption} height="100%" style={{ height: '100%' }} />
           </div>
