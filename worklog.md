@@ -236,3 +236,32 @@ Stage Summary:
 - 移除了 RectAreaLight 的 Z 轴翻转，恢复为 makeBasis + negate 的简洁方案
 - 视觉效果完全一致（数学等价变换）
 - GitHub 已同步
+
+---
+Task ID: fix-rectlight-alignment
+Agent: Super Z (main)
+Task: 修复 RectAreaLight 位置/旋转与灯具模型不匹配
+
+Work Log:
+- 用户反馈：RectAreaLight 位置和旋转与灯光模型不匹配
+- 诊断：先用橙色线框显示原始mesh + 青色线框显示RectAreaLightHelper对比
+- VLM 验证发现：凸包算法给出的旋转相对mesh偏了约90°
+- 根因分析：凸包算法找矩形4角顶点，"最长边"方向可能对应mesh的X轴或Z轴
+  (取决于顶点在buffer中的顺序)，导致longDir/shortDir互换，旋转90°
+- 修复方案：放弃凸包算法，改用直接复制mesh世界变换(参考f90218a)
+  · mesh.getWorldQuaternion() 获取世界旋转
+  · mesh.matrixWorld 变换本地包围盒中心得到世界位置
+  · 自适应判断：最薄轴=法线，剩余较长=宽，较短=高
+  · makeBasis(宽轴, 高轴, -法线) → Z=-法线朝上，-Z=法线朝下
+  · 光垂直照射地面，无需额外翻转Quaternion
+- 临时显示橙色mesh+青色Helper对比验证：
+  · VLM 确认：位置完全重合、旋转一致(无90°偏差)、大小匹配
+  · 俯视图+默认视角均验证对齐
+- 恢复：隐藏原始mesh，Helper恢复品红色
+
+Stage Summary:
+- 提交 ID: 5d3afbd（普通 push，未 force）
+- 改动：47 行新增、72 行删除（BuildingScene.tsx）
+- 代码更简洁：从凸包算法(70+行)简化为直接矩阵变换(40行)
+- RectAreaLight 与灯具模型位置/旋转/大小完全匹配
+- GitHub 已同步
