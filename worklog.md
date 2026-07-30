@@ -624,3 +624,37 @@ Stage Summary:
 - RectAreaLight 与灯具模型位置/旋转/尺寸完全1:1重合
 - 移除了所有灯光朝下的逻辑实现
 - GitHub 已同步
+
+---
+Task ID: show-helper-and-orange-light
+Agent: Super Z (main)
+Task: 显示RectAreaLight边框 + 灯光改为桔黄色
+
+Work Log:
+- 用户需求：
+  1. 显示出 RectAreaLight 的边框，方便检查位置是否合理
+  2. 灯光颜色改成桔黄
+
+- 修改：
+  1. 灯光颜色：0xffcc44(暖黄) → 0xff8800(桔黄)
+  2. RectAreaLightHelper 边框（青色 0x00ffff）：
+     - Helper 作为 mesh 子节点，复制 rectLight 的本地 position/quaternion
+     - 自动跟随 mesh 世界变换，与 RectAreaLight 完全重合
+  3. 灯具 mesh 改为橙色半透明线框（便于对比检查）：
+     - 不再 mesh.visible = false（否则子节点 helper 也不可见）
+     - 改为 MeshBasicMaterial wireframe + transparent + opacity=0.4
+     - color=0xff8800(橙色) + depthWrite=false
+
+- VLM 验证：
+  · 青色 RectAreaLightHelper 边框清晰可见
+  · 橙色半透明 mesh 线框可见
+  · 两者完全重合
+  · 灯光颜色为桔黄色
+  · 整体场景正常
+
+Stage Summary:
+- 提交 ID: 09dfb1d（普通 push，未 force）
+- 改动：1 文件，+12 / -6 行
+- RectAreaLight 边框可见，方便检查位置
+- 灯光颜色改为桔黄色
+- GitHub 已同步
