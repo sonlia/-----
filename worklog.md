@@ -352,3 +352,52 @@ Stage Summary:
 - 4 个非楼宇模块全部使用 ECharts（共17个图表）
 - 统一通过 EChart 包装器组件渲染（暗色主题）
 - GitHub 已同步
+
+---
+Task ID: shenzhen-real-map
+Agent: Super Z (main)
+Task: 充电桩站点分布改用真实深圳地图（ECharts geo + 散点）
+
+Work Log:
+- 用户反馈：充电桩站点分布当前显示不好看，建议用地图软件显示深圳各区+各充电桩信息
+
+- 方案对比:
+  · 在线地图（高德/百度）：需要 key + iframe，难以适配大屏暗色主题
+  · 自绘SVG：之前的方案，但形状不准确
+  · ECharts geo + GeoJSON：最优解，本地加载，可自定义样式
+
+- 数据源：
+  · 阿里 DataV 行政边界数据：https://geo.datav.aliyun.com/areas_v3/bound/440300_full.json
+  · 下载到 public/maps/shenzhen.json (69KB)
+  · 包含9个区：罗湖/福田/南山/宝安/龙岗/盐田/龙华/坪山/光明（大鹏新区不含）
+
+- 新增 ShenzhenMap 组件 (src/components/ShenzhenMap.tsx):
+  · echarts.registerMap('shenzhen', geoJson) 注册地图
+  · 三层 series:
+    - map (choropleth): 各区颜色深浅=充电桩数量（蓝色热力色阶 0a1f3d→primary）
+    - scatter: 20个充电站散点（按状态着色，大小按功率，带label）
+    - effectScatter: 异常站点涟漪告警动画
+  · visualMap 连续色阶映射
+  · geo emphasis 悬停高亮当前区
+  · tooltip 显示详情：区→充电桩数/在线/异常/收益；站→功率/状态
+
+- ChargingPanel 替换原 SVG 地图：
+  · 标题"站点分布"→"深圳站点分布"
+  · 容器加圆角+边框+科技暗色背景
+  · 底部加说明：区域颜色深浅=充电桩数量 / 鼠标悬停查看详情
+
+- 站点坐标（基于深圳实际经纬度）:
+  · 20个充电站，覆盖9个区
+  · 状态：13个充电中 + 4个闲置 + 2个异常 + 2个未启用
+
+- VLM 验证：
+  · 真实9区行政边界准确
+  · 充电站散点状态清晰
+  · 各区热力色阶正确反映数量
+  · 整体视觉效果优秀，科技感强
+
+Stage Summary:
+- 提交 ID: f0c0aec（普通 push，未 force）
+- 改动：3 文件（新增 ShenzhenMap.tsx + shenzhen.json，更新 ChargingPanel.tsx）
+- 充电桩大屏地图从简陋SVG升级为真实行政地图
+- GitHub 已同步
