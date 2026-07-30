@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import CockpitPanel from './CockpitPanel';
 import SolarPanel from './SolarPanel';
 import CarbonPanel from './CarbonPanel';
+import ChargingPanel from './ChargingPanel';
 import * as THREE from 'three';
 import { WebGPURenderer, RectAreaLightNode } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -58,6 +59,7 @@ export default function BuildingScene() {
   const [autoRotate, setAutoRotate] = useState(false);
   const [showList, setShowList] = useState(true);
   const [activeModule, setActiveModule] = useState<'overview' | 'building' | 'solar' | 'charging' | 'carbon'>('building');
+  const [activeFloor, setActiveFloor] = useState(0);
 
   const [deviceList, setDeviceList] = useState<DeviceListItem[]>([]);
   const [activeDeviceIdx, setActiveDeviceIdx] = useState(-1);
@@ -1123,6 +1125,23 @@ export default function BuildingScene() {
   const onTopView = () => { const T = threeRef.current; if (T.modelRoot) { const box = new THREE.Box3().setFromObject(T.modelRoot); const c = box.getCenter(new THREE.Vector3()); const s = box.getSize(new THREE.Vector3()); const d = Math.max(s.x, s.z) * 1.1; T.cameraTween = { startPos: T.camera.position.clone(), endPos: new THREE.Vector3(c.x, c.y + d, c.z + 0.01), startTarget: T.controls.target.clone(), endTarget: c.clone(), time: 0, duration: 0.8 }; showToast('已切换至俯视视角'); } };
   const onToggleList = () => { setShowList(!showList); if (!showList) { const T = threeRef.current; if (T.selectedObject) deselectClosure(T); } };
 
+  // 楼层选择
+  const onFloorSelect = (floor: number) => {
+    setActiveFloor(floor);
+    const T = threeRef.current;
+    if (!T.modelRoot) return;
+    if (floor === 0) { T.fitCameraToModel?.(T); showToast('已切换至整栋楼视图'); }
+    else {
+      const box = new THREE.Box3().setFromObject(T.modelRoot);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const floorY = box.min.y + size.y / 16 * (16 - floor + 0.5);
+      T.cameraTween = { startPos: T.camera.position.clone(), endPos: new THREE.Vector3(center.x + 15, floorY + 5, center.z + 18), startTarget: T.controls.target.clone(), endTarget: new THREE.Vector3(center.x, floorY, center.z), time: 0, duration: 0.8 };
+      showToast(`已切换至 ${floor}F 楼层视图`);
+    }
+  };
+  const floorBtnStyle = (active: boolean): React.CSSProperties => ({ padding: '6px 4px', fontSize: '11px', fontWeight: 600, border: '1px solid ' + (active ? 'var(--primary)' : 'var(--border-line)'), background: active ? 'var(--primary-bg)' : 'transparent', color: active ? 'var(--primary)' : 'var(--text-mid)', borderRadius: '3px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: active ? '0 0 8px rgba(0,212,255,0.3)' : 'none', textAlign: 'center' as const });
+
   // 模块切换
   const onSwitchModule = (mod: 'overview' | 'building' | 'solar' | 'charging' | 'carbon') => {
     setActiveModule(mod);
@@ -1407,6 +1426,7 @@ export default function BuildingScene() {
       {activeModule === 'overview' && <CockpitPanel kpiPower={kpiPower} lightingOn={lightingOn} acOn={acOn} />}
       {activeModule === 'solar' && <SolarPanel kpiPower={kpiPower} />}
       {activeModule === 'carbon' && <CarbonPanel kpiPower={kpiPower} />}
+      {activeModule === 'charging' && <ChargingPanel kpiPower={kpiPower} />}
 
       {/* 操作提示 - 仅楼宇模块显示 */}
       {activeModule === 'building' && (
@@ -1506,6 +1526,36 @@ export default function BuildingScene() {
             <button className={'toggle-btn' + (showList ? ' active' : '')} onClick={onToggleList}>设备列表</button>
           </div>
         </div>
+
+        {/* 楼层选择器 */}
+        <div className="control-group">
+          <div className="control-group-label">
+            <span className="group-name">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 11h6"/></svg>
+              楼层选择 / FLOOR
+            </span>
+            <span className="status-tag">{activeFloor === 0 ? '整栋楼' : `${activeFloor}F`}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
+            <button onClick={() => onFloorSelect(0)} style={floorBtnStyle(activeFloor === 0)}>整栋</button>
+            {Array.from({ length: 16 }, (_, i) => i + 1).map(f => (
+              <button key={f} onClick={() => onFloorSelect(f)} style={floorBtnStyle(activeFloor === f)}>{f}F</button>
+            ))}
+          </div>
+          {activeFloor > 0 && (
+            <div style={{ marginTop: '10px', padding: '10px', background: 'rgba(0,212,255,0.05)', borderRadius: '4px', borderLeft: '2px solid var(--primary)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>
+                <span>{activeFloor}F 用电量</span><span style={{ fontFamily: 'Orbitron, monospace', color: 'var(--primary)' }}>{(parseFloat(kpiPower||'0') / 16 * activeFloor).toFixed(1)} kW</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>
+                <span>灯具数量</span><span style={{ fontFamily: 'Orbitron, monospace', color: 'var(--text-main)' }}>{Math.ceil(54 / 16 * activeFloor)} 个</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-dim)' }}>
+                <span>碳排放</span><span style={{ fontFamily: 'Orbitron, monospace', color: 'var(--cyan-glow)' }}>{(parseFloat(kpiPower||'0') / 16 * activeFloor * 0.5810).toFixed(2)} kgCO₂/h</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       )}
 
@@ -1579,7 +1629,8 @@ export default function BuildingScene() {
         </div>
       )}
 
-      {/* 左下告警面板 */}
+      {/* 左下告警面板 - 仅楼宇模块 */}
+      {activeModule === 'building' && (
       <div className="panel alert-panel">
         <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
         <div className="panel-title">实时告警<span className="title-en">{alerts.length} ALERTS</span></div>
@@ -1595,8 +1646,10 @@ export default function BuildingScene() {
           ))}
         </div>
       </div>
+      )}
 
-      {/* 右下楼层信息 */}
+      {/* 右下楼层信息 - 仅楼宇模块 */}
+      {activeModule === 'building' && (
       <div className="panel floor-panel">
         <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
         <div className="panel-title">楼层信息<span className="title-en">FLOOR INFO</span></div>
@@ -1609,6 +1662,7 @@ export default function BuildingScene() {
           <div className="fi-item"><div className="fi-label">空气湿度</div><div className="fi-value">52<span className="sub">%</span></div></div>
         </div>
       </div>
+      )}
 
       {/* 底部状态栏 - 仅楼宇模块 */}
       {activeModule === 'building' && (
