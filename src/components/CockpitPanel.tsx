@@ -181,35 +181,66 @@ export default function CockpitPanel({ kpiPower, lightingOn, acOn }: CockpitPane
     }],
   }), []);
 
-  // 4. 负荷曲线 + 响应曲线 + 响应收益曲线（5min 时间点，今日 96 点）
+  // 4. 负荷曲线 + 响应曲线 + 响应收益曲线（5min 时间点，今日 288 点）
   const loadCurveOption = useMemo(() => {
-    // 5 分钟一个点，今日 0:00~24:00 共 288 点；为可读性取每 30min 显示一个标签
     const totalPoints = 288;
     const labels: string[] = [];
-    const loadSeries: number[] = [];
-    const responseSeries: number[] = [];
-    const revenueSeries: number[] = [];
+    const loadPast: (number | null)[] = [];
+    const loadFuture: (number | null)[] = [];
+    const respPast: (number | null)[] = [];
+    const respFuture: (number | null)[] = [];
+    const revPast: (number | null)[] = [];
+    const revFuture: (number | null)[] = [];
+    // 当前时间换算为 5min 点序号
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const nowIdx = Math.floor(nowMin / 5);
+
+    // 判断是否处于峰时段（响应只发生在峰时段）
+    const isPeak = (hourFrac: number) => (hourFrac >= 8 && hourFrac <= 11) || (hourFrac >= 17 && hourFrac <= 21);
+    const isShoulder = (hourFrac: number) => (hourFrac >= 6 && hourFrac < 8) || (hourFrac > 11 && hourFrac < 17) || (hourFrac > 21 && hourFrac <= 22);
+
+    let cumRevenue = 0;
     for (let i = 0; i < totalPoints; i++) {
       const totalMin = i * 5;
       const h = Math.floor(totalMin / 60);
       const m = totalMin % 60;
-      // 每 30min 显示一个刻度
       labels.push(m === 0 ? `${String(h).padStart(2, '0')}:00` : (m === 30 ? `${String(h).padStart(2, '0')}:30` : ''));
-      // 当前总负荷曲线：日间高夜间低（钟形）
       const hourFrac = totalMin / 60;
+      // 当前总负荷：钟形日间高夜间低 + 工作时段峰值波动
       const base = totalLoad * (0.35 + 0.65 * Math.max(0, Math.sin((hourFrac - 6) / 24 * Math.PI * 2 + Math.PI / 2)));
-      // 工作时段峰值波动
       const peak = hourFrac >= 9 && hourFrac <= 18 ? 8 * Math.sin((hourFrac - 9) / 9 * Math.PI) : 0;
-      loadSeries.push(+(base + peak + (Math.random() * 2 - 1)).toFixed(2));
-      // 响应负荷曲线：跟随负荷但更平滑（晚峰/早峰响应）
-      const respBase = totalControllable * (0.4 + 0.6 * Math.max(0, Math.sin((hourFrac - 6) / 24 * Math.PI * 2 + Math.PI / 2)));
-      const respPeak = (hourFrac >= 17 && hourFrac <= 21) ? 6 * Math.sin((hourFrac - 17) / 4 * Math.PI) : 0;
-      responseSeries.push(+Math.max(0, respBase + respPeak + (Math.random() * 1 - 0.5)).toFixed(2));
-      // 响应收益（累计）：响应负荷 × 单价（元/kWh）按 5min 折算
-      const price = (hourFrac >= 8 && hourFrac <= 11) || (hourFrac >= 18 && hourFrac <= 21) ? 1.2 : 0.6; // 峰时1.2元 平时0.6元
-      const prev = i === 0 ? 0 : revenueSeries[i - 1];
-      revenueSeries.push(+(prev + responseSeries[i] * price * (5 / 60)).toFixed(2));
+      const loadVal = +(base + peak + (Math.random() * 2 - 1)).toFixed(2);
+      // 响应负荷：仅在峰时段响应（阶段性的，不是一直响应）
+      let resp = 0;
+      if (hourFrac >= 8 && hourFrac <= 11) {
+        resp = totalControllable * 0.75 * Math.sin((hourFrac - 8) / 3 * Math.PI);
+      } else if (hourFrac >= 17 && hourFrac <= 21) {
+        resp = totalControllable * 0.85 * Math.sin((hourFrac - 17) / 4 * Math.PI);
+      } else if (isShoulder(hourFrac)) {
+        resp = totalControllable * 0.1;
+      }
+      const respVal = +Math.max(0, resp + (Math.random() * 0.3 - 0.15)).toFixed(2);
+      // 响应收益（累计）
+      const price = isPeak(hourFrac) ? 1.2 : isShoulder(hourFrac) ? 0.8 : 0.4;
+      cumRevenue += respVal * price * (5 / 60);
+      const revVal = +cumRevenue.toFixed(2);
+
+      // 过去/未来分段（当前点也算过去，未来从下一刻开始）
+      const isPast = i <= nowIdx;
+      loadPast.push(isPast ? loadVal : null);
+      loadFuture.push(isPast ? null : loadVal);
+      respPast.push(isPast ? respVal : null);
+      respFuture.push(isPast ? null : respVal);
+      revPast.push(isPast ? revVal : null);
+      revFuture.push(isPast ? null : revVal);
     }
+
+    // 当前时刻标签
+    const nowLabel = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const predictColor = '#6a7a90';
+    const predictFill = 'rgba(106,122,144,0.12)';
+
     return {
       tooltip: {
         ...commonTooltip,
@@ -217,13 +248,27 @@ export default function CockpitPanel({ kpiPower, lightingOn, acOn }: CockpitPane
         formatter: (params: any) => {
           const idx = params[0].dataIndex;
           const totalMin = idx * 5;
-          const h = String(Math.floor(totalMin / 60)).padStart(2, '0');
-          const m = String(totalMin % 60).padStart(2, '0');
-          return `<b style="color:${PALETTE.primary}">${h}:${m}</b><br/>` +
-            params.map((p: any) => `<span style="display:inline-block;width:10px;height:10px;background:${p.color};border-radius:50%;margin-right:6px"></span>${p.seriesName}: <b style="color:${p.color}">${p.value.toFixed(1)} ${p.seriesName === '响应收益' ? '元' : 'kW'}</b>`).join('<br/>');
+          const hh = String(Math.floor(totalMin / 60)).padStart(2, '0');
+          const mm = String(totalMin % 60).padStart(2, '0');
+          const isPredict = idx > nowIdx;
+          const tag = isPredict ? `<span style="color:${predictColor};font-size:9px;margin-left:6px">[预测]</span>` : '';
+          const lines: string[] = [];
+          const seen = new Set<string>();
+          params.forEach((p: any) => {
+            const key = p.seriesName.replace(/ \(.*\)/, '');
+            if (seen.has(key) || p.value == null) return;
+            seen.add(key);
+            const unit = key === '响应收益' ? '元' : 'kW';
+            lines.push(`<span style="display:inline-block;width:10px;height:10px;background:${p.color};border-radius:50%;margin-right:6px"></span>${key}: <b style="color:${p.color}">${p.value.toFixed(1)} ${unit}</b>`);
+          });
+          return `<b style="color:${PALETTE.primary}">${hh}:${mm}</b>${tag}<br/>` + lines.join('<br/>');
         },
       },
-      legend: { data: ['当前负荷', '响应负荷', '响应收益'], textStyle: { color: PALETTE.textMid, fontSize: 10 }, top: 0, right: 0, itemWidth: 10, itemHeight: 6 },
+      legend: {
+        data: ['当前负荷', '响应负荷', '响应收益'],
+        textStyle: { color: PALETTE.textMid, fontSize: 10 },
+        top: 0, right: 0, itemWidth: 10, itemHeight: 6,
+      },
       grid: { ...commonGrid, left: 44, right: 50, top: 26, bottom: 24 },
       xAxis: { type: 'category', data: labels, ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 9, interval: 29, rotate: 0 } },
       yAxis: [
@@ -231,20 +276,57 @@ export default function CockpitPanel({ kpiPower, lightingOn, acOn }: CockpitPane
         { type: 'value', name: '元', nameTextStyle: { color: PALETTE.textDim, fontSize: 9 }, axisLine: { lineStyle: { color: 'rgba(138,165,196,0.3)' } }, axisLabel: { color: PALETTE.textMid, fontSize: 9, fontFamily: 'Rajdhani' }, splitLine: { show: false } },
       ],
       series: [
+        // 当前负荷 - 历史（橙色）
         {
-          name: '当前负荷', type: 'line', smooth: true, symbol: 'none', data: loadSeries, yAxisIndex: 0,
-          lineStyle: { color: PALETTE.warn, width: 2 }, itemStyle: { color: PALETTE.warn },
+          name: '当前负荷 (实测)', type: 'line', smooth: true, symbol: 'none', data: loadPast, yAxisIndex: 0,
+          lineStyle: { color: PALETTE.warn, width: 2.5 }, itemStyle: { color: PALETTE.warn },
           areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(255,170,68,0.3)' }, { offset: 1, color: 'rgba(255,170,68,0)' }] } },
+          // 当前时刻标记线 + 预测区背景
+          markArea: {
+            silent: true,
+            itemStyle: { color: predictFill, borderColor: 'transparent' },
+            label: { show: true, position: 'insideTopRight', color: predictColor, fontSize: 9, fontFamily: 'Rajdhani', formatter: '预测区间 →', distance: [6, 6] },
+            data: [[{ xAxis: nowIdx }, { xAxis: totalPoints - 1 }]],
+          },
+          markLine: {
+            silent: true, symbol: 'none',
+            lineStyle: { color: PALETTE.primary, type: 'solid', width: 1.5, opacity: 0.6 },
+            label: { show: true, position: 'insideEndTop', color: PALETTE.primary, fontSize: 9, fontFamily: 'Rajdhani', formatter: `现在 ${nowLabel}` },
+            data: [{ xAxis: nowIdx }],
+          },
         },
+        // 当前负荷 - 预测（灰色）
         {
-          name: '响应负荷', type: 'line', smooth: true, symbol: 'none', data: responseSeries, yAxisIndex: 0,
-          lineStyle: { color: PALETTE.success, width: 2 }, itemStyle: { color: PALETTE.success },
+          name: '当前负荷 (预测)', type: 'line', smooth: true, symbol: 'none', data: loadFuture, yAxisIndex: 0,
+          lineStyle: { color: predictColor, width: 2, type: 'dashed' }, itemStyle: { color: predictColor },
+          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(106,122,144,0.2)' }, { offset: 1, color: 'rgba(106,122,144,0)' }] } },
+        },
+        // 响应负荷 - 历史（绿色）
+        {
+          name: '响应负荷 (实测)', type: 'line', smooth: true, symbol: 'none', data: respPast, yAxisIndex: 0,
+          lineStyle: { color: PALETTE.success, width: 2.5 }, itemStyle: { color: PALETTE.success },
           areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(0,255,136,0.35)' }, { offset: 1, color: 'rgba(0,255,136,0)' }] } },
         },
+        // 响应负荷 - 预测（灰色）
         {
-          name: '响应收益', type: 'line', smooth: true, symbol: 'none', data: revenueSeries, yAxisIndex: 1,
+          name: '响应负荷 (预测)', type: 'line', smooth: true, symbol: 'none', data: respFuture, yAxisIndex: 0,
+          lineStyle: { color: predictColor, width: 2, type: 'dashed' }, itemStyle: { color: predictColor },
+          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(106,122,144,0.15)' }, { offset: 1, color: 'rgba(106,122,144,0)' }] } },
+        },
+        // 响应收益 - 历史（青色）
+        {
+          name: '响应收益 (实测)', type: 'line', smooth: true, symbol: 'none', data: revPast, yAxisIndex: 1,
           lineStyle: { color: PALETTE.cyanGlow, width: 2, type: 'dashed' }, itemStyle: { color: PALETTE.cyanGlow },
         },
+        // 响应收益 - 预测（灰色）
+        {
+          name: '响应收益 (预测)', type: 'line', smooth: true, symbol: 'none', data: revFuture, yAxisIndex: 1,
+          lineStyle: { color: predictColor, width: 2, type: 'dotted' }, itemStyle: { color: predictColor },
+        },
+      ],
+      graphic: [
+        { type: 'text', left: '32%', top: 30, style: { text: '早峰 8-11', fill: PALETTE.warn, fontSize: 9, fontFamily: 'Rajdhani' }, silent: true },
+        { type: 'text', left: '65%', top: 30, style: { text: '晚峰 17-21', fill: PALETTE.warn, fontSize: 9, fontFamily: 'Rajdhani' }, silent: true },
       ],
     };
   }, [totalLoad, totalControllable]);
