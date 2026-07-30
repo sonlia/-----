@@ -743,3 +743,49 @@ Stage Summary:
 - RectAreaLight 现在尺寸正确（1.9×1.85 世界单位），与灯具模型完全重合
 - 青色Helper边框清晰可见
 - GitHub 已同步
+
+---
+Task ID: rectlight-perfect-alignment
+Agent: Super Z (main)
+Task: RectAreaLight 位置/旋转/尺寸与灯具模型完全重合
+
+Work Log:
+- 用户反馈：
+  1. rectlight 高于灯光模型很高
+  2. 位置/旋转/尺寸不一致没有重合
+
+- 关键诊断（核心问题）：
+  · 模型的灯具 mesh 变换都是单位矩阵！
+  · 位置/旋转/缩放烘焙在 geometry.attributes.position 顶点里
+  · 所以每个灯具 mesh 的 matrixWorld 相同（都在 4.68, 0.11, -0.47）
+  · 但 geometry 顶点不同（每个灯具有不同的顶点坐标）
+  · 之前把 rectLight 作为 mesh 子节点，所有 rectLight 都被同一个 matrixWorld
+    变换到同一个位置 (4.68, 0.11, 0.47)，导致位置错误、悬浮在高处
+
+- 修复方案：
+  1. 用 mesh.localToWorld(localCenter) 把本地顶点中心变换到世界坐标
+     - 这是灯具的真实世界位置（包含几何体里烘焙的位置信息）
+  2. rectLight 加到 scene（不是 mesh 子节点）
+  3. 世界四元数 = mesh.getWorldQuaternion() × localQuat
+     - 因为 mesh 自身旋转=单位，但父节点可能有旋转，需要应用
+  4. 法线方向在世界空间 = normalAxis.applyQuaternion(meshWorldQuat)
+  5. 沿法线方向偏移 0.5 世界单位（之前 5 太大导致悬浮高处）
+  6. RectAreaLightHelper 也加到 scene
+
+- 验证：
+  · rectLight[0..4] 现在有各自不同的 X/Z 世界位置（之前都是同一个）
+  · VLM 默认视角：青色Helper与橙色mesh完全重合，位置无偏移
+  · VLM 俯视视角：所有54个灯具1:1精准对齐，无偏差
+  · 旋转/尺寸均完全一致
+
+- 技术要点：
+  · 模型几何体烘焙变换 → 必须用 localToWorld 计算世界坐标
+  · rectLight 不能作为 mesh 子节点（matrixWorld 误导）
+  · 法线偏移用世界空间 0.5 单位（不是本地空间）
+
+Stage Summary:
+- 提交 ID: 7e4a950（普通 push，未 force）
+- 改动：1 文件，+29 / -39 行
+- RectAreaLight 与灯具模型位置/旋转/尺寸完全1:1重合
+- 54 个灯具各自有独立正确的世界位置
+- GitHub 已同步
