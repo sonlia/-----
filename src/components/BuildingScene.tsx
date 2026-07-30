@@ -507,7 +507,7 @@ export default function BuildingScene() {
           }
         }
 
-        const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
+        const rectLight = new THREE.RectAreaLight(0xff8800, 0, width, height);  // 桔黄色
         // 本地位置 = 包围盒中心（相对于 mesh）
         rectLight.position.copy(localCenter);
         rectLight.quaternion.copy(localQuat);
@@ -515,12 +515,18 @@ export default function BuildingScene() {
         // 作为 mesh 的子节点添加，自动继承 mesh 的世界变换
         mesh.add(rectLight);
         T.rectLights.push(rectLight);
-        // 隐藏原始灯具 mesh（用 RectAreaLight 面光源替代，位置/旋转/尺寸与原灯具完全一致）
-        mesh.visible = false;
-        // 显示 RectAreaLightHelper 边框（品红色），方便查看旋转/位置
-        const helper = new RectAreaLightHelper(rectLight, 0xff00ff);
+        // 隐藏原始灯具 mesh 的几何体（保留 mesh.visible=true 让子节点 rectLight/helper 可见）
+        (mesh as any).material = new (THREE as any).MeshBasicMaterial({
+          color: 0xff8800, side: THREE.DoubleSide, wireframe: true,
+          transparent: true, opacity: 0.4,  // 橙色半透明线框，便于对比 RectAreaLight 位置
+          depthWrite: false,
+        });
+        // 显示 RectAreaLightHelper 边框（青色），作为 mesh 子节点跟随灯具变换
+        const helper = new RectAreaLightHelper(rectLight, 0x00ffff);
         helper.name = `__rectHelper_${i}`;
-        T.scene.add(helper); // helper 必须加到 scene 才能正确显示
+        helper.position.copy(localCenter);
+        helper.quaternion.copy(localQuat);
+        mesh.add(helper);
       });
       T.rectHelpers = T.rectLights.map((l: any) => T.scene.getObjectByName(`__rectHelper_${T.rectLights.indexOf(l)}`));
       console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (已隐藏原始模型，显示 Helper)`);
