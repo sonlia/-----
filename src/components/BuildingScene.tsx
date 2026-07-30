@@ -1346,8 +1346,8 @@ export default function BuildingScene() {
         <div className="header-left">
           <div className="logo-mark"><div className="logo-inner"></div></div>
           <div className="header-title">
-            <h1>智能楼宇数字孪生系统</h1>
-            <div className="subtitle">SMART BUILDING <span className="accent">DIGITAL TWIN</span> · WebGPU 3D VISUALIZATION</div>
+            <h1>综合能源驾驶舱</h1>
+            <div className="subtitle">COMPREHENSIVE <span className="accent">ENERGY COCKPIT</span> · WebGPU 3D VISUALIZATION</div>
           </div>
         </div>
         <div className="header-right">

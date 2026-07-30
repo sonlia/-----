@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '智能楼宇 3D 数字孪生系统 · Digital Twin',
+  title: '综合能源驾驶舱 · Energy Cockpit',
   description: 'Smart Building Digital Twin - WebGPU 3D Visualization',
 };
 
