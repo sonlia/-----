@@ -433,111 +433,94 @@ export default function BuildingScene() {
       };
     }
 
-    // ===== 灯具发光光源（SpotLight 面板灯效果：向下照亮 + 投影） =====
+    // ===== 灯具发光光源（RectAreaLight 面板灯，与灯具模型完全重合） =====
     function setupPointLights(T: any) {
       const fixtures: any[] = [];
-      const tmpBox = new THREE.Box3();
       // 确保世界矩阵已更新（localToWorld 依赖 matrixWorld）
       T.modelRoot.updateMatrixWorld(true);
       T.lightFixtures.forEach((mesh: any) => {
-        tmpBox.setFromObject(mesh);
-        const center = tmpBox.getCenter(new THREE.Vector3());
-        const size = tmpBox.getSize(new THREE.Vector3());
-        fixtures.push({ mesh, center, size });
+        fixtures.push({ mesh });
       });
       if (fixtures.length === 0) return;
 
       T.pointLights = [];   // 保留兼容（已不用 SpotLight）
       T.shadowLights = [];  // 已不用 SpotLight 投影
-      T.rectLights = [];    // RectAreaLight 面光源（所有灯具，大小=各自面板尺寸）
+      T.rectLights = [];    // RectAreaLight 面光源
 
       fixtures.forEach((f, i) => {
         const { mesh } = f;
-        // === 重要：模型的灯具 mesh 变换都是单位矩阵，位置/旋转/缩放烘焙在几何顶点里 ===
-        // 所以每个灯具 mesh 的 matrixWorld 相同，但 geometry.attributes.position 不同
-        // 解决方案：用 localToWorld 把本地顶点变换到世界坐标，rectLight 加到 scene（不是 mesh 子节点）
+        // === 关键：模型灯具 mesh 变换是单位矩阵，位置/旋转/缩放烘焙在几何顶点里 ===
+        // 每个灯具 geometry 只有 4 个顶点（矩形面板）
+        // 方案：取 4 个顶点的世界坐标，用凸包找矩形4角，精确计算位置/旋转/宽高
         mesh.updateWorldMatrix(true, false);
-        const meshWorldScale = mesh.getWorldScale(new THREE.Vector3());
-        const sx = Math.abs(meshWorldScale.x), sy = Math.abs(meshWorldScale.y), sz = Math.abs(meshWorldScale.z);
+        const posAttr = mesh.geometry.attributes.position;
+        const worldVerts: THREE.Vector3[] = [];
+        for (let v = 0; v < posAttr.count; v++) {
+          const wv = new THREE.Vector3().fromBufferAttribute(posAttr, v);
+          mesh.localToWorld(wv); // 转换到世界坐标（包含所有父节点变换）
+          worldVerts.push(wv);
+        }
+        if (worldVerts.length < 3) return;
 
-        // 本地包围盒（精确面板尺寸和几何中心）
-        const localBox = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position);
-        const localSize = localBox.getSize(new THREE.Vector3());
-        const localCenter = localBox.getCenter(new THREE.Vector3());
+        // 1. 计算法线（前3顶点叉积），用所有顶点平均确保稳定
+        const v0 = worldVerts[0], v1 = worldVerts[1], v2 = worldVerts[2];
+        const normal = new THREE.Vector3().crossVectors(
+          new THREE.Vector3().subVectors(v1, v0),
+          new THREE.Vector3().subVectors(v2, v0)
+        ).normalize();
 
-        // 把 localCenter 转换到世界坐标（这是灯具的真实世界位置）
-        const worldCenter = mesh.localToWorld(localCenter.clone());
+        // 2. 中心点 = 所有顶点平均
+        const center = new THREE.Vector3();
+        worldVerts.forEach(v => center.add(v));
+        center.divideScalar(worldVerts.length);
 
-        // 自适应判断：最薄的轴=法线，剩余两轴中较长的=宽(width)，较短的=高(height)
-        // 注意：geometry 顶点已经是本地坐标，width/height 需要乘以世界缩放
-        const ax = Math.abs(localSize.x) * sx, ay = Math.abs(localSize.y) * sy, az = Math.abs(localSize.z) * sz;
-        let width: number, height: number;
-        let localQuat: THREE.Quaternion; // 让 RectLight 的本地 X/Y/Z 对齐到 width/height/normal
-        let normalAxis: THREE.Vector3; // 本地空间的法线方向（最薄轴）
-        if (ay <= ax && ay <= az) {
-          // Y 是法线（最薄），RectAreaLight 默认 Z 是法线，需要把 Y 旋转到 Z
-          normalAxis = new THREE.Vector3(0, 1, 0);
-          if (ax >= az) {
-            width = ax; height = az;
-            localQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
-          } else {
-            width = az; height = ax;
-            localQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
-            localQuat.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2));
-          }
-        } else if (ax <= ay && ax <= az) {
-          normalAxis = new THREE.Vector3(1, 0, 0);
-          if (ay >= az) {
-            width = ay; height = az;
-            localQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-          } else {
-            width = az; height = ay;
-            localQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-            localQuat.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2));
-          }
-        } else {
-          normalAxis = new THREE.Vector3(0, 0, 1);
-          if (ax >= ay) {
-            width = ax; height = ay;
-            localQuat = new THREE.Quaternion();
-          } else {
-            width = ay; height = ax;
-            localQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
+        // 3. 长边方向 = 任意两顶点间最远的方向（即矩形长边）
+        let maxLen = 0, longDir = new THREE.Vector3(1, 0, 0);
+        for (let a = 0; a < worldVerts.length; a++) {
+          for (let b = a + 1; b < worldVerts.length; b++) {
+            const d = new THREE.Vector3().subVectors(worldVerts[b], worldVerts[a]);
+            const len = d.length();
+            if (len > maxLen) { maxLen = len; longDir = d.clone().normalize(); }
           }
         }
+        const width = maxLen; // 长边长度
 
-        // mesh 的世界四元数（因为 mesh 自身旋转=单位，但父节点可能有旋转，需要应用）
-        const meshWorldQuat = mesh.getWorldQuaternion(new THREE.Quaternion());
-        // rectLight 的世界四元数 = mesh 世界四元数 × localQuat
-        const worldQuat = meshWorldQuat.clone().multiply(localQuat);
-        // 法线方向在世界空间的向量
-        const normalWorldDir = normalAxis.clone().applyQuaternion(meshWorldQuat);
+        // 4. 短边方向 = 法线 × 长边方向，短边长度 = 在短边方向上的投影范围
+        const shortDir = new THREE.Vector3().crossVectors(normal, longDir).normalize();
+        let minProj = Infinity, maxProj = -Infinity;
+        worldVerts.forEach(v => {
+          const proj = new THREE.Vector3().subVectors(v, center).dot(shortDir);
+          if (proj < minProj) minProj = proj;
+          if (proj > maxProj) maxProj = proj;
+        });
+        const height = maxProj - minProj; // 短边长度
 
-        // 沿法线方向偏移（让光从模型下方发出，避免被模型挡住）
-        const halfThicknessWorld = Math.abs(normalAxis.dot(localSize)) * (Math.abs(normalAxis.x) * sx + Math.abs(normalAxis.y) * sy + Math.abs(normalAxis.z) * sz) / 2;
-        const worldOffset = 0.5; // 世界空间偏移 0.5 单位（避免灯光被模型挡住，但不要太远）
-        const offsetWorld = halfThicknessWorld + worldOffset;
+        // 5. 旋转矩阵：RectAreaLight 默认 X=宽, Y=高, Z=法线
+        // -Z 方向是光的发射方向，我们让 -Z = -normal（即光朝法线反方向发射）
+        // 但用户要求"位置/旋转/尺寸与灯具模型一致"，所以这里直接 Z=normal（不再强制朝下）
+        const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
+        const worldQuat = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
 
+        // 6. 位置 = 中心（与灯具完全重合，不再加偏移）
         const rectLight = new THREE.RectAreaLight(0xff8800, 0, width, height);  // 桔黄色
-        rectLight.position.copy(worldCenter).add(normalWorldDir.clone().multiplyScalar(offsetWorld));
+        rectLight.position.copy(center);
         rectLight.quaternion.copy(worldQuat);
         rectLight.name = `__rectLight_${i}`;
-        // 加到 scene（不是 mesh 子节点），避免被 mesh 的单位 matrixWorld 误导
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
-        // 隐藏原始灯具 mesh 的几何体（用半透明线框显示，便于对比）
+        // 用半透明线框显示原始灯具 mesh，便于对比
         (mesh as any).material = new (THREE as any).MeshBasicMaterial({
           color: 0xff8800, side: THREE.DoubleSide, wireframe: true,
           transparent: true, opacity: 0.4,
           depthWrite: false,
         });
-        // 显示 RectAreaLightHelper 边框（青色），加到 scene 跟随 rectLight
+        // 显示 RectAreaLightHelper 边框（青色），加到 scene
         const helper = new RectAreaLightHelper(rectLight, 0x00ffff);
         helper.name = `__rectHelper_${i}`;
         T.scene.add(helper);
       });
       T.rectHelpers = T.rectLights.map((l: any) => T.scene.getObjectByName(`__rectHelper_${T.rectLights.indexOf(l)}`));
-      console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (位置/旋转/尺寸与灯具模型完全一致)`);
+      console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (位置/旋转/尺寸与灯具模型完全重合)`);
     }
 
     function farthestPointSampling(points: any[], n: number) {
