@@ -539,3 +539,34 @@ Stage Summary:
 - 负荷曲线符合实际需求响应业务逻辑
 - 时间分段（实测/预测）视觉区分清晰
 - GitHub 已同步
+
+---
+Task ID: rectlight-exact-match
+Agent: Super Z (main)
+Task: RectAreaLight 与灯具模型位置/旋转/尺寸完全重合
+
+Work Log:
+- 用户需求：相当于在灯光模型的位置放一个一致的 RectAreaLight
+  · 大小要与灯具模型一致
+  · 旋转角度要与灯具模型一致
+  · 位置要与灯具模型一致
+
+- 诊断现有代码：
+  · 位置：worldCenter + lightNormal*0.5（多了0.5偏移）
+  · 旋转：makeBasis(meshWidth, meshHeight, -lightNormal)（正确）
+  · 尺寸：localBox.size × worldScale（正确）
+
+- 修复：
+  · 移除 rectLight.position 的 +lightNormal*0.5 偏移
+  · 位置直接使用 worldCenter（灯具包围盒几何中心）
+
+- VLM 双视角验证:
+  · 默认视角：临时显示橙色mesh线框 + 青色Helper线框 → 完全重合
+  · 俯视视角：无90度旋转偏差，尺寸完全匹配
+  · 最终状态：品红色Helper线框与灯具位置完全对齐，灯光正常向下照射
+
+Stage Summary:
+- 提交 ID: cdc3339（普通 push，未 force）
+- 改动：1 文件，+3 / -3 行
+- RectAreaLight 现在与灯具模型完全1:1重合（位置/旋转/尺寸）
+- GitHub 已同步
