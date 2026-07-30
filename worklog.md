@@ -310,3 +310,45 @@ Stage Summary:
 - 能源总览从单一图表升级为5子系统综合驾驶舱
 - ECharts替代部分Canvas，图表能力大幅提升
 - GitHub 已同步
+
+---
+Task ID: all-panels-echarts
+Agent: Super Z (main)
+Task: SolarPanel/CarbonPanel/ChargingPanel 全部改用 ECharts 渲染图表
+
+Work Log:
+- 用户反馈：其他模块的图表也用ECharts来显示，每次对话更新后都要push git
+
+- SolarPanel 重写（5个 ECharts 图表）:
+  · 24h发电功率趋势：面积图+峰值markPoint+当前点pin+markLine
+  · 逆变器效率仪表盘：半圆gauge+渐变进度+指针
+  · 资产健康度三环图：3层同心gauge（效率/清洁/在线率）
+  · 度电成本对比柱状图：渐变填充+对比markline
+  · 各区域辐照度水平条形图：4区域渐变填充
+
+- CarbonPanel 重写（5个 ECharts 图表）:
+  · Scope 1/2/3 排放源构成饼图（环形+图例）
+  · 12月碳排放趋势柱状图（去年vs今年双柱对比）
+  · 碳中和进度双层环仪表盘（配额使用率+CCER抵消25%）
+  · 重点排放源水平条形图（4源 kgCO₂/h）
+  · 累计排放vs配额上限折线图（趋势预警，超额红线）
+
+- ChargingPanel 重写（5个 ECharts 图表）:
+  · 月度充电量柱状图（渐变填充+顶部数值）
+  · 月度使用率柱状图（70%目标markline）
+  · 24h充电功率堆叠柱状图（快充+慢充分色）
+  · 各区充电桩数量分布柱状图（深圳10区）
+  · 累计运营收益折线图（万元趋势+渐变填充）
+  · 保留深圳SVG地图+KPI+异常监控+状态网格等原有UI
+
+- VLM 验证3个模块：
+  · 光伏：环形图、面积图、仪表盘渲染清晰
+  · 碳监测：图表类型丰富，无溢出
+  · 充电桩：地图点位+列表+卡片完整
+
+Stage Summary:
+- 提交 ID: 7c39070（普通 push，未 force）
+- 改动：3 文件，+451 / -550（代码更精简）
+- 4 个非楼宇模块全部使用 ECharts（共17个图表）
+- 统一通过 EChart 包装器组件渲染（暗色主题）
+- GitHub 已同步
