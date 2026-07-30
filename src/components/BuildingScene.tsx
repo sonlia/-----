@@ -453,10 +453,8 @@ export default function BuildingScene() {
 
       fixtures.forEach((f, i) => {
         const { mesh } = f;
-        // === 直接复制 mesh 世界变换，确保位置/旋转与灯具完全一致 ===
+        // === RectAreaLight 作为 mesh 的子节点，完全继承 mesh 的世界变换（position/rotation/scale）===
         mesh.updateWorldMatrix(true, false);
-        const meshQuat = mesh.getWorldQuaternion(new THREE.Quaternion());
-        const meshScale = mesh.getWorldScale(new THREE.Vector3());
 
         // 本地包围盒（精确面板尺寸和几何中心）
         const localBox = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position);
@@ -465,56 +463,64 @@ export default function BuildingScene() {
 
         // 自适应判断：最薄的轴=法线，剩余两轴中较长的=宽(width)，较短的=高(height)
         const ax = Math.abs(localSize.x), ay = Math.abs(localSize.y), az = Math.abs(localSize.z);
-        let widthAxis: THREE.Vector3, heightAxis: THREE.Vector3, normalAxis: THREE.Vector3;
+        let width: number, height: number;
+        let localQuat: THREE.Quaternion; // 让 RectLight 的本地 X/Y/Z 对齐到 width/height/normal
         if (ay <= ax && ay <= az) {
-          // Y 是法线
-          normalAxis = new THREE.Vector3(0, 1, 0);
-          if (ax >= az) { widthAxis = new THREE.Vector3(1, 0, 0); heightAxis = new THREE.Vector3(0, 0, 1); }
-          else { widthAxis = new THREE.Vector3(0, 0, 1); heightAxis = new THREE.Vector3(1, 0, 0); }
+          // Y 是法线（最薄），RectAreaLight 默认 Z 是法线，需要把 Y 旋转到 Z
+          if (ax >= az) {
+            // X=长边(width), Z=短边(height), Y=法线
+            width = ax; height = az;
+            // 绕 X 轴旋转 90°：localY → localZ, localZ → -localY
+            localQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+          } else {
+            // Z=长边(width), X=短边(height), Y=法线
+            width = az; height = ax;
+            // 绕 Z 轴旋转 90° 让 localX → localY, localY → -localX（Y变法线后再绕Z）
+            // 实际上：先绕 X 旋转 90° 把 Y 变 Z，再绕 Z 旋转 90° 交换 X 和 Y
+            localQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+            localQuat.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2));
+          }
         } else if (ax <= ay && ax <= az) {
-          normalAxis = new THREE.Vector3(1, 0, 0);
-          if (ay >= az) { widthAxis = new THREE.Vector3(0, 1, 0); heightAxis = new THREE.Vector3(0, 0, 1); }
-          else { widthAxis = new THREE.Vector3(0, 0, 1); heightAxis = new THREE.Vector3(0, 1, 0); }
+          // X 是法线
+          if (ay >= az) {
+            // Y=长边(width), Z=短边(height), X=法线
+            width = ay; height = az;
+            // 绕 Y 轴旋转 90°：localX → localZ, localZ → -localX
+            localQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+          } else {
+            // Z=长边(width), Y=短边(height), X=法线
+            width = az; height = ay;
+            // 绕 Y 轴 90° + 绕 X 轴 90°
+            localQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+            localQuat.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2));
+          }
         } else {
-          normalAxis = new THREE.Vector3(0, 0, 1);
-          if (ax >= ay) { widthAxis = new THREE.Vector3(1, 0, 0); heightAxis = new THREE.Vector3(0, 1, 0); }
-          else { widthAxis = new THREE.Vector3(0, 1, 0); heightAxis = new THREE.Vector3(1, 0, 0); }
+          // Z 是法线（RectAreaLight 默认就是 Z 法线，无需旋转）
+          if (ax >= ay) {
+            // X=长边(width), Y=短边(height)
+            width = ax; height = ay;
+            localQuat = new THREE.Quaternion(); // 单位四元数，无需旋转
+          } else {
+            // Y=长边(width), X=短边(height)，绕 Z 轴旋转 90° 交换 X 和 Y
+            width = ay; height = ax;
+            localQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
+          }
         }
 
-        // 尺寸：宽 × 高（基于本地包围盒 + 世界缩放）
-        const wLocal = Math.abs(widthAxis.dot(localSize));
-        const hLocal = Math.abs(heightAxis.dot(localSize));
-        const wScale = Math.abs(widthAxis.dot(meshScale));
-        const hScale = Math.abs(heightAxis.dot(meshScale));
-        const width = wLocal * wScale;
-        const height = hLocal * hScale;
-
-        // 位置：本地包围盒中心经世界变换
-        const worldCenter = localCenter.clone().applyMatrix4(mesh.matrixWorld);
-
-        // 灯具三轴的世界方向
-        const meshWidth = widthAxis.clone().applyQuaternion(meshQuat);
-        const meshHeight = heightAxis.clone().applyQuaternion(meshQuat);
-        const meshNormal = normalAxis.clone().applyQuaternion(meshQuat);
-        // 法线朝下（灯具向下照）
-        const lightNormal = meshNormal.y > 0 ? meshNormal.clone().negate() : meshNormal.clone();
-
-        // 旋转矩阵：RectLight X=宽轴, Y=高轴, Z=-法线(朝上)
-        // -Z = 法线(朝下) → 光垂直照射地面，无需额外翻转
-        const rotMatrix = new THREE.Matrix4().makeBasis(meshWidth, meshHeight, lightNormal.clone().negate());
         const rectLight = new THREE.RectAreaLight(0xffcc44, 0, width, height);
-        // 位置 = 灯具包围盒中心（精确与灯具重合，不再加偏移）
-        rectLight.position.copy(worldCenter);
-        rectLight.quaternion.setFromRotationMatrix(rotMatrix);
+        // 本地位置 = 包围盒中心（相对于 mesh）
+        rectLight.position.copy(localCenter);
+        rectLight.quaternion.copy(localQuat);
         rectLight.name = `__rectLight_${i}`;
-        T.scene.add(rectLight);
+        // 作为 mesh 的子节点添加，自动继承 mesh 的世界变换
+        mesh.add(rectLight);
         T.rectLights.push(rectLight);
         // 隐藏原始灯具 mesh（用 RectAreaLight 面光源替代，位置/旋转/尺寸与原灯具完全一致）
         mesh.visible = false;
         // 显示 RectAreaLightHelper 边框（品红色），方便查看旋转/位置
         const helper = new RectAreaLightHelper(rectLight, 0xff00ff);
         helper.name = `__rectHelper_${i}`;
-        T.scene.add(helper);
+        T.scene.add(helper); // helper 必须加到 scene 才能正确显示
       });
       T.rectHelpers = T.rectLights.map((l: any) => T.scene.getObjectByName(`__rectHelper_${T.rectLights.indexOf(l)}`));
       console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (已隐藏原始模型，显示 Helper)`);
