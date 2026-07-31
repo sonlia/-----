@@ -436,91 +436,127 @@ export default function BuildingScene() {
     // ===== 灯具发光光源（RectAreaLight 面板灯，与灯具模型完全重合） =====
     function setupPointLights(T: any) {
       const fixtures: any[] = [];
-      // 确保世界矩阵已更新（localToWorld 依赖 matrixWorld）
       T.modelRoot.updateMatrixWorld(true);
+      T.scene.updateMatrixWorld(true);
       T.lightFixtures.forEach((mesh: any) => {
         fixtures.push({ mesh });
       });
       if (fixtures.length === 0) return;
 
-      T.pointLights = [];   // 保留兼容（已不用 SpotLight）
-      T.shadowLights = [];  // 已不用 SpotLight 投影
-      T.rectLights = [];    // RectAreaLight 面光源
+      T.pointLights = [];
+      T.shadowLights = [];
+      T.rectLights = [];
 
       fixtures.forEach((f, i) => {
         const { mesh } = f;
-        // === 关键：模型灯具 mesh 变换是单位矩阵，位置/旋转/缩放烘焙在几何顶点里 ===
-        // 每个灯具 geometry 只有 4 个顶点（矩形面板）
-        // 方案：取 4 个顶点的世界坐标，用凸包找矩形4角，精确计算位置/旋转/宽高
         mesh.updateWorldMatrix(true, false);
-        const posAttr = mesh.geometry.attributes.position;
-        const worldVerts: THREE.Vector3[] = [];
-        for (let v = 0; v < posAttr.count; v++) {
-          const wv = new THREE.Vector3().fromBufferAttribute(posAttr, v);
-          mesh.localToWorld(wv); // 转换到世界坐标（包含所有父节点变换）
-          worldVerts.push(wv);
+
+        // === 1. 用 Box3.setFromObject 获取世界包围盒（最稳健的方法）===
+        // 这会自动包含所有子对象、应用所有缩放和旋转后的真实世界尺寸
+        const worldBox = new THREE.Box3().setFromObject(mesh);
+        const worldSize = worldBox.getSize(new THREE.Vector3());
+        const worldCenter = worldBox.getCenter(new THREE.Vector3());
+
+        // 跳过异常小或异常大的mesh（非灯具面板）
+        const maxDim = Math.max(worldSize.x, worldSize.y, worldSize.z);
+        const minDim = Math.min(worldSize.x, worldSize.y, worldSize.z);
+        if (maxDim < 0.5 || maxDim > 50) return;  // 灯具面板应在合理范围
+        if (minDim > maxDim * 0.5) return;  // 灯具面板应扁平（最薄轴明显小于其他两轴）
+
+        // === 2. 自适应判断：最薄轴=法线，剩余两轴中较长=宽，较短=高 ===
+        const sx = worldSize.x, sy = worldSize.y, sz = worldSize.z;
+        let width: number, height: number;
+        let normalLocal: THREE.Vector3; // 局部空间法线方向
+
+        if (sy <= sx && sy <= sz) {
+          // Y 最薄：面板躺在 XZ 平面，法线沿 Y
+          normalLocal = new THREE.Vector3(0, 1, 0);
+          width = sx;
+          height = sz;
+        } else if (sx <= sy && sx <= sz) {
+          // X 最薄：面板躺在 YZ 平面，法线沿 X
+          normalLocal = new THREE.Vector3(1, 0, 0);
+          width = sy;
+          height = sz;
+        } else {
+          // Z 最薄：面板躺在 XY 平面，法线沿 Z
+          normalLocal = new THREE.Vector3(0, 0, 1);
+          width = sx;
+          height = sy;
         }
-        if (worldVerts.length < 3) return;
 
-        // 1. 计算法线（前3顶点叉积），用所有顶点平均确保稳定
-        const v0 = worldVerts[0], v1 = worldVerts[1], v2 = worldVerts[2];
-        const normal = new THREE.Vector3().crossVectors(
-          new THREE.Vector3().subVectors(v1, v0),
-          new THREE.Vector3().subVectors(v2, v0)
-        ).normalize();
+        // === 3. 法线转到世界空间 ===
+        const meshWorldQuat = mesh.getWorldQuaternion(new THREE.Quaternion());
+        const normalWorld = normalLocal.clone().applyQuaternion(meshWorldQuat).normalize();
 
-        // 2. 中心点 = 所有顶点平均
-        const center = new THREE.Vector3();
-        worldVerts.forEach(v => center.add(v));
-        center.divideScalar(worldVerts.length);
-
-        // 3. 长边方向 = 任意两顶点间最远的方向（即矩形长边）
-        let maxLen = 0, longDir = new THREE.Vector3(1, 0, 0);
-        for (let a = 0; a < worldVerts.length; a++) {
-          for (let b = a + 1; b < worldVerts.length; b++) {
-            const d = new THREE.Vector3().subVectors(worldVerts[b], worldVerts[a]);
-            const len = d.length();
-            if (len > maxLen) { maxLen = len; longDir = d.clone().normalize(); }
+        // === 4. 旋转矩阵：让 RectAreaLight 局部 Z 轴 = -normalWorld（光朝法线方向发射）===
+        // 因为 RectAreaLight 默认发光方向是 -Z
+        const Z = normalWorld.clone().negate();
+        // X 轴 = 长边方向（worldSize 较大的方向）
+        let X: THREE.Vector3, Y: THREE.Vector3;
+        if (sy <= sx && sy <= sz) {
+          // 面板在 XZ 平面，X 轴 = worldX, Y 轴 = worldZ
+          if (sx >= sz) {
+            X = new THREE.Vector3(1, 0, 0).applyQuaternion(meshWorldQuat);
+            Y = new THREE.Vector3(0, 0, 1).applyQuaternion(meshWorldQuat);
+          } else {
+            // 长边在 Z 方向，交换 width/height 和 X/Y
+            X = new THREE.Vector3(0, 0, 1).applyQuaternion(meshWorldQuat);
+            Y = new THREE.Vector3(1, 0, 0).applyQuaternion(meshWorldQuat);
+            const tmp = width; width = height; height = tmp;
+          }
+        } else if (sx <= sy && sx <= sz) {
+          // 面板在 YZ 平面
+          if (sy >= sz) {
+            X = new THREE.Vector3(0, 1, 0).applyQuaternion(meshWorldQuat);
+            Y = new THREE.Vector3(0, 0, 1).applyQuaternion(meshWorldQuat);
+          } else {
+            X = new THREE.Vector3(0, 0, 1).applyQuaternion(meshWorldQuat);
+            Y = new THREE.Vector3(0, 1, 0).applyQuaternion(meshWorldQuat);
+            const tmp = width; width = height; height = tmp;
+          }
+        } else {
+          // 面板在 XY 平面
+          if (sx >= sy) {
+            X = new THREE.Vector3(1, 0, 0).applyQuaternion(meshWorldQuat);
+            Y = new THREE.Vector3(0, 1, 0).applyQuaternion(meshWorldQuat);
+          } else {
+            X = new THREE.Vector3(0, 1, 0).applyQuaternion(meshWorldQuat);
+            Y = new THREE.Vector3(1, 0, 0).applyQuaternion(meshWorldQuat);
+            const tmp = width; width = height; height = tmp;
           }
         }
-        const width = maxLen; // 长边长度
 
-        // 4. 短边方向 = 法线 × 长边方向，短边长度 = 在短边方向上的投影范围
-        const shortDir = new THREE.Vector3().crossVectors(normal, longDir).normalize();
-        let minProj = Infinity, maxProj = -Infinity;
-        worldVerts.forEach(v => {
-          const proj = new THREE.Vector3().subVectors(v, center).dot(shortDir);
-          if (proj < minProj) minProj = proj;
-          if (proj > maxProj) maxProj = proj;
-        });
-        const height = maxProj - minProj; // 短边长度
+        // 保证右手坐标系：X × Y 应该 = Z
+        const crossCheck = new THREE.Vector3().crossVectors(X, Y);
+        if (crossCheck.dot(Z) < 0) {
+          Y.negate();
+        }
 
-        // 5. 旋转矩阵：RectAreaLight 默认 X=宽, Y=高, Z=法线
-        // -Z 方向是光的发射方向，我们让 -Z = -normal（即光朝法线反方向发射）
-        // 但用户要求"位置/旋转/尺寸与灯具模型一致"，所以这里直接 Z=normal（不再强制朝下）
-        const rotMatrix = new THREE.Matrix4().makeBasis(longDir, shortDir, normal);
+        const rotMatrix = new THREE.Matrix4().makeBasis(X, Y, Z);
         const worldQuat = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
 
-        // 6. 位置 = 中心（与灯具完全重合，不再加偏移）
-        const rectLight = new THREE.RectAreaLight(0xff8800, 0, width, height);  // 桔黄色
-        rectLight.position.copy(center);
+        // === 5. 创建 RectAreaLight（位置=世界包围盒中心，与灯具完全重合）===
+        const rectLight = new THREE.RectAreaLight(0xff8800, 0, width, height);
+        rectLight.position.copy(worldCenter);
         rectLight.quaternion.copy(worldQuat);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
-        // 用半透明线框显示原始灯具 mesh，便于对比
+
+        // === 6. 半透明线框显示原模型，便于对比 ===
         (mesh as any).material = new (THREE as any).MeshBasicMaterial({
           color: 0xff8800, side: THREE.DoubleSide, wireframe: true,
-          transparent: true, opacity: 0.4,
-          depthWrite: false,
+          transparent: true, opacity: 0.4, depthWrite: false,
         });
-        // 显示 RectAreaLightHelper 边框（青色），加到 scene
+        // 显示 RectAreaLightHelper 边框（青色）
         const helper = new RectAreaLightHelper(rectLight, 0x00ffff);
         helper.name = `__rectHelper_${i}`;
         T.scene.add(helper);
       });
+
       T.rectHelpers = T.rectLights.map((l: any) => T.scene.getObjectByName(`__rectHelper_${T.rectLights.indexOf(l)}`));
-      console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (位置/旋转/尺寸与灯具模型完全重合)`);
+      console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (AABB世界包围盒算法，与灯具完全重合)`);
     }
 
     function farthestPointSampling(points: any[], n: number) {
