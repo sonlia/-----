@@ -54,7 +54,7 @@ export default function BuildingScene() {
   const [date, setDate] = useState('');
 
   const [lightingOn, setLightingOn] = useState(true);
-  const [brightness, setBrightness] = useState(80);
+  const [brightness, setBrightness] = useState(16);
   const [acOn, setAcOn] = useState(true);
   const [temperature, setTemperature] = useState(24);
   const [autoRotate, setAutoRotate] = useState(false);
@@ -554,21 +554,11 @@ export default function BuildingScene() {
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
 
-        // === 8. 可视化核对 ===
-        const helper = new RectAreaLightHelper(rectLight, 0x00ffff);
-        helper.name = `__rectHelper_${i}`;
-        T.scene.add(helper);
-
-        // 将原模型转成线框
-        (mesh as any).material = new (THREE as any).MeshBasicMaterial({
-          color: 0xff8800, side: THREE.DoubleSide, wireframe: true,
-          transparent: true, opacity: 0.4, depthWrite: false,
-        });
+        // === 8. 隐藏原始灯具模型（不再显示线框）===
+        mesh.visible = false;
       });
 
-      T.rectHelpers = T.rectLights.map((_: any, i: number) =>
-        T.scene.getObjectByName(`__rectHelper_${i}`)
-      );
+      T.rectHelpers = []; // 不再创建 Helper
       console.log(`灯具光源: ${T.rectLights.length} 个 (真实顶点去重 + Z轴不取反)`);
     }
 
@@ -1010,7 +1000,7 @@ export default function BuildingScene() {
   }, []);
 
   // refs 同步状态给 Three.js 闭包
-  const stateRef = useRef({ lighting: { enabled: true, brightness: 0.8 }, ac: { enabled: true, temperature: 24 }, autoRotate: false });
+  const stateRef = useRef({ lighting: { enabled: true, brightness: 0.16 }, ac: { enabled: true, temperature: 24 }, autoRotate: false });
   const renderModeRef = useRef('WebGPU');
   const deviceListRef = useRef<DeviceListItem[]>([]);
   useEffect(() => { renderModeRef.current = renderMode; }, [renderMode]);
@@ -1161,6 +1151,8 @@ export default function BuildingScene() {
   // 模块切换
   const onSwitchModule = (mod: 'overview' | 'building' | 'solar' | 'charging' | 'carbon' | 'load') => {
     setActiveModule(mod);
+    // 切换模块时隐藏设备详情面板
+    setSelectedDevice(null);
     const T = threeRef.current;
     if (!T.scene) return;
     if (T.modelRoot) T.modelRoot.visible = (mod === 'building');
