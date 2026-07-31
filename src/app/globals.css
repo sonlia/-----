@@ -259,8 +259,8 @@ canvas { display: block; }
 .control-group:last-child { border-bottom: none; }
 
 .control-group-label {
-  font-size: 12px; color: var(--text-mid);
-  margin-bottom: 10px;
+  font-size: 11px; color: var(--text-mid);
+  margin-bottom: 6px;
   display: flex; align-items: center; justify-content: space-between;
   letter-spacing: 1px;
 }
@@ -279,16 +279,16 @@ canvas { display: block; }
 .status-tag.off { border-color: var(--text-dim); color: var(--text-dim); background: rgba(74, 100, 133, 0.08); }
 
 .toggle-btn {
-  width: 100%; padding: 9px 14px;
+  width: 100%; padding: 6px 8px;
   border: 1px solid var(--primary-dim);
   background: var(--primary-bg);
   color: var(--primary);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.25s;
-  font-size: 12px; font-weight: 600;
-  letter-spacing: 1.5px;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 1px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
   position: relative; overflow: hidden;
 }
 .toggle-btn::before {
@@ -308,7 +308,7 @@ canvas { display: block; }
   box-shadow: 0 0 16px rgba(0, 212, 255, 0.5);
 }
 
-.slider-row { margin-top: 10px; }
+.slider-row { margin-top: 6px; }
 .slider-row .slider-header {
   display: flex; justify-content: space-between;
   font-size: 11px; color: var(--text-dim);
@@ -338,7 +338,7 @@ canvas { display: block; }
   border: 2px solid var(--bg-dark);
 }
 
-.view-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.view-btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 
 .right-panel { right: 20px; top: 84px; width: 340px; }
 
