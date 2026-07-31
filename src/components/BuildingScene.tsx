@@ -817,7 +817,7 @@ export default function BuildingScene() {
         const fixture = T.lightFixtures[i];
         const indOn = fixture?.userData?.individualOn;
         const finalOn = s.enabled && (indOn !== false);
-        light.intensity = finalOn ? b * 200 : 0;  // 降低强度，匹配311lx照度
+        light.intensity = finalOn ? b * 150 : 0;  // 降低强度，匹配300lx照度
       });
       // 关灯时：所有 mesh 的自发光归零（墙/桌椅/logo/空调等），避免残余亮度
       T.modelRoot.traverse((child: any) => {
@@ -1179,7 +1179,7 @@ export default function BuildingScene() {
       const fixture = T.lightFixtures[i];
       const indOn = fixture?.userData?.individualOn;
       const finalOn = enabled && (indOn !== false);
-      light.intensity = finalOn ? b * 200 : 0;
+      light.intensity = finalOn ? b * 150 : 0;
     });
     // 关灯时：所有 mesh 的自发光归零
     T.modelRoot.traverse((child: any) => {
@@ -1332,9 +1332,10 @@ export default function BuildingScene() {
   const activeDevices = (lightingOn ? lightCount : 0) + (acOn ? acCount : 0);
   const totalPowerVal = ((lightingOn ? lightCount * deviceDB.light.power : 0) + (acOn ? acCount * deviceDB.ac.power : 0)) / 1000;
   const avgTemp = acOn ? temperature : '--';
-  // 照度计算：亮度80%时 = 311 lx（用户要求，降低亮度）
-  // 公式：lux = 300 + (brightness/100) * 13.75，brightness=80% → 311 lx
-  const luxVal = lightingOn ? Math.round(300 + (brightness / 100) * 13.75) : 30;
+  // 照度计算：亮度80%时 = 300 lx（用户要求，降低亮度）
+  // 公式：lux = 300 + (brightness/100) * 0，brightness=80% → 300 lx
+  // 固定 300 lx，不随亮度变化（保持基础照度）
+  const luxVal = lightingOn ? 300 : 30;
   let energyLevel = 'A', energyClass = 'good';
   if (totalPowerVal > 8) { energyLevel = 'C'; energyClass = 'warn'; }
   else if (totalPowerVal > 5) { energyLevel = 'B'; energyClass = ''; }
