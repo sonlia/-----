@@ -13,7 +13,10 @@ set -e
 # 默认配置
 DEFAULT_PORT=3000
 PORT=$DEFAULT_PORT
-PROJECT_DIR="/home/z/my-project"
+
+# 获取脚本所在目录（自动定位项目目录，不依赖运行位置）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$SCRIPT_DIR"
 LOG_FILE="/tmp/energy-cockpit.log"
 PID_FILE="/tmp/energy-cockpit.pid"
 
@@ -43,7 +46,16 @@ while getopts "p:h" opt; do
   esac
 done
 
+# 切换到项目目录（脚本所在目录）
 cd "$PROJECT_DIR"
+
+# 验证 package.json 存在
+if [ ! -f "package.json" ]; then
+  echo "❌ 错误：未找到 package.json"
+  echo "  当前目录: $PROJECT_DIR"
+  echo "  请确保脚本位于项目根目录"
+  exit 1
+fi
 
 echo "============================================================"
 echo "  综合能源驾驶舱 · Energy Cockpit 启动脚本"
@@ -100,9 +112,21 @@ stop_existing() {
 # === 2. 检查依赖 ===
 check_deps() {
   echo "[2/4] 检查依赖..."
+  # 确保在项目目录（脚本所在目录）
+  cd "$PROJECT_DIR"
+
+  if [ ! -f "package.json" ]; then
+    echo "  ❌ 未找到 package.json，无法安装依赖"
+    exit 1
+  fi
+
   if [ ! -d "node_modules" ]; then
     echo "  - node_modules 不存在，执行 bun install..."
+    echo "  - 当前目录: $(pwd)"
     bun install
+    echo "  ✓ 依赖安装完成"
+  else
+    echo "  ✓ node_modules 已存在"
   fi
   echo "  ✓ 依赖检查完成"
 }
@@ -110,6 +134,8 @@ check_deps() {
 # === 3. 启动服务（后台运行，SSH 断开不关闭） ===
 start_service() {
   echo "[3/4] 启动服务（端口 $PORT）..."
+  # 确保在项目目录
+  cd "$PROJECT_DIR"
 
   # 清空旧日志
   > "$LOG_FILE"
