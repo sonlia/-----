@@ -59,7 +59,7 @@ export default function BuildingScene() {
   const [temperature, setTemperature] = useState(24);
   const [autoRotate, setAutoRotate] = useState(false);
   const [showList, setShowList] = useState(true);
-  const [activeModule, setActiveModule] = useState<'overview' | 'building' | 'solar' | 'charging' | 'carbon' | 'load'>('building');
+  const [activeModule, setActiveModule] = useState<'overview' | 'building' | 'solar' | 'charging' | 'carbon' | 'load'>('overview');
   const [activeFloor, setActiveFloor] = useState(0);
 
   const [deviceList, setDeviceList] = useState<DeviceListItem[]>([]);
@@ -324,6 +324,11 @@ export default function BuildingScene() {
           applyAC(T);
           buildDeviceList(T);
           updateStatus(T);
+          // 默认显示能源总览模块，隐藏 3D 模型及灯光
+          if (T.modelRoot) T.modelRoot.visible = false;
+          T.rectLights?.forEach((l: any) => { l.visible = false; });
+          T.deviceMarkers?.forEach((m: any) => { m.group.visible = false; });
+          T.airflowSystems?.forEach((s: any) => { s.points.visible = false; });
           resolve();
         },
         (xhr: any) => {
@@ -812,7 +817,7 @@ export default function BuildingScene() {
         const fixture = T.lightFixtures[i];
         const indOn = fixture?.userData?.individualOn;
         const finalOn = s.enabled && (indOn !== false);
-        light.intensity = finalOn ? b * 300 : 0;  // 提高强度，确保真实照明可见
+        light.intensity = finalOn ? b * 200 : 0;  // 降低强度，匹配311lx照度
       });
       // 关灯时：所有 mesh 的自发光归零（墙/桌椅/logo/空调等），避免残余亮度
       T.modelRoot.traverse((child: any) => {
@@ -1174,7 +1179,7 @@ export default function BuildingScene() {
       const fixture = T.lightFixtures[i];
       const indOn = fixture?.userData?.individualOn;
       const finalOn = enabled && (indOn !== false);
-      light.intensity = finalOn ? b * 300 : 0;
+      light.intensity = finalOn ? b * 200 : 0;
     });
     // 关灯时：所有 mesh 的自发光归零
     T.modelRoot.traverse((child: any) => {
@@ -1327,9 +1332,9 @@ export default function BuildingScene() {
   const activeDevices = (lightingOn ? lightCount : 0) + (acOn ? acCount : 0);
   const totalPowerVal = ((lightingOn ? lightCount * deviceDB.light.power : 0) + (acOn ? acCount * deviceDB.ac.power : 0)) / 1000;
   const avgTemp = acOn ? temperature : '--';
-  // 照度计算：亮度80%时 = 385 lx（用户要求）
-  // 公式：lux = 300 + (brightness/100) * 106.25，brightness=80% → 385 lx
-  const luxVal = lightingOn ? Math.round(300 + (brightness / 100) * 106.25) : 30;
+  // 照度计算：亮度80%时 = 311 lx（用户要求，降低亮度）
+  // 公式：lux = 300 + (brightness/100) * 13.75，brightness=80% → 311 lx
+  const luxVal = lightingOn ? Math.round(300 + (brightness / 100) * 13.75) : 30;
   let energyLevel = 'A', energyClass = 'good';
   if (totalPowerVal > 8) { energyLevel = 'C'; energyClass = 'warn'; }
   else if (totalPowerVal > 5) { energyLevel = 'B'; energyClass = ''; }
