@@ -1,14 +1,30 @@
 #!/bin/bash
 # ============================================================
 # 综合能源驾驶舱 - 状态查看脚本
+# 用法: ./status.sh [-p 端口号]
 # ============================================================
 
-PORT=3000
+DEFAULT_PORT=3000
+PORT=$DEFAULT_PORT
 PID_FILE="/tmp/energy-cockpit.pid"
 LOG_FILE="/tmp/energy-cockpit.log"
 
+# === 解析命令行参数 ===
+while getopts "p:h" opt; do
+  case $opt in
+    p) PORT="$OPTARG" ;;
+    h)
+      echo "用法: ./status.sh [-p 端口号]"
+      echo "  -p  指定端口号（默认: $DEFAULT_PORT）"
+      exit 0
+      ;;
+    \?) echo "无效选项: -$OPTARG" >&2; exit 1 ;;
+    :) echo "选项 -$OPTARG 需要参数。" >&2; exit 1 ;;
+  esac
+done
+
 echo "============================================================"
-echo "  综合能源驾驶舱 · 状态"
+echo "  综合能源驾驶舱 · 状态 (端口 $PORT)"
 echo "============================================================"
 
 # 检查进程状态

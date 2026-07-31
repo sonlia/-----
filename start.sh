@@ -3,17 +3,45 @@
 # 综合能源驾驶舱 - 启动脚本
 # 功能：
 #   1. 幂等启动：重复启动会先停止旧进程再启动
-#   2. 端口复用：自动释放 3000 端口
+#   2. 端口复用：自动释放指定端口
 #   3. 后台运行：SSH 断开后服务继续运行（nohup + disown）
+#   4. 自定义端口：./start.sh -p 8888
 # ============================================================
 
 set -e
 
-# 配置
-PORT=3000
+# 默认配置
+DEFAULT_PORT=3000
+PORT=$DEFAULT_PORT
 PROJECT_DIR="/home/z/my-project"
 LOG_FILE="/tmp/energy-cockpit.log"
 PID_FILE="/tmp/energy-cockpit.pid"
+
+# === 解析命令行参数 ===
+while getopts "p:h" opt; do
+  case $opt in
+    p) PORT="$OPTARG" ;;
+    h)
+      echo "用法: ./start.sh [-p 端口号]"
+      echo "  -p  指定端口号（默认: $DEFAULT_PORT）"
+      echo ""
+      echo "示例:"
+      echo "  ./start.sh              # 使用默认端口 $DEFAULT_PORT"
+      echo "  ./start.sh -p 8888      # 使用端口 8888"
+      echo "  ./start.sh -p 8080      # 使用端口 8080"
+      exit 0
+      ;;
+    \?)
+      echo "无效选项: -$OPTARG" >&2
+      echo "使用 ./start.sh -h 查看帮助"
+      exit 1
+      ;;
+    :)
+      echo "选项 -$OPTARG 需要参数。" >&2
+      exit 1
+      ;;
+  esac
+done
 
 cd "$PROJECT_DIR"
 
@@ -57,13 +85,13 @@ stop_existing() {
     fi
   fi
 
-  # 方法3：通过 pgrep 查找 next dev 进程
-  NEXT_PIDS=$(pgrep -f "next dev" 2>/dev/null || true)
+  # 方法3：通过 pgrep 查找 next dev/next-server 进程
+  NEXT_PIDS=$(pgrep -f "next dev\|next-server" 2>/dev/null || true)
   if [ -n "$NEXT_PIDS" ]; then
-    echo "  - 发现 next dev 进程 (PID: $NEXT_PIDS)，正在停止..."
+    echo "  - 发现 next 进程 (PID: $NEXT_PIDS)，正在停止..."
     echo "$NEXT_PIDS" | xargs kill -9 2>/dev/null || true
     sleep 1
-    echo "  - next dev 进程已停止"
+    echo "  - next 进程已停止"
   fi
 
   echo "  ✓ 旧进程清理完成"
@@ -81,7 +109,7 @@ check_deps() {
 
 # === 3. 启动服务（后台运行，SSH 断开不关闭） ===
 start_service() {
-  echo "[3/4] 启动服务..."
+  echo "[3/4] 启动服务（端口 $PORT）..."
 
   # 清空旧日志
   > "$LOG_FILE"
@@ -90,7 +118,8 @@ start_service() {
   # setsid 创建新会话，脱离当前终端
   # nohup 忽略 SIGHUP 信号
   # disown 从 shell 作业列表移除
-  setsid nohup bun run dev > "$LOG_FILE" 2>&1 < /dev/null &
+  # 通过 bun run dev -- -p $PORT 覆盖 package.json 中的端口
+  setsid nohup bun run dev -- -p $PORT > "$LOG_FILE" 2>&1 < /dev/null &
   SERVER_PID=$!
   disown $SERVER_PID 2>/dev/null || true
 
