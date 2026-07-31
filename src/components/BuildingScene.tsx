@@ -433,16 +433,16 @@ export default function BuildingScene() {
       };
     }
 
-    // ===== 灯具发光光源（基于真实世界4顶点去重，完美匹配模型）=====
+    // ===== 灯具发光光源（真实顶点去重 + Z轴不取反，修正镜像问题）=====
     function setupPointLights(T: any) {
       T.modelRoot.updateMatrixWorld(true);
       T.scene.updateMatrixWorld(true);
-      T.pointLights = [];
-      T.shadowLights = [];
       T.rectLights = [];
       T.rectHelpers = [];
+      T.pointLights = [];
+      T.shadowLights = [];
 
-      // 获取整栋楼的Y中心，用于判断天花板灯具的朝向
+      // 获取模型整体 Y 中心，判断灯具是否在天花板
       const modelBox = new THREE.Box3().setFromObject(T.modelRoot);
       const modelCenterY = modelBox.getCenter(new THREE.Vector3()).y;
 
@@ -459,50 +459,37 @@ export default function BuildingScene() {
           rawWorldVerts.push(worldP);
         }
 
-        // === 2. 容差去重（将 GLTF 的6个顶点合并为真正的4个角点） ===
-        // 模型灯具 geometry 有3种顶点数：4(标准矩形)、6(2个三角形，长边中点多1顶点)、9(复杂)
-        // 6顶点情况：4个角+2个长边中点，需要合并长边中点到端点
-        // 但简单容差去重无法处理这种情况，改用：找出4个最外围的角点
-        // 算法：计算所有顶点的质心，按到质心的距离排序，取最远的4个
+        // === 2. 找出4个真正的角点 ===
+        // 模型灯具 geometry 有3种顶点数：
+        //   4顶点（标准矩形，但可能在局部空间是旋转的，AABB不适用）
+        //   6顶点（4角+2长边中点）
+        //   9顶点（复杂结构）
+        // 解决：用质心距离算法选4个最远点 = 4个角点
         const worldVerts: THREE.Vector3[] = [];
-        if (rawWorldVerts.length <= 4) {
-          // 4顶点或更少，直接用容差去重
-          const tolerance = 0.001;
-          for (const v of rawWorldVerts) {
-            let isDup = false;
-            for (const e of worldVerts) {
-              if (v.distanceTo(e) < tolerance) { isDup = true; break; }
-            }
-            if (!isDup) worldVerts.push(v);
+        // 先去重精确重复点
+        const uniqueVerts: THREE.Vector3[] = [];
+        const tol = 0.001;
+        for (const v of rawWorldVerts) {
+          let isDup = false;
+          for (const e of uniqueVerts) {
+            if (v.distanceTo(e) < tol) { isDup = true; break; }
           }
-        } else {
-          // 6顶点或9顶点：找出4个最外围的角点
-          // 1) 先去重精确重复点
-          const uniqueVerts: THREE.Vector3[] = [];
-          const tol = 0.001;
-          for (const v of rawWorldVerts) {
-            let isDup = false;
-            for (const e of uniqueVerts) {
-              if (v.distanceTo(e) < tol) { isDup = true; break; }
-            }
-            if (!isDup) uniqueVerts.push(v);
-          }
-          if (uniqueVerts.length === 4) {
-            worldVerts.push(...uniqueVerts);
-          } else if (uniqueVerts.length > 4) {
-            // 2) 找出4个最外围角点：用凸包算法
-            // 简化版：计算质心，按距离排序取最远4个
-            const centroid = new THREE.Vector3();
-            uniqueVerts.forEach(v => centroid.add(v));
-            centroid.divideScalar(uniqueVerts.length);
-            const sorted = uniqueVerts.slice().sort((a, b) =>
-              b.distanceTo(centroid) - a.distanceTo(centroid)
-            );
-            worldVerts.push(...sorted.slice(0, 4));
-          }
+          if (!isDup) uniqueVerts.push(v);
         }
-
-        // 只要去重后不是标准的4个角点，说明不是扁平矩形面，跳过生成光源
+        if (uniqueVerts.length === 4) {
+          worldVerts.push(...uniqueVerts);
+        } else if (uniqueVerts.length > 4) {
+          // 计算质心，按距离排序取最远4个（即4个角点）
+          const centroid = new THREE.Vector3();
+          uniqueVerts.forEach(v => centroid.add(v));
+          centroid.divideScalar(uniqueVerts.length);
+          const sorted = uniqueVerts.slice().sort((a, b) =>
+            b.distanceTo(centroid) - a.distanceTo(centroid)
+          );
+          worldVerts.push(...sorted.slice(0, 4));
+        } else {
+          return; // 少于4个顶点，跳过
+        }
         if (worldVerts.length !== 4) return;
 
         // === 3. 计算中心点 ===
@@ -526,24 +513,32 @@ export default function BuildingScene() {
 
         const longDir = new THREE.Vector3().subVectors(worldVerts[longPair[1]], worldVerts[longPair[0]]).normalize();
         let shortDir = new THREE.Vector3().subVectors(worldVerts[shortPair[1]], worldVerts[shortPair[0]]).normalize();
-        const normal = new THREE.Vector3().crossVectors(longDir, shortDir).normalize();
+        let normal = new THREE.Vector3().crossVectors(longDir, shortDir).normalize();
 
-        // === 5. 法线矫正（判定天花板灯具始终朝下发光） ===
-        let finalNormal = normal;
-        if (center.y > modelCenterY && normal.y > 0) {
-          finalNormal = normal.clone().negate();
-          shortDir = new THREE.Vector3().crossVectors(finalNormal, longDir).normalize();
-          const check = new THREE.Vector3().crossVectors(longDir, shortDir);
-          if (check.dot(finalNormal) < 0) shortDir.negate();
-        } else {
-          const check = new THREE.Vector3().crossVectors(longDir, shortDir);
-          if (check.dot(finalNormal) < 0) shortDir.negate();
+        // 保证右手坐标系：longDir × shortDir 应该 = normal
+        const crossCheck = new THREE.Vector3().crossVectors(longDir, shortDir);
+        if (crossCheck.dot(normal) < 0) {
+          shortDir.negate();
+          normal = new THREE.Vector3().crossVectors(longDir, shortDir).normalize();
         }
 
-        // === 6. 构建旋转矩阵（RectAreaLight 默认面向 -Z 发射，故 Z = -法线） ===
-        const Z = finalNormal.clone().negate();
-        const X = longDir; // 长边对应局部 X 轴
-        const Y = shortDir; // 短边对应局部 Y 轴
+        // === 5. 法线矫正（天花板灯必须朝下照） ===
+        // 如果灯在天花板（y > modelCenterY）且法线朝上（normal.y > 0），翻转法线让光朝下
+        let finalNormal = normal;
+        if (center.y > modelCenterY && finalNormal.y > 0) {
+          finalNormal = finalNormal.clone().negate();
+          // 翻转法线后需要重新计算 shortDir 保持右手坐标系
+          shortDir = new THREE.Vector3().crossVectors(finalNormal, longDir).normalize();
+          const check2 = new THREE.Vector3().crossVectors(longDir, shortDir);
+          if (check2.dot(finalNormal) < 0) shortDir.negate();
+        }
+
+        // === 6. 核心修正：Z 轴 = 法线，绝对不能取反！ ===
+        // RectAreaLight 默认沿 -Z 方向发光，-Z = -finalNormal，光朝法线反方向（即朝下）发射
+        // 如果取反 Z = -finalNormal，会破坏右手坐标系，导致镜像翻转
+        const Z = finalNormal;
+        const X = longDir;
+        const Y = shortDir;
 
         const rotMatrix = new THREE.Matrix4().makeBasis(X, Y, Z);
         const worldQuat = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
@@ -571,7 +566,7 @@ export default function BuildingScene() {
       T.rectHelpers = T.rectLights.map((_: any, i: number) =>
         T.scene.getObjectByName(`__rectHelper_${i}`)
       );
-      console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (顶点去重精确匹配)`);
+      console.log(`灯具光源: ${T.rectLights.length} 个 (真实顶点去重 + Z轴不取反)`);
     }
 
     function farthestPointSampling(points: any[], n: number) {
