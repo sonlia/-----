@@ -433,123 +433,135 @@ export default function BuildingScene() {
       };
     }
 
-    // ===== 灯具发光光源（RectAreaLight 面板灯，局部4角点精确匹配）=====
+    // ===== 灯具发光光源（基于真实世界4顶点去重，完美匹配模型）=====
     function setupPointLights(T: any) {
       T.modelRoot.updateMatrixWorld(true);
       T.scene.updateMatrixWorld(true);
-
       T.pointLights = [];
       T.shadowLights = [];
       T.rectLights = [];
       T.rectHelpers = [];
 
-      // ===== 步骤 1：过滤 —— 只保留真正的面板（扁平 + 尺寸合理）=====
-      const lightMeshes: any[] = [];
-      T.lightFixtures.forEach((mesh: any) => {
-        if (!mesh.geometry) return;
-        mesh.geometry.computeBoundingBox();
-        const localSize = mesh.geometry.boundingBox.getSize(new THREE.Vector3());
-        const maxDim = Math.max(localSize.x, localSize.y, localSize.z);
-        const minDim = Math.min(localSize.x, localSize.y, localSize.z);
-        // 关键过滤：必须是扁平的（最薄轴 < 最厚轴 × 0.25），排除支架/螺丝
-        if (minDim > maxDim * 0.25) return;
-        // 尺寸必须在合理范围
-        if (maxDim < 0.001 || maxDim > 0.1) return;
-        const area = localSize.x * localSize.y + localSize.y * localSize.z + localSize.z * localSize.x;
-        lightMeshes.push({ mesh, area, localSize });
-      });
-      // 按面积降序，取前 60 个最大的（过滤小支架）
-      lightMeshes.sort((a, b) => b.area - a.area);
-      const validMeshes = lightMeshes.slice(0, 60);
-
-      // 获取模型中心 Y（用于判断天花板/地面，自动修正法线朝向）
+      // 获取整栋楼的Y中心，用于判断天花板灯具的朝向
       const modelBox = new THREE.Box3().setFromObject(T.modelRoot);
       const modelCenterY = modelBox.getCenter(new THREE.Vector3()).y;
 
-      validMeshes.forEach(({ mesh, localSize }, i: number) => {
+      T.lightFixtures.forEach((mesh: any, i: number) => {
+        if (!mesh.geometry || !mesh.geometry.attributes.position) return;
         mesh.updateWorldMatrix(true, false);
 
-        // ===== 步骤 2：局部 AABB（不受旋转影响）=====
-        const localBox = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position);
-        const localCenter = localBox.getCenter(new THREE.Vector3());
-        const min = localBox.min;
-        const max = localBox.max;
+        // === 1. 提取所有顶点的世界空间坐标 ===
+        const posAttr = mesh.geometry.attributes.position;
+        const rawWorldVerts: THREE.Vector3[] = [];
+        for (let v = 0; v < posAttr.count; v++) {
+          const localP = new THREE.Vector3().fromBufferAttribute(posAttr, v);
+          const worldP = new THREE.Vector3().copy(localP).applyMatrix4(mesh.matrixWorld);
+          rawWorldVerts.push(worldP);
+        }
 
-        // ===== 步骤 3：判断最薄轴，构造局部空间的 4 个面板角点 =====
-        // 关键：在局部空间构造，此时几何体是轴对齐的，4 个角点精确对应面板边界
-        let cornersLocal: THREE.Vector3[];
-        if (localSize.y <= localSize.x && localSize.y <= localSize.z) {
-          // Y 最薄：面板躺在 XZ 平面，取 Y = localCenter.y（面板中间层）
-          const y = localCenter.y;
-          cornersLocal = [
-            new THREE.Vector3(min.x, y, min.z),
-            new THREE.Vector3(max.x, y, min.z),
-            new THREE.Vector3(max.x, y, max.z),
-            new THREE.Vector3(min.x, y, max.z),
-          ];
-        } else if (localSize.x <= localSize.y && localSize.x <= localSize.z) {
-          // X 最薄：面板躺在 YZ 平面
-          const x = localCenter.x;
-          cornersLocal = [
-            new THREE.Vector3(x, min.y, min.z),
-            new THREE.Vector3(x, max.y, min.z),
-            new THREE.Vector3(x, max.y, max.z),
-            new THREE.Vector3(x, min.y, max.z),
-          ];
+        // === 2. 容差去重（将 GLTF 的6个顶点合并为真正的4个角点） ===
+        // 模型灯具 geometry 有3种顶点数：4(标准矩形)、6(2个三角形，长边中点多1顶点)、9(复杂)
+        // 6顶点情况：4个角+2个长边中点，需要合并长边中点到端点
+        // 但简单容差去重无法处理这种情况，改用：找出4个最外围的角点
+        // 算法：计算所有顶点的质心，按到质心的距离排序，取最远的4个
+        const worldVerts: THREE.Vector3[] = [];
+        if (rawWorldVerts.length <= 4) {
+          // 4顶点或更少，直接用容差去重
+          const tolerance = 0.001;
+          for (const v of rawWorldVerts) {
+            let isDup = false;
+            for (const e of worldVerts) {
+              if (v.distanceTo(e) < tolerance) { isDup = true; break; }
+            }
+            if (!isDup) worldVerts.push(v);
+          }
         } else {
-          // Z 最薄：面板躺在 XY 平面
-          const z = localCenter.z;
-          cornersLocal = [
-            new THREE.Vector3(min.x, min.y, z),
-            new THREE.Vector3(max.x, min.y, z),
-            new THREE.Vector3(max.x, max.y, z),
-            new THREE.Vector3(min.x, max.y, z),
-          ];
+          // 6顶点或9顶点：找出4个最外围的角点
+          // 1) 先去重精确重复点
+          const uniqueVerts: THREE.Vector3[] = [];
+          const tol = 0.001;
+          for (const v of rawWorldVerts) {
+            let isDup = false;
+            for (const e of uniqueVerts) {
+              if (v.distanceTo(e) < tol) { isDup = true; break; }
+            }
+            if (!isDup) uniqueVerts.push(v);
+          }
+          if (uniqueVerts.length === 4) {
+            worldVerts.push(...uniqueVerts);
+          } else if (uniqueVerts.length > 4) {
+            // 2) 找出4个最外围角点：用凸包算法
+            // 简化版：计算质心，按距离排序取最远4个
+            const centroid = new THREE.Vector3();
+            uniqueVerts.forEach(v => centroid.add(v));
+            centroid.divideScalar(uniqueVerts.length);
+            const sorted = uniqueVerts.slice().sort((a, b) =>
+              b.distanceTo(centroid) - a.distanceTo(centroid)
+            );
+            worldVerts.push(...sorted.slice(0, 4));
+          }
         }
 
-        // ===== 步骤 4：4 个角点转到世界空间（精确应用旋转+缩放+位移）=====
-        const cornersWorld = cornersLocal.map(p => mesh.localToWorld(p.clone()));
+        // 只要去重后不是标准的4个角点，说明不是扁平矩形面，跳过生成光源
+        if (worldVerts.length !== 4) return;
 
-        // ===== 步骤 5：从世界角点计算中心、边向量、法线 =====
-        const worldCenter = new THREE.Vector3();
-        cornersWorld.forEach(p => worldCenter.add(p));
-        worldCenter.divideScalar(4);
+        // === 3. 计算中心点 ===
+        const center = new THREE.Vector3();
+        worldVerts.forEach(v => center.add(v));
+        center.divideScalar(4);
 
-        // 相邻角点构成边
-        const edge1 = new THREE.Vector3().subVectors(cornersWorld[1], cornersWorld[0]);
-        const edge2 = new THREE.Vector3().subVectors(cornersWorld[3], cornersWorld[0]);
-        const worldWidth = edge1.length();
-        const worldHeight = edge2.length();
-        const worldNormal = new THREE.Vector3().crossVectors(edge1, edge2).normalize();
+        // === 4. 精确找出长边和短边（避开"对角线陷阱"） ===
+        const pairs = [[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
+        const dists = pairs.map((p, idx) => ({
+          idx, dist: worldVerts[p[0]].distanceTo(worldVerts[p[1]])
+        }));
+        dists.sort((a, b) => a.dist - b.dist);
 
-        // ===== 步骤 6：法线方向修正（天花板灯必须朝下照）=====
-        let normal = worldNormal;
-        if (worldCenter.y > modelCenterY && normal.y > 0) {
-          normal = normal.clone().negate(); // 翻转法线，让光朝下
+        // 排序后：[短边, 短边, 长边, 长边, 对角线, 对角线]
+        const shortPair = pairs[dists[0].idx];
+        const longPair = pairs[dists[2].idx];
+
+        const width = dists[2].dist;  // 长边（RectAreaLight的宽）
+        const height = dists[0].dist; // 短边（RectAreaLight的高）
+
+        const longDir = new THREE.Vector3().subVectors(worldVerts[longPair[1]], worldVerts[longPair[0]]).normalize();
+        let shortDir = new THREE.Vector3().subVectors(worldVerts[shortPair[1]], worldVerts[shortPair[0]]).normalize();
+        const normal = new THREE.Vector3().crossVectors(longDir, shortDir).normalize();
+
+        // === 5. 法线矫正（判定天花板灯具始终朝下发光） ===
+        let finalNormal = normal;
+        if (center.y > modelCenterY && normal.y > 0) {
+          finalNormal = normal.clone().negate();
+          shortDir = new THREE.Vector3().crossVectors(finalNormal, longDir).normalize();
+          const check = new THREE.Vector3().crossVectors(longDir, shortDir);
+          if (check.dot(finalNormal) < 0) shortDir.negate();
+        } else {
+          const check = new THREE.Vector3().crossVectors(longDir, shortDir);
+          if (check.dot(finalNormal) < 0) shortDir.negate();
         }
 
-        // ===== 步骤 7：构建 RectAreaLight 的旋转矩阵 =====
-        // RectAreaLight 默认：X = width 方向, Y = height 方向, +Z = 法线, -Z = 光照方向
-        const xAxis = edge1.clone().normalize();
-        const yAxis = new THREE.Vector3().crossVectors(normal, xAxis).normalize();
-        const zAxis = normal.clone().negate(); // Z = -normal（让 -Z = normal，光朝法线发射）
-        const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+        // === 6. 构建旋转矩阵（RectAreaLight 默认面向 -Z 发射，故 Z = -法线） ===
+        const Z = finalNormal.clone().negate();
+        const X = longDir; // 长边对应局部 X 轴
+        const Y = shortDir; // 短边对应局部 Y 轴
+
+        const rotMatrix = new THREE.Matrix4().makeBasis(X, Y, Z);
         const worldQuat = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
 
-        // ===== 步骤 8：创建 RectAreaLight（与 4 个世界角点精确重合）=====
-        const rectLight = new THREE.RectAreaLight(0xff8800, 0, worldWidth, worldHeight);
-        rectLight.position.copy(worldCenter);
+        // === 7. 创建 RectAreaLight ===
+        const rectLight = new THREE.RectAreaLight(0xff8800, 0, width, height);
+        rectLight.position.copy(center);
         rectLight.quaternion.copy(worldQuat);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
 
-        // ===== 步骤 9：Helper 用于可视化验证 =====
+        // === 8. 可视化核对 ===
         const helper = new RectAreaLightHelper(rectLight, 0x00ffff);
         helper.name = `__rectHelper_${i}`;
         T.scene.add(helper);
 
-        // 原模型改为半透明线框，观察是否重合
+        // 将原模型转成线框
         (mesh as any).material = new (THREE as any).MeshBasicMaterial({
           color: 0xff8800, side: THREE.DoubleSide, wireframe: true,
           transparent: true, opacity: 0.4, depthWrite: false,
@@ -559,7 +571,7 @@ export default function BuildingScene() {
       T.rectHelpers = T.rectLights.map((_: any, i: number) =>
         T.scene.getObjectByName(`__rectHelper_${i}`)
       );
-      console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (局部4角点精确匹配)`);
+      console.log(`灯具光源: ${T.rectLights.length} 个 RectAreaLight (顶点去重精确匹配)`);
     }
 
     function farthestPointSampling(points: any[], n: number) {
