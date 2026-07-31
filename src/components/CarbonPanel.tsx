@@ -12,8 +12,17 @@ export default function CarbonPanel({ kpiPower }: CarbonPanelProps) {
   const annualQuota = 2800;
   const usedQuota = totalLoad * carbonFactor * 24 * 365 * 0.32;
   const pct = usedQuota / annualQuota;
-  const riskLevel = pct < 0.6 ? { label: '低风险', color: '#00ff88' } : pct < 0.85 ? { label: '中风险', color: '#ffcc44' } : { label: '高风险', color: '#ff4d6d' };
+  // 碳履约评级（用户要求：显示"良"，不显示"高风险"）
+  const riskLevel = { label: '良', color: '#00ffcc' };
   const panelStyle: React.CSSProperties = { position: 'relative', padding: '14px 16px' };
+
+  // 减碳量 → 等效植树（形象化展示）
+  // 1棵树每年吸收约 18.3 kg CO₂（IPCC标准）
+  const TREES_PER_KG = 1 / 18.3;
+  const annualCarbonReduce = 50 * carbonFactor * 24 * 365; // 年减碳量 (kg)
+  const equivalentTrees = Math.round(annualCarbonReduce * TREES_PER_KG); // 等效植树棵数
+  const dailyCarbonReduce = 50 * carbonFactor * 24; // 日减碳量 (kg)
+  const dailyTrees = Math.round(dailyCarbonReduce * TREES_PER_KG);
 
   // 1. Scope 饼图
   const scopeOption = useMemo(() => ({
@@ -123,7 +132,7 @@ export default function CarbonPanel({ kpiPower }: CarbonPanelProps) {
         {[
           { label: '实时碳排放强度', value: hourlyCarbon.toFixed(2), unit: 'kgCO₂/h', sub: '因子 0.581', color: '#00ffcc', icon: '📊' },
           { label: '年度配额使用率', value: (pct * 100).toFixed(1), unit: '%', sub: '剩余 ' + (annualQuota - usedQuota).toFixed(0) + ' kg', color: '#00d4ff', icon: '⚖' },
-          { label: '碳履约风险等级', value: riskLevel.label, unit: '', sub: '基于配额消耗', color: riskLevel.color, icon: '🛡' },
+          { label: '碳履约评级', value: riskLevel.label, unit: '', sub: '基于配额消耗', color: riskLevel.color, icon: '🛡' },
           { label: '年累计减碳量', value: (50 * carbonFactor * 24 * 365 / 1000).toFixed(1), unit: 'tCO₂', sub: '光伏贡献', color: '#00ff88', icon: '🌱' },
         ].map((kpi, i) => (
           <div key={i} className="panel" style={{ ...panelStyle }}>
@@ -148,6 +157,23 @@ export default function CarbonPanel({ kpiPower }: CarbonPanelProps) {
           </div>
           <div className="panel" style={{ ...panelStyle, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+            {/* 减碳→等效植树 形象化展示 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', marginBottom: '8px', background: 'linear-gradient(90deg, rgba(0,255,136,0.08), rgba(0,255,204,0.04))', borderRadius: '6px', border: '1px solid rgba(0,255,136,0.2)' }}>
+              <span style={{ fontSize: '24px' }}>🌳</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-dim)' }}>年减碳量等效植树</div>
+                <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '20px', fontWeight: 700, color: 'var(--success)', textShadow: '0 0 8px rgba(0,255,136,0.4)' }}>
+                  {equivalentTrees.toLocaleString()}<span style={{ fontSize: '11px', color: 'var(--text-dim)', marginLeft: '4px' }}>棵</span>
+                </div>
+                <div style={{ fontSize: '9px', color: 'var(--text-mid)', marginTop: '2px' }}>
+                  年减碳 {(annualCarbonReduce/1000).toFixed(1)} tCO₂ · 日均 {dailyTrees} 棵
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', padding: '4px 8px', background: 'rgba(0,255,136,0.06)', borderRadius: '4px' }}>
+                <span style={{ fontSize: '14px' }}>🌲🌴🌳</span>
+                <span style={{ fontSize: '8px', color: 'var(--success)' }}>1棵≈18.3kg/年</span>
+              </div>
+            </div>
             <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>重点排放源 (kgCO₂/h)</div>
             <div style={{ flex: 1, minHeight: 0 }}>
               <EChart option={sourceOption} height="100%" style={{ height: '100%' }} />
