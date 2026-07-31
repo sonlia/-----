@@ -552,7 +552,7 @@ export default function BuildingScene() {
         const worldQuat = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
 
         // === 7. 创建 RectAreaLight（恢复到原位置 = 灯具中心）===
-        const rectLight = new THREE.RectAreaLight(0xff8800, 0, width, height);
+        const rectLight = new THREE.RectAreaLight(0xff4400, 0, width, height);  // 深桔红色（颜色更深）
         rectLight.position.copy(center);
         rectLight.quaternion.copy(worldQuat);
         rectLight.name = `__rectLight_${i}`;
