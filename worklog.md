@@ -789,3 +789,65 @@ Stage Summary:
 - RectAreaLight 与灯具模型位置/旋转/尺寸完全1:1重合
 - 54 个灯具各自有独立正确的世界位置
 - GitHub 已同步
+
+---
+Task ID: rectlight-aabb-algorithm
+Agent: Super Z (main)
+Task: 用AABB世界包围盒算法精确对齐RectAreaLight与灯具模型
+
+Work Log:
+- 用户反馈：
+  1. 经常push不成功，每次对话后要先pull再push
+  2. RectAreaLight旋转/尺寸还是没有匹配正确
+  3. 灯光包住了模型，但4个顶点没对齐
+  4. 灯光模型的4个顶点对到了灯光4条边的中点上
+
+- 用户提供了两个分析方案：
+  1. AABB算法 + lookAt + 部件过滤
+  2. 顶点去重 + 边长排序找长短边（不用对角线）
+
+- 诊断发现：
+  · 灯具geometry有3种顶点数：4顶点(19个)、6顶点(23个)、9顶点(12个)
+  · 4顶点：之前的'最远两点'是对角线不是长边，导致width偏大longDir斜向
+  · 6顶点：2个三角形不共享顶点，需要顶点去重
+  · 9顶点：可能是灯具+支架，被错误当作面板
+
+- 第一次尝试：边长排序算法（用顶点去重+边长排序找长短边）
+  · 结果：rectLights只有32个（54个灯具中22个被跳过）
+  · 仍有偏差：6顶点去重后选出的4个顶点可能不是正确的4个角
+
+- 第二次尝试（最终方案）：用 Box3.setFromObject 世界包围盒算法
+  · 借鉴用户第一个分析方案，最稳健
+  · 自动包含所有子对象、应用所有缩放和旋转后的真实世界尺寸
+  · 不再依赖顶点遍历（避免对角线问题）
+
+- 算法步骤：
+  1. worldBox = Box3.setFromObject(mesh) 获取世界包围盒
+  2. worldSize = box.getSize(), worldCenter = box.getCenter()
+  3. 过滤非面板mesh：
+     - maxDim < 0.5 或 > 50 跳过（非灯具面板）
+     - minDim > maxDim*0.5 跳过（灯具面板应扁平）
+  4. 自适应判断：最薄轴=法线，剩余较长=宽，较短=高
+  5. 法线转世界空间 normalWorld = normalLocal.applyQuaternion(meshWorldQuat)
+  6. 旋转矩阵 makeBasis(X, Y, Z) where Z = -normalWorld（光朝法线发射）
+     - X = 长边方向, Y = 短边方向
+     - 保证右手坐标系：X×Y = Z，否则 Y.negate()
+  7. 位置 = worldCenter（与灯具完全重合）
+
+- 验证：
+  · rectLights: 19 → 54（全部正确处理）
+  · VLM 默认视角：青色Helper包住橙色mesh，4顶点完全对齐
+  · VLM 俯视视角：54个灯具1:1精准对齐，无'顶点对到边中点'问题
+  · 旋转/尺寸完全一致
+
+- 流程改进：
+  · 每次 push 前先 git pull --rebase origin main
+  · 确保本地与远端同步
+
+Stage Summary:
+- 提交 ID: c1f922c（普通 push，未 force）
+- 改动：1 文件，+93 / -57 行
+- RectAreaLight 与灯具模型位置/旋转/尺寸完全1:1重合
+- 4个顶点完全对齐（无'顶点对到边中点'问题）
+- 54个rectLights全部正确创建
+- GitHub 已同步
