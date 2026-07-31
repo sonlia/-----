@@ -54,7 +54,7 @@ export default function BuildingScene() {
   const [date, setDate] = useState('');
 
   const [lightingOn, setLightingOn] = useState(true);
-  const [brightness, setBrightness] = useState(16);
+  const [brightness, setBrightness] = useState(80);
   const [acOn, setAcOn] = useState(true);
   const [temperature, setTemperature] = useState(24);
   const [autoRotate, setAutoRotate] = useState(false);
@@ -1000,7 +1000,7 @@ export default function BuildingScene() {
   }, []);
 
   // refs 同步状态给 Three.js 闭包
-  const stateRef = useRef({ lighting: { enabled: true, brightness: 0.16 }, ac: { enabled: true, temperature: 24 }, autoRotate: false });
+  const stateRef = useRef({ lighting: { enabled: true, brightness: 0.8 }, ac: { enabled: true, temperature: 24 }, autoRotate: false });
   const renderModeRef = useRef('WebGPU');
   const deviceListRef = useRef<DeviceListItem[]>([]);
   useEffect(() => { renderModeRef.current = renderMode; }, [renderMode]);
@@ -1327,7 +1327,9 @@ export default function BuildingScene() {
   const activeDevices = (lightingOn ? lightCount : 0) + (acOn ? acCount : 0);
   const totalPowerVal = ((lightingOn ? lightCount * deviceDB.light.power : 0) + (acOn ? acCount * deviceDB.ac.power : 0)) / 1000;
   const avgTemp = acOn ? temperature : '--';
-  const luxVal = lightingOn ? Math.round(300 + (brightness / 100) * 450) : 30;
+  // 照度计算：亮度80%时 = 385 lx（用户要求）
+  // 公式：lux = 300 + (brightness/100) * 106.25，brightness=80% → 385 lx
+  const luxVal = lightingOn ? Math.round(300 + (brightness / 100) * 106.25) : 30;
   let energyLevel = 'A', energyClass = 'good';
   if (totalPowerVal > 8) { energyLevel = 'C'; energyClass = 'warn'; }
   else if (totalPowerVal > 5) { energyLevel = 'B'; energyClass = ''; }
