@@ -817,7 +817,7 @@ export default function BuildingScene() {
         const fixture = T.lightFixtures[i];
         const indOn = fixture?.userData?.individualOn;
         const finalOn = s.enabled && (indOn !== false);
-        light.intensity = finalOn ? b * 150 : 0;  // 降低强度，匹配300lx照度
+        light.intensity = finalOn ? b * 22.5 : 0;  // 降低到原亮度的15%（原b*150 → b*22.5）
       });
       // 关灯时：所有 mesh 的自发光归零（墙/桌椅/logo/空调等），避免残余亮度
       T.modelRoot.traverse((child: any) => {
@@ -1179,7 +1179,7 @@ export default function BuildingScene() {
       const fixture = T.lightFixtures[i];
       const indOn = fixture?.userData?.individualOn;
       const finalOn = enabled && (indOn !== false);
-      light.intensity = finalOn ? b * 150 : 0;
+      light.intensity = finalOn ? b * 22.5 : 0;
     });
     // 关灯时：所有 mesh 的自发光归零
     T.modelRoot.traverse((child: any) => {
