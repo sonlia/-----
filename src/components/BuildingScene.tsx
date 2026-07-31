@@ -522,10 +522,12 @@ export default function BuildingScene() {
           normal = new THREE.Vector3().crossVectors(longDir, shortDir).normalize();
         }
 
-        // === 5. 法线矫正（天花板灯必须朝下照） ===
-        // 如果灯在天花板（y > modelCenterY）且法线朝上（normal.y > 0），翻转法线让光朝下
+        // === 5. 法线方向修正：强制法线朝上（指向天花板 +Y）===
+        // RectAreaLight 默认沿 -Z 方向发光
+        // 如果 Z = 法线（朝上 +Y），则 -Z = -法线（朝下 -Y），光自然射向地面
+        // 所以需要保证法线 Y 分量 > 0（朝向天花板）
         let finalNormal = normal;
-        if (center.y > modelCenterY && finalNormal.y > 0) {
+        if (finalNormal.y < 0) {
           finalNormal = finalNormal.clone().negate();
           // 翻转法线后需要重新计算 shortDir 保持右手坐标系
           shortDir = new THREE.Vector3().crossVectors(finalNormal, longDir).normalize();
@@ -533,9 +535,10 @@ export default function BuildingScene() {
           if (check2.dot(finalNormal) < 0) shortDir.negate();
         }
 
-        // === 6. 核心修正：Z 轴 = 法线，绝对不能取反！ ===
-        // RectAreaLight 默认沿 -Z 方向发光，-Z = -finalNormal，光朝法线反方向（即朝下）发射
-        // 如果取反 Z = -finalNormal，会破坏右手坐标系，导致镜像翻转
+        // === 6. 核心修正：Z 轴 = 法线（朝上），永不反转！ ===
+        // Z = finalNormal（朝上 +Y）
+        // -Z = -finalNormal（朝下 -Y）= 光的发射方向，自然射向地面
+        // 不取反 Z，保持右手坐标系，避免镜像翻转
         const Z = finalNormal;
         const X = longDir;
         const Y = shortDir;
@@ -543,18 +546,15 @@ export default function BuildingScene() {
         const rotMatrix = new THREE.Matrix4().makeBasis(X, Y, Z);
         const worldQuat = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
 
-        // === 7. 创建 RectAreaLight（贴近地面）===
+        // === 7. 创建 RectAreaLight（恢复到原位置 = 灯具中心）===
         const rectLight = new THREE.RectAreaLight(0xff8800, 0, width, height);
-        // 位置 = 贴近地面（modelBox.min.y + 一点偏移）
-        // 灯光水平投影到地面，保留 X/Z 坐标，Y 改为地面高度
-        const groundY = modelBox.min.y + 0.1; // 地面以上 0.1 单位
-        rectLight.position.set(center.x, groundY, center.z);
+        rectLight.position.copy(center);
         rectLight.quaternion.copy(worldQuat);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
 
-        // === 8. 可视化核对（Helper 也贴近地面）===
+        // === 8. 可视化核对 ===
         const helper = new RectAreaLightHelper(rectLight, 0x00ffff);
         helper.name = `__rectHelper_${i}`;
         T.scene.add(helper);
