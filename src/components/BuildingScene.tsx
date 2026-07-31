@@ -543,15 +543,18 @@ export default function BuildingScene() {
         const rotMatrix = new THREE.Matrix4().makeBasis(X, Y, Z);
         const worldQuat = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
 
-        // === 7. 创建 RectAreaLight ===
+        // === 7. 创建 RectAreaLight（贴近地面）===
         const rectLight = new THREE.RectAreaLight(0xff8800, 0, width, height);
-        rectLight.position.copy(center);
+        // 位置 = 贴近地面（modelBox.min.y + 一点偏移）
+        // 灯光水平投影到地面，保留 X/Z 坐标，Y 改为地面高度
+        const groundY = modelBox.min.y + 0.1; // 地面以上 0.1 单位
+        rectLight.position.set(center.x, groundY, center.z);
         rectLight.quaternion.copy(worldQuat);
         rectLight.name = `__rectLight_${i}`;
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
 
-        // === 8. 可视化核对 ===
+        // === 8. 可视化核对（Helper 也贴近地面）===
         const helper = new RectAreaLightHelper(rectLight, 0x00ffff);
         helper.name = `__rectHelper_${i}`;
         T.scene.add(helper);
