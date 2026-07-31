@@ -851,3 +851,57 @@ Stage Summary:
 - 4个顶点完全对齐（无'顶点对到边中点'问题）
 - 54个rectLights全部正确创建
 - GitHub 已同步
+
+---
+Task ID: rectlight-local-4corners
+Agent: Super Z (main)
+Task: 用局部4角点法精确对齐RectAreaLight（避免世界AABB膨胀）
+
+Work Log:
+- 用户反馈：之前的AABB算法在模型有旋转时会严重膨胀，导致匹配错误
+  · worldSize 不是真实面板尺寸，而是旋转后的包围盒尺寸
+  · 最薄轴判断完全错误
+  · 4个顶点对到了mesh4条边的中点上
+
+- 用户提供了精确的修复方案：局部4角点法
+  核心思路：在Mesh的局部空间，用AABB确定面板朝向（最薄轴），
+  构造出该面的4个精确角点，再用localToWorld转到世界空间，
+  最后从世界角点计算RectAreaLight的位置/旋转/尺寸。
+
+- 算法实现：
+  1. 过滤非面板部件：
+     · minDim > maxDim*0.25 跳过（必须扁平）
+     · maxDim < 0.001 或 > 0.1 跳过（尺寸合理）
+     · 按面积排序取前60个
+  2. 局部AABB: Box3.setFromBufferAttribute（不受旋转影响）
+  3. 判断最薄轴，构造局部空间4个面板角点：
+     · Y最薄：面板在XZ平面，4角点(min.x,y,min.z)(max.x,y,min.z)...
+     · X最薄：面板在YZ平面
+     · Z最薄：面板在XY平面
+  4. 4角点 localToWorld 转世界空间（精确应用旋转+缩放+位移）
+  5. 从世界角点计算：
+     · worldCenter = 4角点平均
+     · edge1 = cornersWorld[1]-[0], edge2 = cornersWorld[3]-[0]
+     · worldWidth = edge1.length, worldHeight = edge2.length
+     · worldNormal = edge1 × edge2
+  6. 法线方向修正（天花板灯朝下照）
+  7. 旋转矩阵 makeBasis(xAxis, yAxis, zAxis=-normal)
+  8. 位置 = worldCenter，与4个世界角点精确重合
+
+- 关键改进：
+  · 局部AABB不受旋转影响（精确的面板尺寸）
+  · 构造4角点（不是'找'现有顶点，而是'算出'面板边界）
+  · localToWorld精确应用所有变换
+  · 世界角点直接量出真实世界尺寸和方向
+
+- 验证：
+  · rectLights: 54（全部正确创建）
+  · VLM 默认视角：4顶点像素级重合，无'顶点对到边中点'问题
+  · VLM 俯视视角：54个灯具完全重合，旋转/尺寸完全一致
+
+Stage Summary:
+- 提交 ID: 2c58ff3（先 git pull --rebase，再 push）
+- 改动：1 文件，+98 / -95 行
+- RectAreaLight 与灯具模型4顶点精确重合
+- 局部AABB + localToWorld 算法，避免世界AABB膨胀问题
+- GitHub 已同步
