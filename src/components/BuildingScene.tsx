@@ -573,62 +573,49 @@ export default function BuildingScene() {
         // rect 模式：隐藏灯具模型（用 RectAreaLight 真实照明）
         if (lightingModeRef.current === 'emissive') {
           mesh.visible = true;
-          // 给灯具模型设置发光材质（方案A：发光材质模式）
-          // 橘红→灰色 颜色映射：基于顶点 Y 坐标渐变
-          // 计算几何体 Y 范围，为每个顶点设置 emissive 渐变色
+          // 橘红→灰色 颜色映射：用 vertexColors 实现顶点渐变
+          // 基于顶点到中心的距离，中心偏橘红，边缘偏灰
           const posAttr2 = mesh.geometry.attributes.position;
-          let minY = Infinity, maxY = -Infinity;
+          // 计算几何体中心
+          const centerX = (posAttr2.getX(0) + posAttr2.getX(1) + posAttr2.getX(2) + posAttr2.getX(3)) / 4;
+          const centerY = (posAttr2.getY(0) + posAttr2.getY(1) + posAttr2.getY(2) + posAttr2.getY(3)) / 4;
+          const centerZ = (posAttr2.getZ(0) + posAttr2.getZ(1) + posAttr2.getZ(2) + posAttr2.getZ(3)) / 4;
+          // 找最远距离
+          let maxDist = 0;
+          const dists: number[] = [];
           for (let v = 0; v < posAttr2.count; v++) {
-            const y = posAttr2.getY(v);
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
+            const dx = posAttr2.getX(v) - centerX;
+            const dy = posAttr2.getY(v) - centerY;
+            const dz = posAttr2.getZ(v) - centerZ;
+            const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
+            dists.push(d);
+            if (d > maxDist) maxDist = d;
           }
-          const yRange = maxY - minY || 1;
-          // 创建 emissive 顶点颜色（橘红→灰色渐变）
-          const emissiveColors = new Float32Array(posAttr2.count * 3);
+          maxDist = maxDist || 1;
+          // 创建顶点颜色（中心橘红→边缘灰色）
+          const vertexColors = new Float32Array(posAttr2.count * 3);
           const colorOrange = new THREE.Color(0xff4400); // 橘红
-          const colorGray = new THREE.Color(0x444444);   // 灰色
+          const colorGray = new THREE.Color(0x555555);   // 灰色
           const tmpColor = new THREE.Color();
           for (let v = 0; v < posAttr2.count; v++) {
-            const y = posAttr2.getY(v);
-            const t = (y - minY) / yRange; // 0~1
-            // Y高的地方偏橘红，Y低的地方偏灰
-            tmpColor.lerpColors(colorOrange, colorGray, 1 - t);
-            emissiveColors[v * 3] = tmpColor.r;
-            emissiveColors[v * 3 + 1] = tmpColor.g;
-            emissiveColors[v * 3 + 2] = tmpColor.b;
+            const t = dists[v] / maxDist; // 0(中心)~1(边缘)
+            // 中心偏橘红，边缘偏灰
+            tmpColor.lerpColors(colorOrange, colorGray, t);
+            vertexColors[v * 3] = tmpColor.r;
+            vertexColors[v * 3 + 1] = tmpColor.g;
+            vertexColors[v * 3 + 2] = tmpColor.b;
           }
-          mesh.geometry.setAttribute('emissive', new THREE.BufferAttribute(emissiveColors, 3));
+          mesh.geometry.setAttribute('color', new THREE.BufferAttribute(vertexColors, 3));
 
-          (mesh as any).material = new (THREE as any).MeshStandardMaterial({
-            color: 0x2a2a2a,
-            emissive: 0xffffff,           // 白色（让顶点emissive颜色生效）
-            emissiveIntensity: 2.0,
-            roughness: 0.4,
-            metalness: 0.2,
+          // 使用 MeshBasicMaterial（性能最优，无光照计算）
+          // vertexColors=true 让顶点颜色生效
+          // emissive 不需要（MeshBasicMaterial 自发光效果通过 vertexColors + toneMapping 实现）
+          (mesh as any).material = new (THREE as any).MeshBasicMaterial({
+            vertexColors: true,
             side: THREE.DoubleSide,
-            vertexColors: false,
+            transparent: true,
+            opacity: 0.9,
           });
-          // 使用 onBeforeCompile 注入顶点 emissive 颜色
-          const mat = (mesh as any).material;
-          mat.onBeforeCompile = (shader: any) => {
-            shader.vertexShader = shader.vertexShader.replace(
-              '#include <emissivemap_vertex>',
-              `#include <emissivemap_vertex>
-               #ifdef USE_EMISSIVE
-               vEmissive = emissive;
-               #endif`
-            );
-            // 添加 emissive 属性变量
-            shader.vertexShader = 'attribute vec3 emissive;\n' + shader.vertexShader;
-            shader.fragmentShader = shader.fragmentShader.replace(
-              '#include <emissivemap_fragment>',
-              `#include <emissivemap_fragment>
-               totalEmissiveRadiance *= vEmissive;`
-            );
-            shader.fragmentShader = 'varying vec3 vEmissive;\n' + shader.fragmentShader;
-            shader.vertexShader = 'varying vec3 vEmissive;\n' + shader.vertexShader;
-          };
         } else {
           mesh.visible = false;
         }
@@ -651,11 +638,16 @@ export default function BuildingScene() {
           light.intensity = 0;
           light.visible = false;  // 隐藏光源，减少渲染开销
         });
-        // 2. 显示灯具模型 + 调整发光强度（材质已在 setupPointLights 中设置好渐变）
+        // 2. 显示灯具模型 + 用 opacity 控制亮度（MeshBasicMaterial）
         T.lightFixtures?.forEach((mesh: any) => {
           mesh.visible = true;
-          if (mesh.material && mesh.material.emissiveIntensity !== undefined) {
-            mesh.material.emissiveIntensity = enabled ? 2.0 + b * 3 : 0;
+          if (mesh.material) {
+            if (mesh.material.opacity !== undefined) {
+              mesh.material.opacity = enabled ? 0.3 + b * 0.7 : 0;
+            }
+            if (mesh.material.emissiveIntensity !== undefined) {
+              mesh.material.emissiveIntensity = enabled ? 2.0 + b * 3 : 0;
+            }
           }
         });
       } else {
@@ -928,10 +920,17 @@ export default function BuildingScene() {
       // 方案A：发光材质模式 - 灯具模型自发光（性能好）
       if (mode === 'emissive') {
         T.lightFixtures?.forEach((mesh: any) => {
-          if (mesh.material && mesh.material.emissive !== undefined) {
+          if (mesh.material) {
             const indOn = mesh.userData?.individualOn;
             const finalOn = s.enabled && (indOn !== false);
-            mesh.material.emissiveIntensity = finalOn ? 2.0 + b * 3 : 0;
+            // MeshBasicMaterial 用 opacity 控制亮度（0=关灯, 0.3~1.0=亮度调节）
+            // 亮度高时 opacity 高（橘红明显），亮度低时 opacity 低（偏灰暗）
+            if (mesh.material.opacity !== undefined) {
+              mesh.material.opacity = finalOn ? 0.3 + b * 0.7 : 0;
+            }
+            if (mesh.material.emissiveIntensity !== undefined) {
+              mesh.material.emissiveIntensity = finalOn ? 2.0 + b * 3 : 0;
+            }
           }
         });
         // 关闭并隐藏 RectAreaLight（emissive 模式不用，减少渲染开销）
@@ -1319,10 +1318,16 @@ export default function BuildingScene() {
     // 方案A：发光材质模式 - 灯具模型自发光（性能好）
     if (mode === 'emissive') {
       T.lightFixtures?.forEach((mesh: any) => {
-        if (mesh.material && mesh.material.emissive !== undefined) {
+        if (mesh.material) {
           const indOn = mesh.userData?.individualOn;
           const finalOn = enabled && (indOn !== false);
-          mesh.material.emissiveIntensity = finalOn ? 2.0 + b * 3 : 0;
+          // MeshBasicMaterial 用 opacity 控制亮度
+          if (mesh.material.opacity !== undefined) {
+            mesh.material.opacity = finalOn ? 0.3 + b * 0.7 : 0;
+          }
+          if (mesh.material.emissiveIntensity !== undefined) {
+            mesh.material.emissiveIntensity = finalOn ? 2.0 + b * 3 : 0;
+          }
         }
       });
       T.rectLights?.forEach((light: any) => { light.intensity = 0; light.visible = false; });
