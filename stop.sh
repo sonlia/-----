@@ -2,6 +2,7 @@
 # ============================================================
 # 综合能源驾驶舱 - 停止脚本
 # 用法: ./stop.sh [-p 端口号]
+# 只停止指定端口的进程，不影响其他 Node 程序
 # ============================================================
 
 DEFAULT_PORT=3000
@@ -32,7 +33,7 @@ echo "============================================================"
 
 STOPPED=false
 
-# 方法1：通过 PID 文件停止
+# 方法1：通过 PID 文件停止（只停止本项目的进程）
 if [ -f "$PID_FILE" ]; then
   PID=$(cat "$PID_FILE")
   if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
@@ -44,7 +45,7 @@ if [ -f "$PID_FILE" ]; then
   rm -f "$PID_FILE"
 fi
 
-# 方法2：通过端口查找进程
+# 方法2：通过端口查找进程（只停止占用本端口的进程）
 if command -v lsof >/dev/null 2>&1; then
   PORT_PIDS=$(lsof -ti :$PORT 2>/dev/null || true)
   if [ -n "$PORT_PIDS" ]; then
@@ -60,18 +61,9 @@ elif command -v fuser >/dev/null 2>&1; then
   fi
 fi
 
-# 方法3：通过 pgrep 查找 next dev/next-server 进程
-NEXT_PIDS=$(pgrep -f "next dev\|next-server" 2>/dev/null || true)
-if [ -n "$NEXT_PIDS" ]; then
-  echo "停止 next 进程: $NEXT_PIDS"
-  echo "$NEXT_PIDS" | xargs kill -9 2>/dev/null || true
-  sleep 1
-  STOPPED=true
-fi
-
 if [ "$STOPPED" = true ]; then
-  echo "✓ 服务已停止"
+  echo "✓ 端口 $PORT 服务已停止"
 else
-  echo "ℹ 没有发现运行中的服务"
+  echo "ℹ 没有发现端口 $PORT 的运行中服务"
 fi
 echo "============================================================"

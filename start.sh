@@ -63,10 +63,10 @@ echo "服务端口: $PORT"
 echo "日志文件: $LOG_FILE"
 echo ""
 
-# === 1. 停止旧进程（幂等启动） ===
-echo "[1/3] 检查并停止旧进程..."
+# === 1. 停止旧进程（幂等启动，只停止本端口的进程，不影响其他程序） ===
+echo "[1/3] 检查并停止本端口旧进程..."
 
-# 方法1：通过 PID 文件停止
+# 方法1：通过 PID 文件停止（只停止本项目的进程）
 if [ -f "$PID_FILE" ]; then
   OLD_PID=$(cat "$PID_FILE")
   if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
@@ -78,7 +78,7 @@ if [ -f "$PID_FILE" ]; then
   rm -f "$PID_FILE"
 fi
 
-# 方法2：通过 lsof/fuser 查找占用端口的进程
+# 方法2：通过端口查找进程（只停止占用本端口的进程，不影响其他端口的程序）
 if command -v lsof >/dev/null 2>&1; then
   PORT_PIDS=$(lsof -ti :$PORT 2>/dev/null || true)
   if [ -n "$PORT_PIDS" ]; then
@@ -94,16 +94,7 @@ elif command -v fuser >/dev/null 2>&1; then
   fi
 fi
 
-# 方法3：通过 pgrep 查找 next dev/next-server 进程
-NEXT_PIDS=$(pgrep -f "next dev\|next-server" 2>/dev/null || true)
-if [ -n "$NEXT_PIDS" ]; then
-  echo "  - 发现 next 进程 (PID: $NEXT_PIDS)，正在停止..."
-  echo "$NEXT_PIDS" | xargs kill -9 2>/dev/null || true
-  sleep 1
-  echo "  - next 进程已停止"
-fi
-
-echo "  ✓ 旧进程清理完成"
+echo "  ✓ 本端口旧进程清理完成"
 
 # === 2. 检查依赖 ===
 echo "[2/3] 检查依赖..."
