@@ -572,14 +572,61 @@ export default function BuildingScene() {
         if (lightingModeRef.current === 'emissive') {
           mesh.visible = true;
           // 给灯具模型设置发光材质（方案A：发光材质模式）
+          // 橘红→灰色 颜色映射：基于顶点 Y 坐标渐变
+          // 计算几何体 Y 范围，为每个顶点设置 emissive 渐变色
+          const posAttr2 = mesh.geometry.attributes.position;
+          let minY = Infinity, maxY = -Infinity;
+          for (let v = 0; v < posAttr2.count; v++) {
+            const y = posAttr2.getY(v);
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+          const yRange = maxY - minY || 1;
+          // 创建 emissive 顶点颜色（橘红→灰色渐变）
+          const emissiveColors = new Float32Array(posAttr2.count * 3);
+          const colorOrange = new THREE.Color(0xff4400); // 橘红
+          const colorGray = new THREE.Color(0x444444);   // 灰色
+          const tmpColor = new THREE.Color();
+          for (let v = 0; v < posAttr2.count; v++) {
+            const y = posAttr2.getY(v);
+            const t = (y - minY) / yRange; // 0~1
+            // Y高的地方偏橘红，Y低的地方偏灰
+            tmpColor.lerpColors(colorOrange, colorGray, 1 - t);
+            emissiveColors[v * 3] = tmpColor.r;
+            emissiveColors[v * 3 + 1] = tmpColor.g;
+            emissiveColors[v * 3 + 2] = tmpColor.b;
+          }
+          mesh.geometry.setAttribute('emissive', new THREE.BufferAttribute(emissiveColors, 3));
+
           (mesh as any).material = new (THREE as any).MeshStandardMaterial({
             color: 0x2a2a2a,
-            emissive: 0xff4400,
+            emissive: 0xffffff,           // 白色（让顶点emissive颜色生效）
             emissiveIntensity: 2.0,
             roughness: 0.4,
             metalness: 0.2,
             side: THREE.DoubleSide,
+            vertexColors: false,
           });
+          // 使用 onBeforeCompile 注入顶点 emissive 颜色
+          const mat = (mesh as any).material;
+          mat.onBeforeCompile = (shader: any) => {
+            shader.vertexShader = shader.vertexShader.replace(
+              '#include <emissivemap_vertex>',
+              `#include <emissivemap_vertex>
+               #ifdef USE_EMISSIVE
+               vEmissive = emissive;
+               #endif`
+            );
+            // 添加 emissive 属性变量
+            shader.vertexShader = 'attribute vec3 emissive;\n' + shader.vertexShader;
+            shader.fragmentShader = shader.fragmentShader.replace(
+              '#include <emissivemap_fragment>',
+              `#include <emissivemap_fragment>
+               totalEmissiveRadiance *= vEmissive;`
+            );
+            shader.fragmentShader = 'varying vec3 vEmissive;\n' + shader.fragmentShader;
+            shader.vertexShader = 'varying vec3 vEmissive;\n' + shader.vertexShader;
+          };
         } else {
           mesh.visible = false;
         }
@@ -599,23 +646,11 @@ export default function BuildingScene() {
         // 方案A：发光材质模式（性能好，低配置友好）
         // 1. 关闭所有 RectAreaLight
         T.rectLights?.forEach((light: any) => { light.intensity = 0; });
-        // 2. 显示灯具模型 + 设置发光材质
+        // 2. 显示灯具模型 + 调整发光强度（材质已在 setupPointLights 中设置好渐变）
         T.lightFixtures?.forEach((mesh: any) => {
           mesh.visible = true;
-          if (mesh.material && mesh.material.emissive !== undefined) {
-            // 已有发光材质，调整强度
-            mesh.material.emissive = new THREE.Color(0xff4400);
+          if (mesh.material && mesh.material.emissiveIntensity !== undefined) {
             mesh.material.emissiveIntensity = enabled ? 2.0 + b * 3 : 0;
-          } else {
-            // 设置新的发光材质
-            mesh.material = new (THREE as any).MeshStandardMaterial({
-              color: 0x2a2a2a,
-              emissive: 0xff4400,
-              emissiveIntensity: enabled ? 2.0 + b * 3 : 0,
-              roughness: 0.4,
-              metalness: 0.2,
-              side: THREE.DoubleSide,
-            });
           }
         });
       } else {
@@ -820,7 +855,12 @@ export default function BuildingScene() {
     }
     function findSelectableRoot(obj: any) {
       let cur = obj;
-      while (cur) { if (cur.userData.deviceInfo && cur.userData.deviceInfo.name) return cur; cur = cur.parent; }
+      // 向上遍历找到有 deviceInfo 或 deviceType 的节点（整个灯具/空调模型）
+      while (cur) {
+        if (cur.userData.deviceInfo && cur.userData.deviceInfo.name) return cur;
+        if (cur.userData.deviceType) return cur;
+        cur = cur.parent;
+      }
       return obj;
     }
     function selectObject(obj: any) {
