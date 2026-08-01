@@ -1440,14 +1440,28 @@ export default function BuildingScene() {
     const obj = selectedDevice.obj;
     // 记录单灯状态
     obj.userData.individualOn = newOn;
-    // 控制对应的 RectAreaLight
-    const rect = T.rectLights?.[lightIdx];
-    if (rect) {
-      rect.intensity = newOn ? stateRef.current.lighting.brightness * 30 : 0;
-    }
-    // 控制灯具 mesh 自发光（虽然 mesh 已隐藏，保持状态一致）
-    if (obj.material && !obj.userData._hlEmissive) {
-      obj.material.emissiveIntensity = newOn ? 3 + stateRef.current.lighting.brightness * 4 : 0;
+    const b = stateRef.current.lighting.brightness;
+    const mode = lightingModeRef.current;
+
+    if (mode === 'emissive') {
+      // emissive 模式：改变灯具模型颜色（橘红→灰色）
+      if (obj.material) {
+        const colorOn = new THREE.Color(0xff4400);
+        const colorOff = new THREE.Color(0x555555);
+        const tmpColor = new THREE.Color();
+        if (newOn) {
+          tmpColor.lerpColors(colorOff, colorOn, b);
+        } else {
+          tmpColor.copy(colorOff);
+        }
+        obj.material.color = tmpColor.clone();
+      }
+    } else {
+      // rect 模式：控制对应的 RectAreaLight
+      const rect = T.rectLights?.[lightIdx];
+      if (rect) {
+        rect.intensity = newOn ? b * 22.5 : 0;
+      }
     }
     // 更新设备信息状态
     obj.userData.deviceInfo.status = newOn ? '运行中' : '已关闭';
