@@ -6,6 +6,8 @@ import SolarPanel from './SolarPanel';
 import CarbonPanel from './CarbonPanel';
 import ChargingPanel from './ChargingPanel';
 import LoadManagementPanel from './LoadManagementPanel';
+import GridPanel from './GridPanel';
+import OverviewPanel2 from './OverviewPanel2';
 import * as THREE from 'three';
 import { WebGPURenderer, RectAreaLightNode } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -60,7 +62,7 @@ export default function BuildingScene() {
   const [temperature, setTemperature] = useState(24);
   const [autoRotate, setAutoRotate] = useState(false);
   const [showList, setShowList] = useState(true);
-  const [activeModule, setActiveModule] = useState<'overview' | 'building' | 'solar' | 'charging' | 'carbon' | 'load'>('overview');
+  const [activeModule, setActiveModule] = useState<'overview' | 'overview2' | 'building' | 'solar' | 'charging' | 'carbon' | 'load' | 'grid'>('overview');
   const [activeFloor, setActiveFloor] = useState(0);
 
   const [deviceList, setDeviceList] = useState<DeviceListItem[]>([]);
@@ -1234,7 +1236,7 @@ export default function BuildingScene() {
   const floorBtnStyle = (active: boolean): React.CSSProperties => ({ padding: '6px 4px', fontSize: '11px', fontWeight: 600, border: '1px solid ' + (active ? 'var(--primary)' : 'var(--border-line)'), background: active ? 'var(--primary-bg)' : 'transparent', color: active ? 'var(--primary)' : 'var(--text-mid)', borderRadius: '3px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: active ? '0 0 8px rgba(0,212,255,0.3)' : 'none', textAlign: 'center' as const });
 
   // 模块切换
-  const onSwitchModule = (mod: 'overview' | 'building' | 'solar' | 'charging' | 'carbon' | 'load') => {
+  const onSwitchModule = (mod: 'overview' | 'overview2' | 'building' | 'solar' | 'charging' | 'carbon' | 'load' | 'grid') => {
     setActiveModule(mod);
     // 切换模块时隐藏设备详情面板
     setSelectedDevice(null);
@@ -1246,7 +1248,7 @@ export default function BuildingScene() {
     T.deviceMarkers?.forEach((m: any) => { m.group.visible = (mod === 'building'); });
     T.airflowSystems?.forEach((s: any) => { s.points.visible = (mod === 'building'); });
     if (mod === 'building') { T.fitCameraToModel?.(T); showToast('已切换至楼宇管理'); }
-    else { showToast('已切换至' + (mod === 'overview' ? '能源总览' : mod === 'solar' ? '光伏发电' : mod === 'charging' ? '充电桩' : mod === 'load' ? '负荷管理' : '碳监测')); }
+    else { showToast('已切换至' + (mod === 'overview' ? '能源总览' : mod === 'overview2' ? '全景总览' : mod === 'solar' ? '光伏发电' : mod === 'charging' ? '充电桩' : mod === 'load' ? '负荷管理' : mod === 'grid' ? '配网管理' : '碳监测')); }
   };
 
   // 闭包版状态应用（避免依赖 effect 内函数）
@@ -1535,24 +1537,28 @@ export default function BuildingScene() {
       <div style={{ position: 'absolute', top: '72px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '4px', background: 'var(--bg-panel)', border: '1px solid var(--border-line)', borderRadius: '6px', padding: '4px', backdropFilter: 'blur(14px)', zIndex: 45 }}>
         {[
           { id: 'overview', label: '能源总览', icon: '📊' },
+          { id: 'overview2', label: '全景总览', icon: '🗺' },
           { id: 'building', label: '楼宇管理', icon: '🏢' },
           { id: 'solar', label: '光伏发电', icon: '☀' },
           { id: 'charging', label: '充电桩', icon: '🔌' },
           { id: 'load', label: '负荷管理', icon: '🎛' },
+          { id: 'grid', label: '配网管理', icon: '⚡' },
           { id: 'carbon', label: '碳监测', icon: '🌱' },
         ].map((mod) => (
-          <button key={mod.id} onClick={() => onSwitchModule(mod.id as any)} style={{ padding: '8px 18px', fontSize: '13px', fontWeight: 600, letterSpacing: '1px', border: '1px solid ' + (activeModule === mod.id ? 'var(--primary)' : 'transparent'), background: activeModule === mod.id ? 'var(--primary-bg)' : 'transparent', color: activeModule === mod.id ? 'var(--primary)' : 'var(--text-mid)', borderRadius: '4px', cursor: 'pointer', transition: 'all 0.25s', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: activeModule === mod.id ? '0 0 12px rgba(0,212,255,0.3)' : 'none' }}>
-            <span style={{ fontSize: '15px' }}>{mod.icon}</span><span>{mod.label}</span>
+          <button key={mod.id} onClick={() => onSwitchModule(mod.id as any)} style={{ padding: '8px 12px', fontSize: '12px', fontWeight: 600, letterSpacing: '0.5px', border: '1px solid ' + (activeModule === mod.id ? 'var(--primary)' : 'transparent'), background: activeModule === mod.id ? 'var(--primary-bg)' : 'transparent', color: activeModule === mod.id ? 'var(--primary)' : 'var(--text-mid)', borderRadius: '4px', cursor: 'pointer', transition: 'all 0.25s', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: activeModule === mod.id ? '0 0 12px rgba(0,212,255,0.3)' : 'none' }}>
+            <span style={{ fontSize: '14px' }}>{mod.icon}</span><span>{mod.label}</span>
           </button>
         ))}
       </div>
 
       {/* 各模块面板 */}
       {activeModule === 'overview' && <CockpitPanel kpiPower={kpiPower} lightingOn={lightingOn} acOn={acOn} />}
+      {activeModule === 'overview2' && <OverviewPanel2 kpiPower={kpiPower} />}
       {activeModule === 'solar' && <SolarPanel kpiPower={kpiPower} />}
       {activeModule === 'carbon' && <CarbonPanel kpiPower={kpiPower} />}
       {activeModule === 'charging' && <ChargingPanel kpiPower={kpiPower} />}
       {activeModule === 'load' && <LoadManagementPanel kpiPower={kpiPower} />}
+      {activeModule === 'grid' && <GridPanel kpiPower={kpiPower} />}
 
       {/* 操作提示 - 仅楼宇模块显示 */}
       {activeModule === 'building' && (
