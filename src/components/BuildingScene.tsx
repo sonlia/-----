@@ -327,6 +327,8 @@ export default function BuildingScene() {
           // 地面平面已移除（用户要求去掉大平面正方形）
           // 空调脉冲标记光柱已移除（影响灯光选择和视觉）
           fitCameraToModel(T);
+          // 初始化灯光模式（emissive 模式下隐藏 RectAreaLight 减少渲染开销）
+          switchLightingMode(T, lightingModeRef.current);
           applyLighting(T);
           applyAC(T);
           buildDeviceList(T);
@@ -644,8 +646,11 @@ export default function BuildingScene() {
 
       if (mode === 'emissive') {
         // 方案A：发光材质模式（性能好，低配置友好）
-        // 1. 关闭所有 RectAreaLight
-        T.rectLights?.forEach((light: any) => { light.intensity = 0; });
+        // 1. 从场景中移除所有 RectAreaLight（即使 intensity=0 仍有渲染开销）
+        T.rectLights?.forEach((light: any) => {
+          light.intensity = 0;
+          light.visible = false;  // 隐藏光源，减少渲染开销
+        });
         // 2. 显示灯具模型 + 调整发光强度（材质已在 setupPointLights 中设置好渐变）
         T.lightFixtures?.forEach((mesh: any) => {
           mesh.visible = true;
@@ -655,7 +660,9 @@ export default function BuildingScene() {
         });
       } else {
         // 方案B：RectAreaLight 真实照明模式（效果好，性能要求高）
-        // 1. 隐藏灯具模型
+        // 1. 显示 RectAreaLight
+        T.rectLights?.forEach((light: any) => { light.visible = true; });
+        // 2. 隐藏灯具模型
         T.lightFixtures?.forEach((mesh: any) => { mesh.visible = false; });
         // 2. 开启 RectAreaLight
         T.rectLights?.forEach((light: any, i: number) => {
@@ -927,8 +934,8 @@ export default function BuildingScene() {
             mesh.material.emissiveIntensity = finalOn ? 2.0 + b * 3 : 0;
           }
         });
-        // 关闭 RectAreaLight（emissive 模式不用）
-        T.rectLights?.forEach((light: any) => { light.intensity = 0; });
+        // 关闭并隐藏 RectAreaLight（emissive 模式不用，减少渲染开销）
+        T.rectLights?.forEach((light: any) => { light.intensity = 0; light.visible = false; });
       } else {
         // 方案B：RectAreaLight 真实照明模式（效果好）
         T.rectLights.forEach((light: any, i: number) => {
@@ -1041,10 +1048,14 @@ export default function BuildingScene() {
 
     // ===== 动画 =====
     let fpsCounter = { frames: 0, lastTime: performance.now() };
+    let frameCount = 0;
     function animate() {
       if (disposed) return;
       T.rafId = requestAnimationFrame(animate);
       const delta = T.clock.getDelta();
+      frameCount++;
+
+      // 相机缓动
       if (T.cameraTween) {
         T.cameraTween.time += delta;
         const t = Math.min(T.cameraTween.time / T.cameraTween.duration, 1);
@@ -1054,7 +1065,9 @@ export default function BuildingScene() {
         if (t >= 1) T.cameraTween = null;
       }
       T.controls.update();
-      if (T.deviceMarkers) {
+
+      // 性能优化：设备标记脉冲动画降频（每3帧更新一次）
+      if (T.deviceMarkers && frameCount % 3 === 0) {
         const time = T.clock.elapsedTime;
         T.deviceMarkers.forEach((m: any) => {
           const pulse = 0.5 + 0.5 * Math.sin(time * 2 + m.phase);
@@ -1063,18 +1076,23 @@ export default function BuildingScene() {
           m.beam.material.opacity = 0.15 + pulse * 0.25;
         });
       }
-      if (stateRef.current.ac.enabled && T.airflowSystems) updateAirflow(T, delta);
+
+      // 性能优化：气流粒子动画降频（每2帧更新一次）
+      if (stateRef.current.ac.enabled && T.airflowSystems && frameCount % 2 === 0) {
+        updateAirflow(T, delta * 2);
+      }
+
+      // FPS 计数
       fpsCounter.frames++;
       const now = performance.now();
       if (now - fpsCounter.lastTime >= 1000) {
         const fpsVal = Math.round((fpsCounter.frames * 1000) / (now - fpsCounter.lastTime));
         fpsCounter.frames = 0;
         fpsCounter.lastTime = now;
-        // 直接更新 DOM 避免 React state 在 rAF 闭包里的延迟
         const fpsEl = document.getElementById('fps-value');
         if (fpsEl) fpsEl.textContent = String(fpsVal);
       }
-      // 直接渲染（无 Bloom 辉光，让 SpotLight 光照效果清晰可见）
+      // 直接渲染
       T.renderer.render(T.scene, T.camera);
     }
 
@@ -1283,7 +1301,8 @@ export default function BuildingScene() {
     const T = threeRef.current;
     if (!T.scene) return;
     if (T.modelRoot) T.modelRoot.visible = (mod === 'building');
-    T.rectLights?.forEach((l: any) => { l.visible = (mod === 'building'); });
+    // rect 模式下才显示 RectAreaLight，emissive 模式下保持隐藏
+    T.rectLights?.forEach((l: any) => { l.visible = (mod === 'building') && (lightingModeRef.current === 'rect'); });
     T.rectHelpers?.forEach((h: any) => { if (h) h.visible = (mod === 'building'); });
     T.deviceMarkers?.forEach((m: any) => { m.group.visible = (mod === 'building'); });
     T.airflowSystems?.forEach((s: any) => { s.points.visible = (mod === 'building'); });
@@ -1306,7 +1325,7 @@ export default function BuildingScene() {
           mesh.material.emissiveIntensity = finalOn ? 2.0 + b * 3 : 0;
         }
       });
-      T.rectLights?.forEach((light: any) => { light.intensity = 0; });
+      T.rectLights?.forEach((light: any) => { light.intensity = 0; light.visible = false; });
     } else {
       // 方案B：RectAreaLight 真实照明模式
       T.rectLights.forEach((light: any, i: number) => {
