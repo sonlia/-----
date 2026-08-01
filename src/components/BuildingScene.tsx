@@ -49,6 +49,7 @@ export default function BuildingScene() {
   const [loaderText, setLoaderText] = useState('INITIALIZING SYSTEM');
   const [loaderPct, setLoaderPct] = useState(0);
   const [renderMode, setRenderMode] = useState('WebGPU');
+  const [lightingMode, setLightingMode] = useState<'rect' | 'emissive'>('emissive'); // 默认发光材质模式（低配置友好）
   const [fps, setFps] = useState(0);
   const [clock, setClock] = useState('--:--:--');
   const [date, setDate] = useState('');
@@ -103,8 +104,10 @@ export default function BuildingScene() {
       const isWebGPU = T.renderer.backend && T.renderer.backend.isWebGPUBackend;
       setRenderMode(isWebGPU ? 'WebGPU' : 'WebGL2');
       T.renderer.setSize(window.innerWidth, window.innerHeight);
-      T.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-      T.renderer.shadowMap.enabled = true;
+      // 优化：降低 pixelRatio 提升渲染速度（低配置友好）
+      T.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
+      // 优化：关闭阴影（灯光模式下阴影是性能瓶颈）
+      T.renderer.shadowMap.enabled = false;
       T.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       T.renderer.toneMapping = THREE.ACESFilmicToneMapping;
       T.renderer.toneMappingExposure = 1.05;
@@ -316,6 +319,8 @@ export default function BuildingScene() {
           }
 
           setupPointLights(T);
+          // 暴露 switchLightingMode 给 React 组件
+          switchLightingModeRef.current = switchLightingMode;
           setupAirflow(T);
           // 地面平面已移除（用户要求去掉大平面正方形）
           // 空调脉冲标记光柱已移除（影响灯光选择和视觉）
@@ -559,12 +564,70 @@ export default function BuildingScene() {
         T.scene.add(rectLight);
         T.rectLights.push(rectLight);
 
-        // === 8. 隐藏原始灯具模型（不再显示线框）===
-        mesh.visible = false;
+        // === 8. 灯具模型可见性根据灯光模式决定 ===
+        // emissive 模式：显示灯具模型 + 发光材质（性能好）
+        // rect 模式：隐藏灯具模型（用 RectAreaLight 真实照明）
+        if (lightingModeRef.current === 'emissive') {
+          mesh.visible = true;
+          // 给灯具模型设置发光材质（方案A：发光材质模式）
+          (mesh as any).material = new (THREE as any).MeshStandardMaterial({
+            color: 0x2a2a2a,
+            emissive: 0xff4400,
+            emissiveIntensity: 2.0,
+            roughness: 0.4,
+            metalness: 0.2,
+            side: THREE.DoubleSide,
+          });
+        } else {
+          mesh.visible = false;
+        }
       });
 
       T.rectHelpers = []; // 不再创建 Helper
-      console.log(`灯具光源: ${T.rectLights.length} 个 (真实顶点去重 + Z轴不取反)`);
+      console.log(`灯具光源: ${T.rectLights.length} 个 (模式: ${lightingModeRef.current})`);
+    }
+
+    // ===== 切换灯光模式（发光材质 vs RectAreaLight）=====
+    function switchLightingMode(T: any, mode: 'rect' | 'emissive') {
+      lightingModeRef.current = mode;
+      const b = stateRef.current.lighting.brightness;
+      const enabled = stateRef.current.lighting.enabled;
+
+      if (mode === 'emissive') {
+        // 方案A：发光材质模式（性能好，低配置友好）
+        // 1. 关闭所有 RectAreaLight
+        T.rectLights?.forEach((light: any) => { light.intensity = 0; });
+        // 2. 显示灯具模型 + 设置发光材质
+        T.lightFixtures?.forEach((mesh: any) => {
+          mesh.visible = true;
+          if (mesh.material && mesh.material.emissive !== undefined) {
+            // 已有发光材质，调整强度
+            mesh.material.emissive = new THREE.Color(0xff4400);
+            mesh.material.emissiveIntensity = enabled ? 2.0 + b * 3 : 0;
+          } else {
+            // 设置新的发光材质
+            mesh.material = new (THREE as any).MeshStandardMaterial({
+              color: 0x2a2a2a,
+              emissive: 0xff4400,
+              emissiveIntensity: enabled ? 2.0 + b * 3 : 0,
+              roughness: 0.4,
+              metalness: 0.2,
+              side: THREE.DoubleSide,
+            });
+          }
+        });
+      } else {
+        // 方案B：RectAreaLight 真实照明模式（效果好，性能要求高）
+        // 1. 隐藏灯具模型
+        T.lightFixtures?.forEach((mesh: any) => { mesh.visible = false; });
+        // 2. 开启 RectAreaLight
+        T.rectLights?.forEach((light: any, i: number) => {
+          const fixture = T.lightFixtures[i];
+          const indOn = fixture?.userData?.individualOn;
+          const finalOn = enabled && (indOn !== false);
+          light.intensity = finalOn ? b * 22.5 : 0;
+        });
+      }
     }
 
     function farthestPointSampling(points: any[], n: number) {
@@ -811,14 +874,28 @@ export default function BuildingScene() {
     function applyLighting(T: any) {
       const s = stateRef.current.lighting;
       const b = s.brightness;
-      // RectAreaLight 桔黄色面光源（全局开关 + 单灯开关 individualOn 优先）
-      // 不再使用 mesh 自发光，完全依靠 RectAreaLight 真实照明
-      T.rectLights.forEach((light: any, i: number) => {
-        const fixture = T.lightFixtures[i];
-        const indOn = fixture?.userData?.individualOn;
-        const finalOn = s.enabled && (indOn !== false);
-        light.intensity = finalOn ? b * 22.5 : 0;  // 降低到原亮度的15%（原b*150 → b*22.5）
-      });
+      const mode = lightingModeRef.current;
+
+      // 方案A：发光材质模式 - 灯具模型自发光（性能好）
+      if (mode === 'emissive') {
+        T.lightFixtures?.forEach((mesh: any) => {
+          if (mesh.material && mesh.material.emissive !== undefined) {
+            const indOn = mesh.userData?.individualOn;
+            const finalOn = s.enabled && (indOn !== false);
+            mesh.material.emissiveIntensity = finalOn ? 2.0 + b * 3 : 0;
+          }
+        });
+        // 关闭 RectAreaLight（emissive 模式不用）
+        T.rectLights?.forEach((light: any) => { light.intensity = 0; });
+      } else {
+        // 方案B：RectAreaLight 真实照明模式（效果好）
+        T.rectLights.forEach((light: any, i: number) => {
+          const fixture = T.lightFixtures[i];
+          const indOn = fixture?.userData?.individualOn;
+          const finalOn = s.enabled && (indOn !== false);
+          light.intensity = finalOn ? b * 22.5 : 0;
+        });
+      }
       // 关灯时：所有 mesh 的自发光归零（墙/桌椅/logo/空调等），避免残余亮度
       T.modelRoot.traverse((child: any) => {
         if (child.isMesh && child.material && !child.userData._hlEmissive) {
@@ -1007,8 +1084,11 @@ export default function BuildingScene() {
   // refs 同步状态给 Three.js 闭包
   const stateRef = useRef({ lighting: { enabled: true, brightness: 0.8 }, ac: { enabled: true, temperature: 24 }, autoRotate: false });
   const renderModeRef = useRef('WebGPU');
+  const lightingModeRef = useRef<'rect' | 'emissive'>('emissive');
+  const switchLightingModeRef = useRef<((T: any, mode: 'rect' | 'emissive') => void) | null>(null);
   const deviceListRef = useRef<DeviceListItem[]>([]);
   useEffect(() => { renderModeRef.current = renderMode; }, [renderMode]);
+  useEffect(() => { lightingModeRef.current = lightingMode; }, [lightingMode]);
   useEffect(() => { stateRef.current.lighting.enabled = lightingOn; stateRef.current.lighting.brightness = brightness / 100; }, [lightingOn, brightness]);
   useEffect(() => { stateRef.current.ac.enabled = acOn; stateRef.current.ac.temperature = temperature; }, [acOn, temperature]);
 
@@ -1173,14 +1253,27 @@ export default function BuildingScene() {
   function applyLightingClosure(T: any, enabled: boolean, b: number) {
     stateRef.current.lighting.enabled = enabled;
     stateRef.current.lighting.brightness = b;
-    // RectAreaLight：全局开关 + 单灯开关（individualOn 优先，未设置则跟随全局）
-    // 不再使用 mesh 自发光，完全依靠 RectAreaLight 真实照明
-    T.rectLights.forEach((light: any, i: number) => {
-      const fixture = T.lightFixtures[i];
-      const indOn = fixture?.userData?.individualOn;
-      const finalOn = enabled && (indOn !== false);
-      light.intensity = finalOn ? b * 22.5 : 0;
-    });
+    const mode = lightingModeRef.current;
+
+    // 方案A：发光材质模式 - 灯具模型自发光（性能好）
+    if (mode === 'emissive') {
+      T.lightFixtures?.forEach((mesh: any) => {
+        if (mesh.material && mesh.material.emissive !== undefined) {
+          const indOn = mesh.userData?.individualOn;
+          const finalOn = enabled && (indOn !== false);
+          mesh.material.emissiveIntensity = finalOn ? 2.0 + b * 3 : 0;
+        }
+      });
+      T.rectLights?.forEach((light: any) => { light.intensity = 0; });
+    } else {
+      // 方案B：RectAreaLight 真实照明模式
+      T.rectLights.forEach((light: any, i: number) => {
+        const fixture = T.lightFixtures[i];
+        const indOn = fixture?.userData?.individualOn;
+        const finalOn = enabled && (indOn !== false);
+        light.intensity = finalOn ? b * 22.5 : 0;
+      });
+    }
     // 关灯时：所有 mesh 的自发光归零
     T.modelRoot.traverse((child: any) => {
       if (child.isMesh && child.material && !child.userData._hlEmissive) {
@@ -1397,6 +1490,28 @@ export default function BuildingScene() {
           </div>
         </div>
         <div className="header-right">
+          {/* 灯光模式切换：发光材质(性能好) vs RectAreaLight(效果好) */}
+          <button
+            onClick={() => {
+              const newMode = lightingMode === 'emissive' ? 'rect' : 'emissive';
+              setLightingMode(newMode);
+              const T = threeRef.current;
+              if (T.scene) {
+                switchLightingModeRef.current?.(T, newMode);
+              }
+              showToast(newMode === 'emissive' ? '已切换至发光材质模式（性能优先）' : '已切换至面光源模式（效果优先）');
+            }}
+            style={{
+              padding: '4px 10px', fontSize: '10px', fontWeight: 600, letterSpacing: '1px',
+              border: '1px solid ' + (lightingMode === 'emissive' ? 'var(--success)' : 'var(--primary)'),
+              background: lightingMode === 'emissive' ? 'rgba(0,255,136,0.1)' : 'rgba(0,212,255,0.1)',
+              color: lightingMode === 'emissive' ? 'var(--success)' : 'var(--primary)',
+              borderRadius: '4px', cursor: 'pointer', marginRight: '8px',
+            }}
+            title="切换灯光渲染模式"
+          >
+            {lightingMode === 'emissive' ? '⚡ 性能模式' : '💡 效果模式'}
+          </button>
           <div className="render-badge">
             <div className="dot"></div>
             <span>{renderMode}</span>
