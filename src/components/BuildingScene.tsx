@@ -577,8 +577,8 @@ export default function BuildingScene() {
           // 使用 MeshBasicMaterial（性能最优，无光照计算）
           (mesh as any).material = new (THREE as any).MeshBasicMaterial({
             color: 0xff4400,    // 橘红色（亮灯）
-            side: THREE.DoubleSide,
-            transparent: false,  // 不透明，避免黑边
+            side: THREE.FrontSide,  // 单面渲染，避免双面黑边
+            transparent: false,
             opacity: 1.0,
           });
         } else {
@@ -598,16 +598,24 @@ export default function BuildingScene() {
 
       if (mode === 'emissive') {
         // 方案A：发光材质模式（性能好，低配置友好）
-        // 1. 从场景中移除所有 RectAreaLight（即使 intensity=0 仍有渲染开销）
+        // 1. 隐藏所有 RectAreaLight
         T.rectLights?.forEach((light: any) => {
           light.intensity = 0;
-          light.visible = false;  // 隐藏光源，减少渲染开销
+          light.visible = false;
         });
-        // 2. 显示灯具模型 + 亮灯橘红/关灯灰色
+        // 2. 显示灯具模型 + 颜色从橘红→灰色过渡
+        const colorOn = new THREE.Color(0xff4400);
+        const colorOff = new THREE.Color(0x555555);
+        const tmpColor = new THREE.Color();
         T.lightFixtures?.forEach((mesh: any) => {
           mesh.visible = true;
           if (mesh.material) {
-            mesh.material.color = new THREE.Color(enabled ? 0xff4400 : 0x555555);
+            if (enabled) {
+              tmpColor.lerpColors(colorOff, colorOn, b);
+            } else {
+              tmpColor.copy(colorOff);
+            }
+            mesh.material.color = tmpColor.clone();
           }
         });
       } else {
@@ -879,12 +887,21 @@ export default function BuildingScene() {
 
       // 方案A：发光材质模式 - 灯具模型自发光（性能好）
       if (mode === 'emissive') {
+        // 颜色从橘红(亮度100%)→灰色(亮度0%)过渡
+        const colorOn = new THREE.Color(0xff4400);  // 橘红
+        const colorOff = new THREE.Color(0x555555); // 灰色
+        const tmpColor = new THREE.Color();
         T.lightFixtures?.forEach((mesh: any) => {
           if (mesh.material) {
             const indOn = mesh.userData?.individualOn;
             const finalOn = s.enabled && (indOn !== false);
-            // 亮灯=橘红色，关灯=灰色（整块颜色切换，不用透明度避免黑边）
-            mesh.material.color = new THREE.Color(finalOn ? 0xff4400 : 0x555555);
+            // 亮度调节 = 颜色从橘红(b=1)到灰色(b=0)过渡
+            if (finalOn) {
+              tmpColor.lerpColors(colorOff, colorOn, b);
+            } else {
+              tmpColor.copy(colorOff);
+            }
+            mesh.material.color = tmpColor.clone();
           }
         });
         // 关闭并隐藏 RectAreaLight（emissive 模式不用，减少渲染开销）
@@ -1259,7 +1276,7 @@ export default function BuildingScene() {
     T.rectHelpers?.forEach((h: any) => { if (h) h.visible = (mod === 'building'); });
     T.deviceMarkers?.forEach((m: any) => { m.group.visible = (mod === 'building'); });
     T.airflowSystems?.forEach((s: any) => { s.points.visible = (mod === 'building'); });
-    if (mod === 'building') { T.fitCameraToModel?.(T); showToast('已切换至楼宇管理'); }
+    if (mod === 'building') { T.fitCameraToModel?.(T); showToast('已切换至节能管理'); }
     else { showToast('已切换至' + (mod === 'overview' ? '能源总览' : mod === 'overview2' ? '全景总览' : mod === 'solar' ? '光伏发电' : mod === 'charging' ? '充电桩' : mod === 'load' ? '负荷管理' : mod === 'grid' ? '配网管理' : '碳监测')); }
   };
 
@@ -1271,12 +1288,20 @@ export default function BuildingScene() {
 
     // 方案A：发光材质模式 - 灯具模型自发光（性能好）
     if (mode === 'emissive') {
+      // 颜色从橘红(亮度100%)→灰色(亮度0%)过渡
+      const colorOn = new THREE.Color(0xff4400);
+      const colorOff = new THREE.Color(0x555555);
+      const tmpColor = new THREE.Color();
       T.lightFixtures?.forEach((mesh: any) => {
         if (mesh.material) {
           const indOn = mesh.userData?.individualOn;
           const finalOn = enabled && (indOn !== false);
-          // 亮灯=橘红色，关灯=灰色
-          mesh.material.color = new THREE.Color(finalOn ? 0xff4400 : 0x555555);
+          if (finalOn) {
+            tmpColor.lerpColors(colorOff, colorOn, b);
+          } else {
+            tmpColor.copy(colorOff);
+          }
+          mesh.material.color = tmpColor.clone();
         }
       });
       T.rectLights?.forEach((light: any) => { light.intensity = 0; light.visible = false; });
@@ -1551,7 +1576,7 @@ export default function BuildingScene() {
         {[
           { id: 'overview', label: '能源总览', icon: '📊' },
           { id: 'overview2', label: '全景总览', icon: '🗺' },
-          { id: 'building', label: '楼宇管理', icon: '🏢' },
+          { id: 'building', label: '节能管理', icon: '🏢' },
           { id: 'solar', label: '光伏发电', icon: '☀' },
           { id: 'charging', label: '充电桩', icon: '🔌' },
           { id: 'load', label: '负荷管理', icon: '🎛' },
