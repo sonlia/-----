@@ -154,29 +154,34 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
         },
-        // 光束飞线：各省 → 广东（数据汇入动效）
+        // 光束飞线：各省 → 广东（流星动效：头小亮，尾部渐变变暗）
         {
           name: '数据汇入',
           type: 'lines',
           coordinateSystem: 'geo',
           data: beamLines,
-          // 飞线轨迹（半透明渐变线）
+          // 飞线轨迹（渐变线：从起点到终点逐渐变暗）
           lineStyle: {
-            color: '#00ffcc',
-            width: 1.5,
-            opacity: 0.25,
+            color: {
+              type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
+              colorStops: [
+                { offset: 0, color: 'rgba(0, 255, 204, 0.01)' },  // 起点几乎透明
+                { offset: 0.5, color: 'rgba(0, 255, 204, 0.15)' }, // 中间淡
+                { offset: 1, color: 'rgba(0, 255, 204, 0.4)' },    // 终点较亮
+              ],
+            },
+            width: 1,
             curveness: 0.3,
           },
-          // 飞行动效（流星效果：头亮大，尾部拖尾透明）
+          // 流星飞行动效
           effect: {
             show: true,
-            period: 5,          // 飞行周期5秒（慢一点更优雅）
-            trailLength: 0.6,   // 尾迹更长
+            period: 5,          // 飞行周期
+            trailLength: 0.7,   // 尾迹长（渐变拖尾）
             symbol: 'circle',   // 圆形头部
-            symbolSize: 8,      // 头部更大
-            color: '#ffffff',   // 头部白色高亮
-            shadowColor: '#00ffcc',
-            shadowBlur: 15,
+            symbolSize: 4,      // 头部小而亮
+            color: '#00ffcc',   // 流星颜色与轨迹一致（青色）
+            // trailLength 会自动生成从亮到透明的渐变拖尾
           },
           zlevel: 3,
         },

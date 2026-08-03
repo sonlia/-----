@@ -69,7 +69,7 @@ canvas { display: block; }
 
 .panel {
   position: absolute;
-  background: var(--bg-panel);
+  background: rgba(8, 18, 38, 0.8);
   border: 1px solid var(--border-line);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);

@@ -158,7 +158,7 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
           }, []);
           return (
             <div key={i} className="panel" style={{ ...panelStyle, position: 'relative', overflow: 'hidden',
-              background: 'linear-gradient(135deg, rgba(8,18,38,0.9) 0%, rgba(10,25,50,0.85) 100%)',
+              background: 'rgba(8, 18, 38, 0.8)',
               border: '1px solid rgba(0,212,255,0.25)', boxShadow: '0 8px 32px rgba(0,0,0,0.5), inset 0 0 40px rgba(0,212,255,0.03)',
             }}>
               <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
@@ -209,7 +209,7 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
 
         {/* 中心：中国地图 */}
         <div className="panel" style={{ ...panelStyle, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden',
-          background: 'linear-gradient(135deg, rgba(8,18,38,0.9) 0%, rgba(5,15,35,0.95) 100%)',
+          background: 'rgba(8, 18, 38, 0.8)',
           border: '1px solid rgba(0,212,255,0.3)', boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 0 60px rgba(0,212,255,0.04)',
         }}>
           <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
