@@ -228,6 +228,122 @@ canvas { display: block; }
   50% { opacity: 0.5; transform: scale(0.85); }
 }
 
+/* ====== 全景总览动态效果 ====== */
+
+/* 流光背景 - 全局动态渐变 */
+@keyframes flowBg {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.flow-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg,
+    rgba(0, 136, 255, 0.03) 0%,
+    rgba(0, 255, 204, 0.05) 25%,
+    rgba(0, 212, 255, 0.03) 50%,
+    rgba(128, 0, 255, 0.04) 75%,
+    rgba(0, 136, 255, 0.03) 100%
+  );
+  background-size: 400% 400%;
+  animation: flowBg 15s ease infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 面板边缘流光扫描 */
+@keyframes edgeScan {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.panel-scan {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 204, 0.8), transparent);
+  animation: edgeScan 4s linear infinite;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.panel-scan-bottom {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 30%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.6), transparent);
+  animation: edgeScan 5s linear infinite reverse;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* KPI 数字呼吸光效 */
+@keyframes numGlow {
+  0%, 100% { text-shadow: 0 0 12px currentColor; }
+  50% { text-shadow: 0 0 24px currentColor, 0 0 8px currentColor; }
+}
+
+.num-glow {
+  animation: numGlow 3s ease-in-out infinite;
+}
+
+/* 数据条脉冲边框 */
+@keyframes borderPulse {
+  0%, 100% { border-color: rgba(0, 212, 255, 0.2); box-shadow: 0 0 8px rgba(0, 212, 255, 0.1); }
+  50% { border-color: rgba(0, 255, 204, 0.4); box-shadow: 0 0 16px rgba(0, 255, 204, 0.2); }
+}
+
+.border-pulse {
+  animation: borderPulse 3s ease-in-out infinite;
+}
+
+/* 排行榜进度条流光 */
+@keyframes barShine {
+  0% { box-shadow: 0 0 4px currentColor; }
+  50% { box-shadow: 0 0 12px currentColor, 0 0 4px currentColor; }
+  100% { box-shadow: 0 0 4px currentColor; }
+}
+
+.bar-shine {
+  animation: barShine 2s ease-in-out infinite;
+}
+
+/* 粒子飘浮 */
+@keyframes float {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
+  50% { transform: translateY(-10px) translateX(5px); opacity: 0.8; }
+}
+
+.float-particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(0, 255, 204, 0.6);
+  animation: float 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* 数据中心脉冲光环 */
+@keyframes centerPulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+.center-ring {
+  position: absolute;
+  border: 2px solid rgba(255, 136, 0, 0.6);
+  border-radius: 50%;
+  animation: centerPulse 2s ease-out infinite;
+  pointer-events: none;
+}
+
 .left-panel { left: 20px; top: 84px; width: 310px; max-height: calc(100vh - 220px); overflow-y: auto; }
 .left-panel::-webkit-scrollbar { width: 4px; }
 .left-panel::-webkit-scrollbar-thumb { background: var(--primary-dim); }

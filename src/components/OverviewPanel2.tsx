@@ -77,6 +77,18 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
 
   return (
     <div style={{ position: 'absolute', top: '120px', left: '20px', right: '20px', bottom: '20px', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 40, overflow: 'hidden' }}>
+      {/* 流光动态背景 */}
+      <div className="flow-bg"></div>
+      {/* 飘浮粒子 */}
+      {Array.from({ length: 15 }).map((_, i) => (
+        <div key={i} className="float-particle" style={{
+          left: `${Math.random() * 100}%`,
+          top: `${Math.random() * 100}%`,
+          animationDelay: `${i * 0.3}s`,
+          animationDuration: `${3 + Math.random() * 3}s`,
+          background: i % 3 === 0 ? 'rgba(0,255,204,0.5)' : i % 3 === 1 ? 'rgba(0,212,255,0.4)' : 'rgba(128,0,255,0.3)',
+        }}></div>
+      ))}
       {/* 顶部时间切换 + 预警灯 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {/* 时间维度切换 */}
@@ -141,6 +153,8 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
               border: '1px solid rgba(0,212,255,0.25)', boxShadow: '0 8px 32px rgba(0,0,0,0.5), inset 0 0 40px rgba(0,212,255,0.03)',
             }}>
               <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+            <div className="panel-scan" style={{ animationDelay: '0.5s' }}></div>
+            <div className="panel-scan-bottom" style={{ animationDelay: '1s' }}></div>
               {/* 玻璃光效 */}
               <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '100px', height: '100px', borderRadius: '50%', background: `radial-gradient(circle, ${kpi.color}15 0%, transparent 70%)`, pointerEvents: 'none' }}></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -166,6 +180,8 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div className="panel" style={{ ...panelStyle, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+            <div className="panel-scan" style={{ animationDelay: '0.5s' }}></div>
+            <div className="panel-scan-bottom" style={{ animationDelay: '1s' }}></div>
             <div style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>📊 能源结构</div>
             <div style={{ flex: 1, minHeight: 0 }}>
               <EChart option={energyMixOption} height="100%" style={{ height: '100%' }} />
@@ -173,6 +189,8 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
           </div>
           <div className="panel" style={{ ...panelStyle, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+            <div className="panel-scan" style={{ animationDelay: '0.5s' }}></div>
+            <div className="panel-scan-bottom" style={{ animationDelay: '1s' }}></div>
             <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>📈 电网负荷 (MW)</div>
             <div style={{ flex: 1, minHeight: 0 }}>
               <EChart option={gridLoadOption} height="100%" style={{ height: '100%' }} />
@@ -196,7 +214,7 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
             </div>
           </div>
           {/* 地图底部数据栏 */}
-          <div style={{ position: 'absolute', bottom: '8px', left: '16px', right: '16px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '8px 16px', background: 'rgba(0,212,255,0.08)', borderRadius: '6px', backdropFilter: 'blur(12px)', zIndex: 2, border: '1px solid rgba(0,212,255,0.2)' }}>
+          <div className="border-pulse" style={{ position: 'absolute', bottom: '8px', left: '16px', right: '16px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '8px 16px', background: 'rgba(0,212,255,0.08)', borderRadius: '6px', backdropFilter: 'blur(12px)', zIndex: 2, border: '1px solid rgba(0,212,255,0.2)' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontFamily: 'Orbitron', fontSize: '18px', color: 'var(--cyan-glow)', fontWeight: 700, textShadow: '0 0 8px rgba(0,255,204,0.4)' }}>3,286<span style={{ fontSize: '9px', color: 'var(--text-dim)', marginLeft: '2px' }}>MW</span></div>
               <div style={{ fontSize: '9px', color: 'var(--text-dim)' }}>全国总负荷</div>
@@ -227,6 +245,8 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
           {/* 省份绩效排行 */}
           <div className="panel" style={{ ...panelStyle, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+            <div className="panel-scan" style={{ animationDelay: '0.5s' }}></div>
+            <div className="panel-scan-bottom" style={{ animationDelay: '1s' }}></div>
             <div style={{ fontSize: '13px', color: 'var(--warn)', fontWeight: 600, marginBottom: '8px', letterSpacing: '1px' }}>🏆 省份绩效排行</div>
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {provinceRank.map((p, i) => (
@@ -234,7 +254,7 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
                   <span style={{ fontFamily: 'Orbitron', fontSize: '14px', fontWeight: 700, color: i < 3 ? p.color : 'var(--text-dim)', width: '20px', textAlign: 'center' }}>{i + 1}</span>
                   <span style={{ fontSize: '11px', color: 'var(--text-main)', flex: 1 }}>{p.name}</span>
                   <div style={{ width: '60px', height: '6px', background: 'rgba(0,212,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${p.score}%`, background: p.color, boxShadow: `0 0 4px ${p.color}` }}></div>
+                    <div className="bar-shine" style={{ height: '100%', width: `${p.score}%`, background: p.color, color: p.color }}></div>
                   </div>
                   <span style={{ fontFamily: 'Orbitron', fontSize: '11px', color: p.color, fontWeight: 600, width: '36px', textAlign: 'right' }}>{p.score}</span>
                 </div>
@@ -244,6 +264,8 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
           {/* 环境效益 */}
           <div className="panel" style={{ ...panelStyle, minHeight: '0' }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+            <div className="panel-scan" style={{ animationDelay: '0.5s' }}></div>
+            <div className="panel-scan-bottom" style={{ animationDelay: '1s' }}></div>
             <div style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 600, marginBottom: '8px', letterSpacing: '1px' }}>🌱 环境效益</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <div style={{ textAlign: 'center', padding: '8px', background: 'rgba(0,255,136,0.06)', borderRadius: '6px', border: '1px solid rgba(0,255,136,0.15)' }}>
