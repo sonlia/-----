@@ -62,7 +62,7 @@ export default function BuildingScene() {
   const [temperature, setTemperature] = useState(24);
   const [autoRotate, setAutoRotate] = useState(false);
   const [showList, setShowList] = useState(true);
-  const [activeModule, setActiveModule] = useState<'overview' | 'overview2' | 'building' | 'solar' | 'charging' | 'carbon' | 'load' | 'grid'>('overview');
+  const [activeModule, setActiveModule] = useState<'overview' | 'overview2' | 'building' | 'solar' | 'charging' | 'carbon' | 'load' | 'grid'>('overview2');
   const [activeFloor, setActiveFloor] = useState(0);
 
   const [deviceList, setDeviceList] = useState<DeviceListItem[]>([]);
@@ -1277,7 +1277,7 @@ export default function BuildingScene() {
     T.deviceMarkers?.forEach((m: any) => { m.group.visible = (mod === 'building'); });
     T.airflowSystems?.forEach((s: any) => { s.points.visible = (mod === 'building'); });
     if (mod === 'building') { T.fitCameraToModel?.(T); showToast('已切换至节能管理'); }
-    else { showToast('已切换至' + (mod === 'overview' ? '能源总览' : mod === 'overview2' ? '全景总览' : mod === 'solar' ? '光伏发电' : mod === 'charging' ? '充电桩' : mod === 'load' ? '负荷管理' : mod === 'grid' ? '配网管理' : '碳监测')); }
+    else { showToast('已切换至' + (mod === 'overview' ? '总览2' : mod === 'overview2' ? '全景总览' : mod === 'solar' ? '光伏发电' : mod === 'charging' ? '充电桩' : mod === 'load' ? '负荷管理' : mod === 'grid' ? '配网管理' : '碳监测')); }
   };
 
   // 闭包版状态应用（避免依赖 effect 内函数）
@@ -1588,8 +1588,8 @@ export default function BuildingScene() {
       {/* 顶部模块导航栏 */}
       <div style={{ position: 'absolute', top: '72px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '4px', background: 'var(--bg-panel)', border: '1px solid var(--border-line)', borderRadius: '6px', padding: '4px', backdropFilter: 'blur(14px)', zIndex: 45 }}>
         {[
-          { id: 'overview', label: '能源总览', icon: '📊' },
           { id: 'overview2', label: '全景总览', icon: '🗺' },
+          { id: 'overview', label: '总览2', icon: '📊' },
           { id: 'building', label: '节能管理', icon: '🏢' },
           { id: 'solar', label: '光伏发电', icon: '☀' },
           { id: 'charging', label: '充电桩', icon: '🔌' },
