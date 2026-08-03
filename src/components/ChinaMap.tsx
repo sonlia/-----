@@ -163,31 +163,32 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           // 飞线轨迹（半透明渐变线）
           lineStyle: {
             color: '#00ffcc',
-            width: 1,
-            opacity: 0.4,
+            width: 1.5,
+            opacity: 0.25,
             curveness: 0.3,
-            type: 'dashed',
           },
-          // 飞行动效（尾迹粒子）
+          // 飞行动效（流星效果：头亮大，尾部拖尾透明）
           effect: {
             show: true,
-            period: 4,        // 飞行周期4秒
-            trailLength: 0.4, // 尾迹长度
-            symbol: 'arrow',
-            symbolSize: 6,
-            color: '#00ffcc',
+            period: 5,          // 飞行周期5秒（慢一点更优雅）
+            trailLength: 0.6,   // 尾迹更长
+            symbol: 'circle',   // 圆形头部
+            symbolSize: 8,      // 头部更大
+            color: '#ffffff',   // 头部白色高亮
+            shadowColor: '#00ffcc',
+            shadowBlur: 15,
           },
           zlevel: 3,
         },
-        // 广东终点闪烁
+        // 广东终点闪烁（数据到达后亮光）
         {
           name: '数据中心',
           type: 'effectScatter',
           coordinateSystem: 'geo',
           data: [[...guangdongCenter, 999]],
-          symbolSize: 18,
-          rippleEffect: { brushType: 'stroke', period: 3, scale: 4 },
-          itemStyle: { color: '#ff8800', shadowColor: '#ff8800', shadowBlur: 20 },
+          symbolSize: 20,
+          rippleEffect: { brushType: 'stroke', period: 2.5, scale: 5 },
+          itemStyle: { color: '#ff8800', shadowColor: '#ff8800', shadowBlur: 25 },
           label: {
             show: true,
             formatter: '数据中心',
@@ -196,6 +197,8 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             fontSize: 10,
             fontFamily: 'Rajdhani',
             fontWeight: 700,
+            textShadowColor: 'rgba(255,136,0,0.5)',
+            textShadowBlur: 6,
           },
           zlevel: 4,
         },

@@ -148,7 +148,13 @@ canvas { display: block; }
   bottom: 0; left: 0; right: 0;
   height: 2px;
   background: linear-gradient(90deg, transparent 0%, var(--primary) 30%, var(--cyan-glow) 50%, var(--primary) 70%, transparent 100%);
-  box-shadow: 0 0 12px var(--primary);
+  box-shadow: 0 0 12px var(--primary), 0 0 24px rgba(0, 212, 255, 0.3);
+  animation: headerBeam 4s ease-in-out infinite;
+}
+
+@keyframes headerBeam {
+  0%, 100% { opacity: 0.7; box-shadow: 0 0 8px var(--primary); }
+  50% { opacity: 1; box-shadow: 0 0 20px var(--cyan-glow), 0 0 40px rgba(0, 255, 204, 0.2); }
 }
 
 .header-left { display: flex; align-items: center; gap: 18px; pointer-events: auto; }
@@ -230,7 +236,7 @@ canvas { display: block; }
 
 /* ====== 全景总览动态效果 ====== */
 
-/* 流光背景 - 全局动态渐变 */
+/* 流光背景 - 全局动态渐变（增强空间感） */
 @keyframes flowBg {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -240,15 +246,14 @@ canvas { display: block; }
 .flow-bg {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg,
-    rgba(0, 136, 255, 0.03) 0%,
-    rgba(0, 255, 204, 0.05) 25%,
-    rgba(0, 212, 255, 0.03) 50%,
-    rgba(128, 0, 255, 0.04) 75%,
-    rgba(0, 136, 255, 0.03) 100%
-  );
-  background-size: 400% 400%;
-  animation: flowBg 15s ease infinite;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 30%, rgba(0, 136, 255, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 50% at 80% 20%, rgba(0, 255, 204, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 60% at 70% 80%, rgba(128, 0, 255, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 15% 75%, rgba(0, 212, 255, 0.05) 0%, transparent 60%),
+    linear-gradient(135deg, rgba(0, 10, 25, 0.3) 0%, rgba(0, 20, 45, 0.2) 50%, rgba(0, 10, 25, 0.3) 100%);
+  background-size: 200% 200%, 200% 200%, 200% 200%, 200% 200%, 400% 400%;
+  animation: flowBg 20s ease infinite;
   pointer-events: none;
   z-index: 0;
 }
@@ -322,10 +327,11 @@ canvas { display: block; }
 
 .float-particle {
   position: absolute;
-  width: 3px;
-  height: 3px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: rgba(0, 255, 204, 0.6);
+  box-shadow: 0 0 8px currentColor;
   animation: float 4s ease-in-out infinite;
   pointer-events: none;
 }

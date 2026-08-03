@@ -76,17 +76,26 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
   ];
 
   return (
-    <div style={{ position: 'absolute', top: '120px', left: '20px', right: '20px', bottom: '20px', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 40, overflow: 'hidden' }}>
+    <div style={{ position: 'absolute', top: '120px', left: '20px', right: '20px', bottom: '20px', display: 'flex', flexDirection: 'column', gap: '14px', zIndex: 40, overflow: 'hidden' }}>
       {/* 流光动态背景 */}
       <div className="flow-bg"></div>
-      {/* 飘浮粒子 */}
-      {Array.from({ length: 15 }).map((_, i) => (
+      {/* 飘浮粒子（固定位置避免SSR hydration mismatch） */}
+      {[
+        { left: '12%', top: '15%', delay: '0s', dur: '4s', c: 'rgba(0,255,204,0.5)' },
+        { left: '85%', top: '22%', delay: '0.5s', dur: '5s', c: 'rgba(0,212,255,0.4)' },
+        { left: '45%', top: '8%', delay: '1s', dur: '3.5s', c: 'rgba(128,0,255,0.3)' },
+        { left: '20%', top: '55%', delay: '1.5s', dur: '4.5s', c: 'rgba(0,255,204,0.5)' },
+        { left: '70%', top: '45%', delay: '2s', dur: '5s', c: 'rgba(0,212,255,0.4)' },
+        { left: '90%', top: '70%', delay: '2.5s', dur: '3.8s', c: 'rgba(128,0,255,0.3)' },
+        { left: '15%', top: '80%', delay: '3s', dur: '4.2s', c: 'rgba(0,255,204,0.5)' },
+        { left: '55%', top: '85%', delay: '3.5s', dur: '5s', c: 'rgba(0,212,255,0.4)' },
+        { left: '35%', top: '35%', delay: '4s', dur: '4s', c: 'rgba(128,0,255,0.3)' },
+        { left: '75%', top: '15%', delay: '4.5s', dur: '5.5s', c: 'rgba(0,255,204,0.5)' },
+        { left: '5%', top: '40%', delay: '5s', dur: '3.5s', c: 'rgba(0,212,255,0.4)' },
+        { left: '60%', top: '60%', delay: '5.5s', dur: '4.5s', c: 'rgba(128,0,255,0.3)' },
+      ].map((p, i) => (
         <div key={i} className="float-particle" style={{
-          left: `${Math.random() * 100}%`,
-          top: `${Math.random() * 100}%`,
-          animationDelay: `${i * 0.3}s`,
-          animationDuration: `${3 + Math.random() * 3}s`,
-          background: i % 3 === 0 ? 'rgba(0,255,204,0.5)' : i % 3 === 1 ? 'rgba(0,212,255,0.4)' : 'rgba(128,0,255,0.3)',
+          left: p.left, top: p.top, animationDelay: p.delay, animationDuration: p.dur, background: p.c,
         }}></div>
       ))}
       {/* 顶部时间切换 + 预警灯 */}
@@ -122,7 +131,7 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
       </div>
 
       {/* 顶部 3 核心 KPI（玻璃拟态卡片） */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
         {[
           { label: '总发电量', value: totalGen, unit: 'kWh', sub: '同比 ⬇ 3.2%', color: PALETTE.primary, icon: '⚡', trend: [42, 45, 48, 44, 50, 52, 55, 53, 58, 56, 60, 62] },
           { label: '碳减排量', value: carbonReduce, unit: 'tCO₂', sub: '等效植树 ' + trees + ' 棵', color: PALETTE.success, icon: '🌱', trend: [10, 15, 20, 25, 30, 28, 35, 32, 38, 40, 42, 45] },
@@ -175,9 +184,9 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
       </div>
 
       {/* 主图区：中国地图(中心) + 左侧能源结构+电网负荷 + 右侧省份排行+环境效益 */}
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1.8fr 1fr', gap: '10px', minHeight: 0 }}>
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1.8fr 1fr', gap: '14px', minHeight: 0 }}>
         {/* 左侧：能源结构 + 电网负荷 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div className="panel" style={{ ...panelStyle, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
             <div className="panel-scan" style={{ animationDelay: '0.5s' }}></div>
@@ -241,7 +250,7 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
         </div>
 
         {/* 右侧：省份排行 + 环境效益 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* 省份绩效排行 */}
           <div className="panel" style={{ ...panelStyle, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
