@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import * as echarts from 'echarts';
 import ReactECharts from 'echarts-for-react';
 import { PALETTE, commonTooltip } from './EChart';
@@ -54,6 +54,8 @@ const DEFAULT_PROVINCES = [
 
 export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: ChinaMapProps) {
   const [registered, setRegistered] = useState(false);
+  const chartRef = useRef<ReactECharts>(null);
+  const carouselIdx = useRef(0);
 
   useEffect(() => {
     fetch('/maps/china.json')
@@ -111,17 +113,73 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           shadowBlur: 6,
         },
         emphasis: {
-          label: { show: true, color: PALETTE.cyanGlow, fontSize: 10, fontFamily: 'Rajdhani', fontWeight: 700 },
-          itemStyle: { areaColor: '#1a3a66', borderColor: PALETTE.cyanGlow, borderWidth: 1.2, shadowBlur: 12 },
+          label: { show: true, color: PALETTE.cyanGlow, fontSize: 11, fontFamily: 'Rajdhani', fontWeight: 700 },
+          itemStyle: { areaColor: '#1a4a7a', borderColor: PALETTE.cyanGlow, borderWidth: 1.5, shadowBlur: 16, shadowColor: PALETTE.cyanGlow },
         },
       },
-      series: [{
-        name: '省级负荷',
-        type: 'map',
-        geoIndex: 0,
-        data: data,
-      }],
+      series: [
+        {
+          name: '省级负荷',
+          type: 'map',
+          geoIndex: 0,
+          data: data,
+        },
+        // 涟漪效果层 - 在轮播省份的中心坐标显示脉冲
+        {
+          name: '脉冲',
+          type: 'effectScatter',
+          coordinateSystem: 'geo',
+          data: [],
+          symbolSize: 8,
+          rippleEffect: { brushType: 'stroke', period: 2, scale: 4 },
+          itemStyle: { color: PALETTE.cyanGlow, shadowColor: PALETTE.cyanGlow, shadowBlur: 10 },
+          zlevel: 2,
+        },
+      ],
     };
+  }, [registered, data]);
+
+  // 周期性轮播省份：高亮 + 显示tooltip + 涟漪
+  useEffect(() => {
+    if (!registered || !chartRef.current) return;
+    const chart = chartRef.current.getEchartsInstance();
+    // 构建省份名称到中心坐标的映射（从GeoJSON properties.centroid）
+    const provinceCentroids: Record<string, [number, number]> = {};
+    // 从已注册的地图中获取坐标
+    const geoJson = (echarts as any).getMap?.('china')?.geoJson;
+    if (geoJson && geoJson.features) {
+      geoJson.features.forEach((f: any) => {
+        if (f.properties && f.properties.centroid) {
+          provinceCentroids[f.properties.name] = f.properties.centroid;
+        }
+      });
+    }
+
+    const interval = setInterval(() => {
+      const idx = carouselIdx.current % data.length;
+      const province = data[idx];
+      carouselIdx.current++;
+
+      // 1. 高亮省份
+      chart.dispatchAction({ type: 'downplay' });
+      chart.dispatchAction({ type: 'highlight', name: province.name });
+      // 2. 显示 tooltip
+      chart.dispatchAction({ type: 'showTip', name: province.name });
+      // 3. 涟漪效果：在省份中心显示脉冲点
+      const centroid = provinceCentroids[province.name];
+      if (centroid) {
+        chart.setOption({
+          series: [
+            {},
+            {
+              data: [{ name: province.name, value: [...centroid, province.value] }],
+            },
+          ],
+        });
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
   }, [registered, data]);
 
   if (!registered) {
@@ -132,5 +190,5 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
     );
   }
 
-  return <ReactECharts option={option} notMerge={true} lazyUpdate={true} style={{ height: typeof height === 'number' ? `${height}px` : height, width: '100%' }} opts={{ renderer: 'canvas' }} />;
+  return <ReactECharts ref={chartRef} option={option} notMerge={false} lazyUpdate={true} style={{ height: typeof height === 'number' ? `${height}px` : height, width: '100%' }} opts={{ renderer: 'canvas' }} />;
 }
