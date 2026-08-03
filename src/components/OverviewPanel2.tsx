@@ -1,239 +1,268 @@
 'use client';
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import EChart, { PALETTE, commonGrid, commonTooltip, commonAxis } from './EChart';
 import ChinaMap from './ChinaMap';
 
 interface OverviewPanel2Props { kpiPower: string; }
 
+// 时间维度
+type TimeRange = 'today' | 'week' | 'month' | 'year';
+
 export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
-  const power = parseFloat(kpiPower || '0');
-  const totalLoad = power + 18.6;
-  const pvOutput = 32.5;
-  const chargingLoad = 18.6;
-  const acLoad = power;
-  const buildingLoad = 18.4;
-  const gridLoad = 52.0;
+  const [timeRange, setTimeRange] = useState<TimeRange>('today');
   const panelStyle: React.CSSProperties = { position: 'relative', padding: '14px 16px' };
 
-  // 轮播索引
-  const carouselRef = useRef(0);
+  // 根据时间维度调整数据
+  const multiplier = timeRange === 'today' ? 1 : timeRange === 'week' ? 7 : timeRange === 'month' ? 30 : 365;
+  const totalPower = 3286; // MW
+  const totalGen = (1248 * multiplier).toLocaleString();
+  const carbonReduce = (0.45 * multiplier).toFixed(2);
+  const revenue = (4989 * multiplier).toLocaleString();
+  const trees = Math.round(13906 * multiplier / 365);
 
-  // 1. 各业态功率占比 - 环形仪表盘
-  const gaugeOption = useMemo(() => ({
+  // 1. 能源结构饼图
+  const energyMixOption = useMemo(() => ({
+    tooltip: { ...commonTooltip, trigger: 'item', formatter: '{b}: {c} MW ({d}%)' },
+    legend: { orient: 'vertical', right: 4, top: 'middle', textStyle: { color: PALETTE.textMid, fontSize: 9 }, itemWidth: 8, itemHeight: 8 },
     series: [{
-      type: 'gauge', radius: '85%', center: ['50%', '55%'],
-      startAngle: 90, endAngle: -270,
-      min: 0, max: 200,
-      progress: { show: true, width: 14, roundCap: true,
-        itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 1, colorStops: [
-          { offset: 0, color: PALETTE.primary }, { offset: 0.5, color: PALETTE.cyanGlow }, { offset: 1, color: PALETTE.success }
-        ]} } },
-      axisLine: { lineStyle: { width: 14, color: [[1, 'rgba(0,212,255,0.06)']] } },
-      axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
-      pointer: { show: false }, anchor: { show: false },
-      title: { show: false },
-      detail: { valueAnimation: true, offsetCenter: [0, '-10%'],
-        formatter: '{value}', color: PALETTE.cyanGlow, fontSize: 36, fontFamily: 'Orbitron', fontWeight: 700 },
-      data: [{ value: totalLoad.toFixed(0) }],
+      type: 'pie', radius: ['45%', '70%'], center: ['35%', '50%'],
+      itemStyle: { borderColor: '#02070f', borderWidth: 2 },
+      label: { show: false },
+      emphasis: { label: { show: true, color: PALETTE.textMain, fontSize: 11, fontFamily: 'Orbitron', formatter: '{b}\n{c} MW' } },
+      data: [
+        { value: 52, name: '配电网', itemStyle: { color: PALETTE.primary } },
+        { value: 32.5, name: '光伏', itemStyle: { color: '#ff8844' } },
+        { value: 18.6, name: '充电桩', itemStyle: { color: PALETTE.success } },
+        { value: 33.4, name: '空调节能', itemStyle: { color: PALETTE.danger } },
+        { value: 18.4, name: '楼宇控制', itemStyle: { color: PALETTE.cyanGlow } },
+      ],
     }],
-    graphic: [
-      { type: 'text', left: 'center', top: '68%', style: { text: 'MW 总功率', fill: PALETTE.textDim, fontSize: 11, fontFamily: 'Rajdhani' } },
-      { type: 'text', left: 'center', top: '80%', style: { text: '实时监测', fill: PALETTE.success, fontSize: 10, fontFamily: 'Rajdhani' } },
-    ],
-  }), [totalLoad]);
+  }), []);
 
-  // 2. 24h 功率流 - 多业态堆叠面积
-  const powerFlowOption = useMemo(() => {
-    const hours = Array.from({ length: 25 }, (_, i) => i + ':00');
-    const gen = (base: number, phase: number) => hours.map((_, i) => +(base * (0.35 + 0.65 * Math.max(0, Math.sin((i - 6 + phase) / 24 * Math.PI * 2 + Math.PI / 2)))).toFixed(1));
+  // 2. 电网负荷实时折线图
+  const gridLoadOption = useMemo(() => {
+    const labels = Array.from({ length: 25 }, (_, i) => i + ':00');
     return {
       tooltip: { ...commonTooltip, trigger: 'axis' },
-      legend: { data: ['配电网', '光伏', '充电桩', '空调节能', '楼宇控制'], textStyle: { color: PALETTE.textMid, fontSize: 9 }, top: 0, right: 0, itemWidth: 8, itemHeight: 6 },
-      grid: { ...commonGrid, left: 36, right: 12, top: 26, bottom: 24 },
-      xAxis: { type: 'category', data: hours, ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 9, interval: 4 } },
-      yAxis: { type: 'value', name: 'kW', ...commonAxis, nameTextStyle: { color: PALETTE.textDim, fontSize: 9 } },
-      series: [
-        { name: '配电网', type: 'line', stack: 'a', smooth: true, symbol: 'none', data: gen(gridLoad, 0), lineStyle: { width: 0 }, areaStyle: { color: PALETTE.primary, opacity: 0.7 } },
-        { name: '光伏', type: 'line', stack: 'a', smooth: true, symbol: 'none', data: gen(pvOutput, 2), lineStyle: { width: 0 }, areaStyle: { color: '#ff8844', opacity: 0.7 } },
-        { name: '充电桩', type: 'line', stack: 'a', smooth: true, symbol: 'none', data: gen(chargingLoad, -1), lineStyle: { width: 0 }, areaStyle: { color: PALETTE.success, opacity: 0.7 } },
-        { name: '空调节能', type: 'line', stack: 'a', smooth: true, symbol: 'none', data: gen(acLoad, 1), lineStyle: { width: 0 }, areaStyle: { color: PALETTE.danger, opacity: 0.7 } },
-        { name: '楼宇控制', type: 'line', stack: 'a', smooth: true, symbol: 'none', data: gen(buildingLoad, 0.5), lineStyle: { width: 0 }, areaStyle: { color: PALETTE.cyanGlow, opacity: 0.7 } },
-      ],
+      grid: { ...commonGrid, left: 36, right: 12, top: 10, bottom: 22 },
+      xAxis: { type: 'category', data: labels, ...commonAxis, axisLabel: { ...commonAxis.axisLabel, fontSize: 8, interval: 5 } },
+      yAxis: { type: 'value', name: 'MW', ...commonAxis, nameTextStyle: { color: PALETTE.textDim, fontSize: 9 }, splitLine: { lineStyle: { color: 'rgba(0,212,255,0.05)' } } },
+      series: [{
+        type: 'line', smooth: true, symbol: 'none',
+        data: labels.map((_, i) => +(totalPower * (0.5 + 0.5 * Math.max(0, Math.sin((i - 6) / 24 * Math.PI * 2 + Math.PI / 2))) / 100).toFixed(1)),
+        lineStyle: { color: PALETTE.cyanGlow, width: 2, shadowColor: PALETTE.cyanGlow, shadowBlur: 6 },
+        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(0,255,204,0.3)' }, { offset: 1, color: 'rgba(0,255,204,0)' }] } },
+        markLine: { silent: true, symbol: 'none', lineStyle: { color: PALETTE.danger, type: 'dashed', width: 1 }, data: [{ yAxis: 40, name: '上限' }], label: { color: PALETTE.danger, fontSize: 8 } },
+      }],
     };
-  }, [gridLoad, pvOutput, chargingLoad, acLoad, buildingLoad]);
+  }, []);
 
-  // 3. 业态轮播数据
-  const businesses = [
-    { name: '配电网', value: gridLoad, unit: 'kW', color: PALETTE.primary, icon: '⚡', desc: '4段母线 · 电压10kV', trend: '+2.3%', trendUp: true, data: [42, 45, 48, 44, 50, 52, 55, 53, 58, 56, 60, gridLoad] },
-    { name: '光伏发电', value: pvOutput, unit: 'kW', color: '#ff8844', icon: '☀', desc: '48站 · 日发260kWh', trend: '+12.5%', trendUp: true, data: [0, 0, 5, 12, 22, 30, 38, 45, 48, 42, 35, pvOutput] },
-    { name: '充电桩', value: chargingLoad, unit: 'kW', color: PALETTE.success, icon: '🔌', desc: '1,459桩 · 66.7%利用率', trend: '+8.2%', trendUp: true, data: [320, 380, 410, 450, 480, 520, 490, 510, 540, 560, 580, 590] },
-    { name: '空调节能', value: acLoad, unit: 'kW', color: PALETTE.danger, icon: '❄', desc: '21台 · 节能率23.5%', trend: '-3.1%', trendUp: false, data: [18, 19, 20, 21, 21, 20, 21, 21, 20, 21, 21, 21] },
-    { name: '楼宇控制', value: buildingLoad, unit: 'kW', color: PALETTE.cyanGlow, icon: '🏢', desc: '75台 · 能效23.5%', trend: '+5.6%', trendUp: true, data: [60, 62, 65, 68, 70, 72, 75, 78, 80, 82, 84, 85] },
+  // 3. 省份绩效排行榜
+  const provinceRank = [
+    { name: '广东省', score: 98.5, trend: '+2.3%', color: PALETTE.primary },
+    { name: '江苏省', score: 95.2, trend: '+1.8%', color: PALETTE.cyanGlow },
+    { name: '浙江省', score: 92.8, trend: '+3.1%', color: PALETTE.success },
+    { name: '山东省', score: 88.6, trend: '+0.5%', color: PALETTE.warn },
+    { name: '四川省', score: 85.3, trend: '+4.2%', color: '#ff8844' },
+    { name: '北京市', score: 82.1, trend: '+1.2%', color: PALETTE.primary },
+    { name: '湖北省', score: 78.5, trend: '-0.8%', color: PALETTE.danger },
   ];
 
-  // 轮播 sparkline Canvas
-  const sparkCanvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const interval = setInterval(() => {
-      carouselRef.current = (carouselRef.current + 1) % businesses.length;
-      const idx = carouselRef.current;
-      const b = businesses[idx];
-      // 更新 DOM
-      const nameEl = document.getElementById('carousel-name');
-      const valueEl = document.getElementById('carousel-value');
-      const descEl = document.getElementById('carousel-desc');
-      const trendEl = document.getElementById('carousel-trend');
-      const iconEl = document.getElementById('carousel-icon');
-      if (nameEl) { nameEl.textContent = b.name; nameEl.style.color = b.color; }
-      if (valueEl) { valueEl.textContent = b.value + b.unit; valueEl.style.color = b.color; }
-      if (descEl) descEl.textContent = b.desc;
-      if (trendEl) { trendEl.textContent = (b.trendUp ? '↑' : '↓') + ' ' + b.trend; trendEl.style.color = b.trendUp ? PALETTE.success : PALETTE.danger; }
-      if (iconEl) iconEl.textContent = b.icon;
-      // 绘制 sparkline
-      const canvas = sparkCanvasRef.current;
-      if (canvas) {
-        const ctx = canvas.getContext('2d')!;
-        const W = canvas.width, H = canvas.height;
-        ctx.clearRect(0, 0, W, H);
-        const d = b.data;
-        const mx = Math.max(...d), mn = Math.min(...d);
-        const range = mx - mn || 1;
-        const grad = ctx.createLinearGradient(0, 0, 0, H);
-        grad.addColorStop(0, b.color + '60'); grad.addColorStop(1, b.color + '00');
-        ctx.fillStyle = grad;
-        ctx.beginPath(); ctx.moveTo(0, H);
-        d.forEach((v, i) => { const x = i / (d.length - 1) * W; const y = H - (v - mn) / range * (H - 4) - 2; ctx.lineTo(x, y); });
-        ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
-        ctx.strokeStyle = b.color; ctx.lineWidth = 2; ctx.shadowColor = b.color; ctx.shadowBlur = 4;
-        ctx.beginPath();
-        d.forEach((v, i) => { const x = i / (d.length - 1) * W; const y = H - (v - mn) / range * (H - 4) - 2; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
-        ctx.stroke();
-      }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+  // 预警状态
+  const alerts = [
+    { level: 'green', text: '系统运行正常', count: 0 },
+    { level: 'yellow', text: 'III段母线负载偏高', count: 1 },
+    { level: 'red', text: '无紧急告警', count: 0 },
+  ];
 
   return (
     <div style={{ position: 'absolute', top: '120px', left: '20px', right: '20px', bottom: '20px', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 40, overflow: 'hidden' }}>
-      {/* 顶部 5 业态 KPI 卡片 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '10px' }}>
-        {businesses.map((b, i) => (
-          <div key={i} className="panel" style={{ ...panelStyle, borderLeft: `3px solid ${b.color}`, position: 'relative', overflow: 'hidden' }}>
-            <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-            {/* 背景光效 */}
-            <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '60px', height: '60px', borderRadius: '50%', background: `radial-gradient(circle, ${b.color}20 0%, transparent 70%)`, pointerEvents: 'none' }}></div>
-            <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '16px' }}>{b.icon}</span>{b.name}
+      {/* 顶部时间切换 + 预警灯 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* 时间维度切换 */}
+        <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-panel)', border: '1px solid var(--border-line)', borderRadius: '6px', padding: '4px', backdropFilter: 'blur(14px)' }}>
+          {([['today', '今日'], ['week', '本周'], ['month', '本月'], ['year', '本年']] as const).map(([key, label]) => (
+            <button key={key} onClick={() => setTimeRange(key)} style={{
+              padding: '6px 16px', fontSize: '12px', fontWeight: 600, letterSpacing: '1px',
+              border: '1px solid ' + (timeRange === key ? 'var(--primary)' : 'transparent'),
+              background: timeRange === key ? 'var(--primary-bg)' : 'transparent',
+              color: timeRange === key ? 'var(--primary)' : 'var(--text-mid)',
+              borderRadius: '4px', cursor: 'pointer', transition: 'all 0.25s',
+              boxShadow: timeRange === key ? '0 0 12px rgba(0,212,255,0.3)' : 'none',
+            }}>{label}</button>
+          ))}
+        </div>
+        {/* 预警灯 */}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', background: 'var(--bg-panel)', border: '1px solid var(--border-line)', borderRadius: '6px', padding: '6px 16px', backdropFilter: 'blur(14px)' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-dim)', letterSpacing: '1px' }}>系统预警</span>
+          {alerts.map((a, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{
+                width: '10px', height: '10px', borderRadius: '50%',
+                background: a.level === 'green' ? PALETTE.success : a.level === 'yellow' ? PALETTE.warn : PALETTE.danger,
+                boxShadow: `0 0 8px ${a.level === 'green' ? PALETTE.success : a.level === 'yellow' ? PALETTE.warn : PALETTE.danger}`,
+                animation: a.count > 0 ? 'pulse 1.5s infinite' : 'none',
+              }}></div>
+              <span style={{ fontSize: '10px', color: 'var(--text-mid)' }}>{a.text}</span>
             </div>
-            <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '26px', fontWeight: 700, color: b.color, textShadow: `0 0 16px ${b.color}60`, lineHeight: 1.1 }}>
-              {b.value}<span style={{ fontSize: '12px', color: 'var(--text-dim)', marginLeft: '3px' }}>{b.unit}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-              <span style={{ fontSize: '9px', color: 'var(--text-mid)' }}>{b.desc}</span>
-              <span style={{ fontSize: '10px', color: b.trendUp ? 'var(--success)' : 'var(--danger)', fontFamily: 'Orbitron', fontWeight: 600 }}>{b.trendUp ? '↑' : '↓'} {b.trend}</span>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      {/* 主图区：中国地图 + 总功率仪表盘 + 业态轮播 */}
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1.8fr 0.8fr 1fr', gap: '10px', minHeight: 0 }}>
-        {/* 中国地图 */}
-        <div className="panel" style={{ ...panelStyle, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-          <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-          {/* 地图顶部标题栏 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', zIndex: 2 }}>
-            <span style={{ fontSize: '14px', color: 'var(--primary)', fontWeight: 700, letterSpacing: '2px' }}>🇨🇳 全国业态分布</span>
-            <div style={{ display: 'flex', gap: '12px', fontSize: '10px' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary)', boxShadow: '0 0 6px var(--primary)' }}></span>31省覆盖</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)', animation: 'pulse 2s infinite' }}></span>实时同步</span>
+      {/* 顶部 3 核心 KPI（玻璃拟态卡片） */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+        {[
+          { label: '总发电量', value: totalGen, unit: 'kWh', sub: '同比 ⬇ 3.2%', color: PALETTE.primary, icon: '⚡', trend: [42, 45, 48, 44, 50, 52, 55, 53, 58, 56, 60, 62] },
+          { label: '碳减排量', value: carbonReduce, unit: 'tCO₂', sub: '等效植树 ' + trees + ' 棵', color: PALETTE.success, icon: '🌱', trend: [10, 15, 20, 25, 30, 28, 35, 32, 38, 40, 42, 45] },
+          { label: '运营收益', value: '¥' + revenue, unit: '', sub: '同比 ⬆ 12.5%', color: PALETTE.warn, icon: '💰', trend: [200, 350, 500, 680, 820, 950, 1100, 1250, 1400, 1550, 1700, 1860] },
+        ].map((kpi, i) => {
+          const sparkCanvasRef = useRef<HTMLCanvasElement>(null);
+          useEffect(() => {
+            const canvas = sparkCanvasRef.current;
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d')!;
+            const W = 100, H = 28;
+            canvas.width = W * 2; canvas.height = H * 2; canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+            ctx.scale(2, 2); ctx.clearRect(0, 0, W, H);
+            const d = kpi.trend; const mx = Math.max(...d), mn = Math.min(...d); const range = mx - mn || 1;
+            const grad = ctx.createLinearGradient(0, 0, 0, H);
+            grad.addColorStop(0, kpi.color + '50'); grad.addColorStop(1, kpi.color + '00');
+            ctx.fillStyle = grad; ctx.beginPath(); ctx.moveTo(0, H);
+            d.forEach((v, j) => { const x = j / (d.length - 1) * W; const y = H - (v - mn) / range * (H - 4) - 2; ctx.lineTo(x, y); });
+            ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = kpi.color; ctx.lineWidth = 1.5; ctx.shadowColor = kpi.color; ctx.shadowBlur = 3;
+            ctx.beginPath();
+            d.forEach((v, j) => { const x = j / (d.length - 1) * W; const y = H - (v - mn) / range * (H - 4) - 2; j === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+            ctx.stroke();
+          }, []);
+          return (
+            <div key={i} className="panel" style={{ ...panelStyle, position: 'relative', overflow: 'hidden',
+              background: 'linear-gradient(135deg, rgba(8,18,38,0.9) 0%, rgba(10,25,50,0.85) 100%)',
+              border: '1px solid rgba(0,212,255,0.25)', boxShadow: '0 8px 32px rgba(0,0,0,0.5), inset 0 0 40px rgba(0,212,255,0.03)',
+            }}>
+              <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+              {/* 玻璃光效 */}
+              <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '100px', height: '100px', borderRadius: '50%', background: `radial-gradient(circle, ${kpi.color}15 0%, transparent 70%)`, pointerEvents: 'none' }}></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', letterSpacing: '2px' }}>
+                    <span style={{ fontSize: '16px' }}>{kpi.icon}</span>{kpi.label}
+                  </div>
+                  <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '32px', fontWeight: 700, color: kpi.color, textShadow: `0 0 20px ${kpi.color}50`, lineHeight: 1.1 }}>
+                    {kpi.value}<span style={{ fontSize: '14px', color: 'var(--text-dim)', marginLeft: '4px' }}>{kpi.unit}</span>
+                  </div>
+                  <div style={{ fontSize: '10px', color: kpi.color, marginTop: '4px', opacity: 0.8 }}>{kpi.sub}</div>
+                </div>
+                <canvas ref={sparkCanvasRef} style={{ marginTop: '4px' }}></canvas>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 主图区：中国地图(中心) + 左侧能源结构+电网负荷 + 右侧省份排行+环境效益 */}
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1.8fr 1fr', gap: '10px', minHeight: 0 }}>
+        {/* 左侧：能源结构 + 电网负荷 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div className="panel" style={{ ...panelStyle, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+            <div style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>📊 能源结构</div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <EChart option={energyMixOption} height="100%" style={{ height: '100%' }} />
             </div>
           </div>
-          {/* 地图底部数据条 */}
-          <div style={{ position: 'absolute', bottom: '8px', left: '16px', right: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', background: 'rgba(0,212,255,0.06)', borderRadius: '4px', backdropFilter: 'blur(8px)', zIndex: 2, border: '1px solid rgba(0,212,255,0.15)' }}>
-            <span style={{ fontSize: '10px', color: 'var(--text-mid)' }}>全国总负荷</span>
-            <span style={{ fontFamily: 'Orbitron', fontSize: '14px', color: 'var(--cyan-glow)', fontWeight: 700 }}>3,286 <span style={{ fontSize: '9px', color: 'var(--text-dim)' }}>MW</span></span>
-            <span style={{ fontSize: '10px', color: 'var(--success)' }}>↑ 5.2%</span>
-            <span style={{ fontSize: '10px', color: 'var(--text-mid)' }}>|</span>
-            <span style={{ fontSize: '10px', color: 'var(--text-mid)' }}>覆盖省份</span>
-            <span style={{ fontFamily: 'Orbitron', fontSize: '14px', color: 'var(--primary)', fontWeight: 700 }}>31</span>
-            <span style={{ fontSize: '10px', color: 'var(--text-mid)' }}>|</span>
-            <span style={{ fontSize: '10px', color: 'var(--text-mid)' }}>站点</span>
-            <span style={{ fontFamily: 'Orbitron', fontSize: '14px', color: 'var(--warn)', fontWeight: 700 }}>186</span>
+          <div className="panel" style={{ ...panelStyle, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+            <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>📈 电网负荷 (MW)</div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <EChart option={gridLoadOption} height="100%" style={{ height: '100%' }} />
+            </div>
+          </div>
+        </div>
+
+        {/* 中心：中国地图 */}
+        <div className="panel" style={{ ...panelStyle, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden',
+          background: 'linear-gradient(135deg, rgba(8,18,38,0.9) 0%, rgba(5,15,35,0.95) 100%)',
+          border: '1px solid rgba(0,212,255,0.3)', boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 0 60px rgba(0,212,255,0.04)',
+        }}>
+          <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+          {/* 地图标题 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', zIndex: 2 }}>
+            <span style={{ fontSize: '15px', color: 'var(--primary)', fontWeight: 700, letterSpacing: '2px' }}>🇨🇳 全国项目分布</span>
+            <div style={{ display: 'flex', gap: '10px', fontSize: '10px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ff8844', boxShadow: '0 0 6px #ff8844' }}></span>光伏</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: PALETTE.success, boxShadow: '0 0 6px ' + PALETTE.success }}></span>充电桩</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: PALETTE.primary, boxShadow: '0 0 6px ' + PALETTE.primary }}></span>楼宇节能</span>
+            </div>
+          </div>
+          {/* 地图底部数据栏 */}
+          <div style={{ position: 'absolute', bottom: '8px', left: '16px', right: '16px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '8px 16px', background: 'rgba(0,212,255,0.08)', borderRadius: '6px', backdropFilter: 'blur(12px)', zIndex: 2, border: '1px solid rgba(0,212,255,0.2)' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontFamily: 'Orbitron', fontSize: '18px', color: 'var(--cyan-glow)', fontWeight: 700, textShadow: '0 0 8px rgba(0,255,204,0.4)' }}>3,286<span style={{ fontSize: '9px', color: 'var(--text-dim)', marginLeft: '2px' }}>MW</span></div>
+              <div style={{ fontSize: '9px', color: 'var(--text-dim)' }}>全国总负荷</div>
+            </div>
+            <div style={{ width: '1px', height: '24px', background: 'rgba(0,212,255,0.2)' }}></div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontFamily: 'Orbitron', fontSize: '18px', color: 'var(--primary)', fontWeight: 700 }}>31<span style={{ fontSize: '9px', color: 'var(--text-dim)', marginLeft: '2px' }}>省</span></div>
+              <div style={{ fontSize: '9px', color: 'var(--text-dim)' }}>覆盖省份</div>
+            </div>
+            <div style={{ width: '1px', height: '24px', background: 'rgba(0,212,255,0.2)' }}></div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontFamily: 'Orbitron', fontSize: '18px', color: 'var(--warn)', fontWeight: 700 }}>186<span style={{ fontSize: '9px', color: 'var(--text-dim)', marginLeft: '2px' }}>站</span></div>
+              <div style={{ fontSize: '9px', color: 'var(--text-dim)' }}>站点总数</div>
+            </div>
+            <div style={{ width: '1px', height: '24px', background: 'rgba(0,212,255,0.2)' }}></div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontFamily: 'Orbitron', fontSize: '18px', color: 'var(--success)', fontWeight: 700 }}>98.5<span style={{ fontSize: '9px', color: 'var(--text-dim)', marginLeft: '2px' }}>%</span></div>
+              <div style={{ fontSize: '9px', color: 'var(--text-dim)' }}>在线率</div>
+            </div>
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             <ChinaMap height="100%" />
           </div>
         </div>
 
-        {/* 总功率仪表盘 */}
-        <div className="panel" style={{ ...panelStyle, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-          <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-          <div style={{ fontSize: '13px', color: 'var(--cyan-glow)', fontWeight: 600, marginBottom: '4px', letterSpacing: '1px' }}>⚡ 总功率监测</div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <EChart option={gaugeOption} height="100%" style={{ height: '100%' }} />
-          </div>
-          {/* 底部小指标 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', padding: '8px 0 0 0' }}>
-            <div style={{ textAlign: 'center', padding: '6px', background: 'rgba(0,255,136,0.06)', borderRadius: '4px', border: '1px solid rgba(0,255,136,0.15)' }}>
-              <div style={{ fontSize: '9px', color: 'var(--text-dim)' }}>今日减碳</div>
-              <div style={{ fontFamily: 'Orbitron', fontSize: '14px', color: 'var(--success)', fontWeight: 700 }}>0.45<span style={{ fontSize: '8px' }}>tCO₂</span></div>
-            </div>
-            <div style={{ textAlign: 'center', padding: '6px', background: 'rgba(0,212,255,0.06)', borderRadius: '4px', border: '1px solid rgba(0,212,255,0.15)' }}>
-              <div style={{ fontSize: '9px', color: 'var(--text-dim)' }}>等效植树</div>
-              <div style={{ fontFamily: 'Orbitron', fontSize: '14px', color: 'var(--primary)', fontWeight: 700 }}>13,906<span style={{ fontSize: '8px' }}>棵</span></div>
-            </div>
-          </div>
-        </div>
-
-        {/* 业态轮播展示 */}
-        <div className="panel" style={{ ...panelStyle, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-          <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600, letterSpacing: '1px' }}>📊 业态巡检</span>
-            <span style={{ fontSize: '9px', color: 'var(--text-dim)' }}>每3s轮播</span>
-          </div>
-          {/* 轮播内容 */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-              <div id="carousel-icon" style={{ fontSize: '32px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,212,255,0.08)', borderRadius: '8px', border: '1px solid rgba(0,212,255,0.2)' }}>⚡</div>
-              <div style={{ flex: 1 }}>
-                <div id="carousel-name" style={{ fontSize: '16px', fontWeight: 700, color: PALETTE.primary }}>配电网</div>
-                <div id="carousel-desc" style={{ fontSize: '10px', color: 'var(--text-mid)', marginTop: '2px' }}>4段母线 · 电压10kV</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
-              <span id="carousel-value" style={{ fontFamily: 'Orbitron', fontSize: '28px', fontWeight: 700, color: PALETTE.primary, textShadow: '0 0 12px rgba(0,212,255,0.4)' }}>52.0kW</span>
-              <span id="carousel-trend" style={{ fontFamily: 'Orbitron', fontSize: '12px', color: PALETTE.success, fontWeight: 600 }}>↑ +2.3%</span>
-            </div>
-            {/* sparkline */}
-            <canvas ref={sparkCanvasRef} width={200} height={50} style={{ width: '100%', height: '50px' }}></canvas>
-            {/* 进度指示器 */}
-            <div style={{ display: 'flex', gap: '4px', marginTop: '8px', justifyContent: 'center' }}>
-              {businesses.map((_, i) => (
-                <div key={i} style={{ width: '20px', height: '3px', borderRadius: '2px', background: 'rgba(0,212,255,0.15)' }}></div>
+        {/* 右侧：省份排行 + 环境效益 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {/* 省份绩效排行 */}
+          <div className="panel" style={{ ...panelStyle, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+            <div style={{ fontSize: '13px', color: 'var(--warn)', fontWeight: 600, marginBottom: '8px', letterSpacing: '1px' }}>🏆 省份绩效排行</div>
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {provinceRank.map((p, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', background: 'rgba(0,212,255,0.04)', borderRadius: '4px', border: '1px solid rgba(0,212,255,0.08)' }}>
+                  <span style={{ fontFamily: 'Orbitron', fontSize: '14px', fontWeight: 700, color: i < 3 ? p.color : 'var(--text-dim)', width: '20px', textAlign: 'center' }}>{i + 1}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-main)', flex: 1 }}>{p.name}</span>
+                  <div style={{ width: '60px', height: '6px', background: 'rgba(0,212,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${p.score}%`, background: p.color, boxShadow: `0 0 4px ${p.color}` }}></div>
+                  </div>
+                  <span style={{ fontFamily: 'Orbitron', fontSize: '11px', color: p.color, fontWeight: 600, width: '36px', textAlign: 'right' }}>{p.score}</span>
+                </div>
               ))}
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* 底部：24h 功率流堆叠面积 */}
-      <div style={{ minHeight: '200px' }}>
-        <div className="panel" style={{ ...panelStyle, display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--warn)', fontWeight: 600, letterSpacing: '1px' }}>📈 24h 各业态功率流 (kW)</span>
-            <div style={{ display: 'flex', gap: '10px', fontSize: '10px' }}>
-              <span style={{ color: 'var(--success)' }}>峰值 124.8 kW</span>
-              <span style={{ color: 'var(--text-dim)' }}>|</span>
-              <span style={{ color: 'var(--primary)' }}>均值 68.5 kW</span>
-              <span style={{ color: 'var(--text-dim)' }}>|</span>
-              <span style={{ color: 'var(--warn)' }}>谷值 28.3 kW</span>
+          {/* 环境效益 */}
+          <div className="panel" style={{ ...panelStyle, minHeight: '0' }}>
+            <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+            <div style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 600, marginBottom: '8px', letterSpacing: '1px' }}>🌱 环境效益</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div style={{ textAlign: 'center', padding: '8px', background: 'rgba(0,255,136,0.06)', borderRadius: '6px', border: '1px solid rgba(0,255,136,0.15)' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-dim)' }}>等效植树</div>
+                <div style={{ fontFamily: 'Orbitron', fontSize: '18px', color: 'var(--success)', fontWeight: 700, textShadow: '0 0 8px rgba(0,255,136,0.3)' }}>{trees.toLocaleString()}<span style={{ fontSize: '9px', color: 'var(--text-dim)' }}>棵</span></div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '8px', background: 'rgba(0,255,204,0.06)', borderRadius: '6px', border: '1px solid rgba(0,255,204,0.15)' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-dim)' }}>节约标煤</div>
+                <div style={{ fontFamily: 'Orbitron', fontSize: '18px', color: 'var(--cyan-glow)', fontWeight: 700 }}>{(0.155 * multiplier).toFixed(1)}<span style={{ fontSize: '9px', color: 'var(--text-dim)' }}>t</span></div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '8px', background: 'rgba(0,212,255,0.06)', borderRadius: '6px', border: '1px solid rgba(0,212,255,0.15)' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-dim)' }}>SO₂减排</div>
+                <div style={{ fontFamily: 'Orbitron', fontSize: '18px', color: 'var(--primary)', fontWeight: 700 }}>{(1.32 * multiplier).toFixed(0)}<span style={{ fontSize: '9px', color: 'var(--text-dim)' }}>kg</span></div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '8px', background: 'rgba(255,170,68,0.06)', borderRadius: '6px', border: '1px solid rgba(255,170,68,0.15)' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-dim)' }}>NOx减排</div>
+                <div style={{ fontFamily: 'Orbitron', fontSize: '18px', color: 'var(--warn)', fontWeight: 700 }}>{(0.71 * multiplier).toFixed(0)}<span style={{ fontSize: '9px', color: 'var(--text-dim)' }}>kg</span></div>
+              </div>
             </div>
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <EChart option={powerFlowOption} height="100%" style={{ height: '100%' }} />
           </div>
         </div>
       </div>
