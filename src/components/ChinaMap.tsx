@@ -91,6 +91,21 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       ? [[...PROVINCE_CENTERS[rippleProvince], data.find(d => d.name === rippleProvince)?.value || 0]]
       : [];
 
+    // 光束数据：所有省份 → 广东（数据汇入）
+    const guangdongCenter = PROVINCE_CENTERS['广东省'] || [113.28, 23.13];
+    const beamLines = data
+      .filter(d => d.name !== '广东省' && PROVINCE_CENTERS[d.name])
+      .map(d => {
+        const from = PROVINCE_CENTERS[d.name];
+        // 曲线控制点（在两点中间偏上，形成弧线）
+        const midLng = (from[0] + guangdongCenter[0]) / 2;
+        const midLat = (from[1] + guangdongCenter[1]) / 2 + Math.abs(from[0] - guangdongCenter[0]) * 0.15;
+        return {
+          coords: [from, [midLng, midLat], guangdongCenter],
+          value: d.value,
+        };
+      });
+
     return {
       tooltip: {
         ...commonTooltip,
@@ -138,6 +153,51 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           rippleEffect: { brushType: 'stroke', period: 2.5, scale: 6 },
           itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
+        },
+        // 光束飞线：各省 → 广东（数据汇入动效）
+        {
+          name: '数据汇入',
+          type: 'lines',
+          coordinateSystem: 'geo',
+          data: beamLines,
+          // 飞线轨迹（半透明渐变线）
+          lineStyle: {
+            color: '#00ffcc',
+            width: 1,
+            opacity: 0.4,
+            curveness: 0.3,
+            type: 'dashed',
+          },
+          // 飞行动效（尾迹粒子）
+          effect: {
+            show: true,
+            period: 4,        // 飞行周期4秒
+            trailLength: 0.4, // 尾迹长度
+            symbol: 'arrow',
+            symbolSize: 6,
+            color: '#00ffcc',
+          },
+          zlevel: 3,
+        },
+        // 广东终点闪烁
+        {
+          name: '数据中心',
+          type: 'effectScatter',
+          coordinateSystem: 'geo',
+          data: [[...guangdongCenter, 999]],
+          symbolSize: 18,
+          rippleEffect: { brushType: 'stroke', period: 3, scale: 4 },
+          itemStyle: { color: '#ff8800', shadowColor: '#ff8800', shadowBlur: 20 },
+          label: {
+            show: true,
+            formatter: '数据中心',
+            position: 'right',
+            color: '#ff8800',
+            fontSize: 10,
+            fontFamily: 'Rajdhani',
+            fontWeight: 700,
+          },
+          zlevel: 4,
         },
       ],
     };
