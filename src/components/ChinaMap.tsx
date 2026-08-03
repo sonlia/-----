@@ -17,7 +17,6 @@ interface ChinaMapProps {
   height?: number | string;
 }
 
-// 默认省级数据
 const DEFAULT_PROVINCES = [
   { name: '广东省', value: 186.5, pv: 32.5, charging: 48.2, ac: 28.6, grid: 52.0, building: 18.4 },
   { name: '江苏省', value: 165.2, pv: 28.3, charging: 35.6, ac: 22.1, grid: 45.8, building: 16.2 },
@@ -52,7 +51,7 @@ const DEFAULT_PROVINCES = [
   { name: '贵州省', value: 72.5, pv: 16.8, charging: 8.5, ac: 11.5, grid: 21.2, building: 7.2 },
 ];
 
-// 省会城市坐标（lng, lat）用于涟漪定位
+// 省会城市坐标
 const PROVINCE_CENTERS: Record<string, [number, number]> = {
   '广东省': [113.28, 23.13], '江苏省': [118.78, 32.06], '浙江省': [120.16, 30.27],
   '山东省': [117.0, 36.65], '北京市': [116.41, 39.90], '上海市': [121.47, 31.23],
@@ -71,7 +70,8 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
   const [registered, setRegistered] = useState(false);
   const chartRef = useRef<ReactECharts>(null);
   const carouselIdx = useRef(0);
-  const [highlightProvince, setHighlightProvince] = useState<string>('');
+  // 用于触发 option 重建
+  const [rippleProvince, setRippleProvince] = useState<string>('');
 
   useEffect(() => {
     fetch('/maps/china.json')
@@ -86,22 +86,9 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
   const option = useMemo(() => {
     if (!registered) return {};
     const maxVal = Math.max(...data.map(d => d.value));
-    // 为当前高亮省份设置特殊样式
-    const mapData = data.map(d => ({
-      ...d,
-      itemStyle: d.name === highlightProvince ? {
-        areaColor: '#00ffcc',
-        borderColor: '#00ffcc',
-        borderWidth: 2,
-        shadowColor: '#00ffcc',
-        shadowBlur: 20,
-      } : undefined,
-      label: d.name === highlightProvince ? { show: true, color: '#00ffcc', fontSize: 11, fontWeight: 700 } : undefined,
-    }));
-
-    // 涟漪点数据：高亮省份的中心坐标
-    const rippleData = highlightProvince && PROVINCE_CENTERS[highlightProvince]
-      ? [[...PROVINCE_CENTERS[highlightProvince], data.find(d => d.name === highlightProvince)?.value || 0]]
+    // 涟漪点数据
+    const rippleData = rippleProvince && PROVINCE_CENTERS[rippleProvince]
+      ? [[...PROVINCE_CENTERS[rippleProvince], data.find(d => d.name === rippleProvince)?.value || 0]]
       : [];
 
     return {
@@ -109,13 +96,14 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
         ...commonTooltip,
         trigger: 'item',
         enterable: false,
+        alwaysShowContent: false,
         formatter: (p: any) => {
           const d = p.data;
           if (!d || (!d.value && d.value !== 0)) return `${p.name}<br/>暂无数据`;
           if (typeof d.value === 'object') return `${p.name}`;
-          return `<div style="border:1px solid rgba(0,255,204,0.3);border-radius:4px;padding:4px 8px;">` +
-            `<b style="color:#00ffcc;font-size:13px;">${p.name}</b><br/>` +
-            `总负荷: <b style="color:#ffaa44">${d.value} MW</b><br/>` +
+          return `<div style="border:1px solid rgba(0,255,204,0.4);border-radius:6px;padding:6px 10px;background:rgba(8,18,38,0.95);">` +
+            `<b style="color:#00ffcc;font-size:14px;">${p.name}</b><br/>` +
+            `总负荷: <b style="color:#ffaa44;font-size:13px;">${d.value} MW</b><br/>` +
             `<span style="color:#00ff88">☀ 光伏: ${d.pv} MW</span><br/>` +
             `<span style="color:#00ffcc">🔌 充电桩: ${d.charging} MW</span><br/>` +
             `<span style="color:#ff4d6d">❄ 空调: ${d.ac} MW</span><br/>` +
@@ -136,43 +124,60 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
         map: 'china', roam: true, zoom: 1.2,
         label: { show: false },
         itemStyle: { areaColor: '#0a1f3d', borderColor: PALETTE.primary, borderWidth: 0.8, shadowColor: PALETTE.primary, shadowBlur: 6 },
+        // emphasis 样式 = 鼠标悬停效果（轮播时通过 dispatchAction 触发）
         emphasis: {
-          label: { show: true, color: PALETTE.cyanGlow, fontSize: 11, fontFamily: 'Rajdhani', fontWeight: 700 },
-          itemStyle: { areaColor: '#1a4a7a', borderColor: PALETTE.cyanGlow, borderWidth: 1.5, shadowBlur: 16, shadowColor: PALETTE.cyanGlow },
+          label: { show: true, color: '#00ffcc', fontSize: 12, fontFamily: 'Rajdhani', fontWeight: 700 },
+          itemStyle: { areaColor: '#00ffcc', borderColor: '#00ffcc', borderWidth: 2, shadowBlur: 20, shadowColor: '#00ffcc' },
         },
       },
       series: [
-        { name: '省级负荷', type: 'map', geoIndex: 0, data: mapData },
+        { name: '省级负荷', type: 'map', geoIndex: 0, data: data },
         {
           name: '脉冲', type: 'effectScatter', coordinateSystem: 'geo',
-          data: rippleData, symbolSize: 12,
-          rippleEffect: { brushType: 'stroke', period: 2, scale: 5 },
-          itemStyle: { color: PALETTE.cyanGlow, shadowColor: PALETTE.cyanGlow, shadowBlur: 15 },
-          label: { show: true, formatter: (p: any) => '', position: 'right' },
+          data: rippleData, symbolSize: 14,
+          rippleEffect: { brushType: 'stroke', period: 2.5, scale: 6 },
+          itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
         },
       ],
     };
-  }, [registered, data, highlightProvince]);
+  }, [registered, data, rippleProvince]);
 
-  // 周期性轮播省份
+  // 周期性轮播：模拟鼠标 hover 效果，8秒轮换
   useEffect(() => {
     if (!registered) return;
     const interval = setInterval(() => {
+      const chart = chartRef.current?.getEchartsInstance();
+      if (!chart) return;
+
       const idx = carouselIdx.current % data.length;
       const province = data[idx];
       carouselIdx.current++;
-      setHighlightProvince(province.name);
 
-      // 显示 tooltip
-      const chart = chartRef.current?.getEchartsInstance();
-      if (chart) {
-        const center = PROVINCE_CENTERS[province.name];
-        if (center) {
-          chart.dispatchAction({ type: 'showTip', seriesIndex: 1, dataIndex: 0 });
-        }
-      }
-    }, 3000);
+      // 1. 先取消上一个高亮
+      chart.dispatchAction({ type: 'downplay' });
+      // 2. 隐藏上一个 tooltip
+      chart.dispatchAction({ type: 'hideTip' });
+
+      // 延迟100ms后高亮新的（让前一个先消失）
+      setTimeout(() => {
+        // 3. 高亮当前省份（触发 emphasis 样式 = 模拟鼠标悬停）
+        chart.dispatchAction({
+          type: 'highlight',
+          seriesIndex: 0,
+          name: province.name,
+        });
+        // 4. 显示 tooltip
+        chart.dispatchAction({
+          type: 'showTip',
+          seriesIndex: 0,
+          name: province.name,
+        });
+        // 5. 更新涟漪效果
+        setRippleProvince(province.name);
+      }, 100);
+    }, 8000); // 8秒轮换
+
     return () => clearInterval(interval);
   }, [registered, data]);
 
@@ -184,5 +189,5 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
     );
   }
 
-  return <ReactECharts ref={chartRef} option={option} notMerge={true} lazyUpdate={true} style={{ height: typeof height === 'number' ? `${height}px` : height, width: '100%' }} opts={{ renderer: 'canvas' }} />;
+  return <ReactECharts ref={chartRef} option={option} notMerge={false} lazyUpdate={true} style={{ height: typeof height === 'number' ? `${height}px` : height, width: '100%' }} opts={{ renderer: 'canvas' }} />;
 }
