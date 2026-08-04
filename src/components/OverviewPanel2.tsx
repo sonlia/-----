@@ -79,24 +79,24 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
     <div style={{ position: 'absolute', top: '120px', left: '20px', right: '20px', bottom: '20px', display: 'flex', flexDirection: 'column', gap: '14px', zIndex: 40, overflow: 'hidden' }}>
       {/* 流光动态背景 */}
       <div className="flow-bg"></div>
-      {/* 飘浮粒子（固定位置避免SSR hydration mismatch） - 参考全息数据可视化图，更大更亮 */}
+      {/* 飘浮粒子（固定位置避免SSR hydration mismatch） - 透明度降低40% */}
       {[
-        { left: '12%', top: '15%', delay: '0s', dur: '4s', c: 'rgba(0,255,204,0.85)', size: 12 },
-        { left: '85%', top: '22%', delay: '0.5s', dur: '5s', c: 'rgba(0,212,255,0.75)', size: 10 },
-        { left: '45%', top: '8%', delay: '1s', dur: '3.5s', c: 'rgba(255,170,68,0.7)', size: 14 },
-        { left: '20%', top: '55%', delay: '1.5s', dur: '4.5s', c: 'rgba(0,255,204,0.85)', size: 11 },
-        { left: '70%', top: '45%', delay: '2s', dur: '5s', c: 'rgba(0,212,255,0.75)', size: 9 },
-        { left: '90%', top: '70%', delay: '2.5s', dur: '3.8s', c: 'rgba(255,136,0,0.7)', size: 13 },
-        { left: '15%', top: '80%', delay: '3s', dur: '4.2s', c: 'rgba(0,255,204,0.85)', size: 10 },
-        { left: '55%', top: '85%', delay: '3.5s', dur: '5s', c: 'rgba(0,212,255,0.75)', size: 12 },
-        { left: '35%', top: '35%', delay: '4s', dur: '4s', c: 'rgba(255,170,68,0.7)', size: 8 },
-        { left: '75%', top: '15%', delay: '4.5s', dur: '5.5s', c: 'rgba(0,255,204,0.85)', size: 14 },
-        { left: '5%', top: '40%', delay: '5s', dur: '3.5s', c: 'rgba(0,212,255,0.75)', size: 9 },
-        { left: '60%', top: '60%', delay: '5.5s', dur: '4.5s', c: 'rgba(255,136,0,0.7)', size: 11 },
-        { left: '25%', top: '25%', delay: '6s', dur: '4.8s', c: 'rgba(0,255,204,0.85)', size: 10 },
-        { left: '80%', top: '50%', delay: '6.5s', dur: '4.2s', c: 'rgba(0,212,255,0.75)', size: 13 },
-        { left: '40%', top: '65%', delay: '7s', dur: '5.2s', c: 'rgba(255,170,68,0.7)', size: 9 },
-        { left: '65%', top: '30%', delay: '7.5s', dur: '4.5s', c: 'rgba(0,255,204,0.85)', size: 11 },
+        { left: '12%', top: '15%', delay: '0s', dur: '4s', c: 'rgba(0,255,204,0.51)', size: 12 },
+        { left: '85%', top: '22%', delay: '0.5s', dur: '5s', c: 'rgba(0,212,255,0.45)', size: 10 },
+        { left: '45%', top: '8%', delay: '1s', dur: '3.5s', c: 'rgba(255,170,68,0.42)', size: 14 },
+        { left: '20%', top: '55%', delay: '1.5s', dur: '4.5s', c: 'rgba(0,255,204,0.51)', size: 11 },
+        { left: '70%', top: '45%', delay: '2s', dur: '5s', c: 'rgba(0,212,255,0.45)', size: 9 },
+        { left: '90%', top: '70%', delay: '2.5s', dur: '3.8s', c: 'rgba(255,136,0,0.42)', size: 13 },
+        { left: '15%', top: '80%', delay: '3s', dur: '4.2s', c: 'rgba(0,255,204,0.51)', size: 10 },
+        { left: '55%', top: '85%', delay: '3.5s', dur: '5s', c: 'rgba(0,212,255,0.45)', size: 12 },
+        { left: '35%', top: '35%', delay: '4s', dur: '4s', c: 'rgba(255,170,68,0.42)', size: 8 },
+        { left: '75%', top: '15%', delay: '4.5s', dur: '5.5s', c: 'rgba(0,255,204,0.51)', size: 14 },
+        { left: '5%', top: '40%', delay: '5s', dur: '3.5s', c: 'rgba(0,212,255,0.45)', size: 9 },
+        { left: '60%', top: '60%', delay: '5.5s', dur: '4.5s', c: 'rgba(255,136,0,0.42)', size: 11 },
+        { left: '25%', top: '25%', delay: '6s', dur: '4.8s', c: 'rgba(0,255,204,0.51)', size: 10 },
+        { left: '80%', top: '50%', delay: '6.5s', dur: '4.2s', c: 'rgba(0,212,255,0.45)', size: 13 },
+        { left: '40%', top: '65%', delay: '7s', dur: '5.2s', c: 'rgba(255,170,68,0.42)', size: 9 },
+        { left: '65%', top: '30%', delay: '7.5s', dur: '4.5s', c: 'rgba(0,255,204,0.51)', size: 11 },
       ].map((p, i) => (
         <div key={i} className="float-particle" style={{
           left: p.left, top: p.top, animationDelay: p.delay, animationDuration: p.dur, color: p.c, width: p.size + 'px', height: p.size + 'px',

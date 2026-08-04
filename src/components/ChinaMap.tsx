@@ -158,59 +158,52 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
         },
-        // 光束飞线：各省 → 广东（参考全息图，亮头+渐变拖尾+持续流星雨）
+        // 光束飞线：各省 → 广东（头大尾细彗星状，运动轨迹完全隐藏）
         {
           name: '数据汇入',
           type: 'lines',
           coordinateSystem: 'geo',
           data: beamLines,
-          // 飞线轨迹（路径较亮，配合 effect 的拖尾形成"管道"感）
+          // 飞线轨迹完全透明（运动轨迹隐藏，只显示流星本体）
           lineStyle: {
-            color: {
-              type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
-              colorStops: [
-                { offset: 0, color: 'rgba(0, 255, 204, 0.02)' },
-                { offset: 0.5, color: 'rgba(0, 212, 255, 0.18)' },
-                { offset: 1, color: 'rgba(0, 255, 204, 0.35)' },
-              ],
-            },
-            width: 1.2,
+            color: 'transparent',
+            width: 0,
             curveness: 0.3,
-            shadowColor: 'rgba(0, 212, 255, 0.5)',
-            shadowBlur: 8,
           },
-          // 流星飞行动效：头大且亮，长拖尾形成动态流光感
+          // 流星飞行动效：头大且亮，尾巴细且渐变透明
           effect: {
             show: true,
             period: 4,             // 默认飞行周期（每条线 effect.period 覆盖）
-            trailLength: 0.5,      // 加长拖尾，形成流光轨迹
-            // 水滴形 symbol：头部为圆形（粗），尾部收敛为尖点（细）
-            symbol: 'path://M 12,0 Q 5,-7 -5,-6 Q -18,-3 -25,0 Q -18,3 -5,6 Q 5,7 12,0 Z',
-            symbolSize: 14,        // 头部更大更亮
-            color: '#00ffcc',      // 流星本体高亮
+            trailLength: 0.6,      // 较长拖尾，但通过 symbol 形状让尾部收细
+            // 水滴形 symbol：头部大圆形（饱满），尾部急速收尖
+            symbol: 'path://M 14,0 Q 8,-8 -2,-7 Q -16,-4 -28,0 Q -16,4 -2,7 Q 8,8 14,0 Z',
+            symbolSize: 16,        // 头部大且亮
+            color: '#00ffcc',      // 流星本体高亮青色
             // trailLength 会自动生成从亮到透明的渐变拖尾
           },
           zlevel: 3,
         },
-        // 第二层光束：橙色辅流，错峰发射，与青色形成冷暖对比（参考图特征）
+        // 第二层光束：橙色辅流，错峰发射，与青色形成冷暖对比
         {
           name: '数据汇入-辅流',
           type: 'lines',
           coordinateSystem: 'geo',
-          data: beamLines.filter((_, i) => i % 2 === 0),  // 取一半线路发射橙色辅流
+          data: beamLines.filter((_, i) => i % 2 === 0),
           polyline: false,
+          // 轨迹完全隐藏
           lineStyle: {
-            color: 'transparent',  // 辅流不显示路径线，只显示流星本体
+            color: 'transparent',
             width: 0,
             curveness: 0.3,
           },
           effect: {
             show: true,
             period: 5.5,
-            trailLength: 0.45,
-            symbol: 'path://M 10,0 Q 4,-6 -4,-5 Q -15,-3 -22,0 Q -15,3 -4,5 Q 4,6 10,0 Z',
-            symbolSize: 11,
-            color: 'rgba(255, 170, 68, 0.9)',
+            trailLength: 0.55,
+            // 水滴形 symbol：头部大，尾部尖
+            symbol: 'path://M 12,0 Q 6,-7 -2,-6 Q -14,-3 -24,0 Q -14,3 -2,6 Q 6,7 12,0 Z',
+            symbolSize: 13,
+            color: 'rgba(255, 170, 68, 0.95)',
           },
           zlevel: 3,
         },
