@@ -176,7 +176,8 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
         text: ['高', '低'], realtime: false, calculable: true,
         left: 10, bottom: 10,
         textStyle: { color: PALETTE.textMid, fontSize: 9, fontFamily: 'Rajdhani' },
-        inRange: { color: ['#0a1f3d', '#0d3a66', PALETTE.primaryDeep, PALETTE.primary, PALETTE.cyanGlow] },
+        // 默认省份颜色统一用深蓝色系，让选中橙色高亮更明显
+        inRange: { color: ['#0a1f3d', '#0d3a66', '#0d3a66', '#0d3a66', '#0d3a66'] },
         itemHeight: 80, itemWidth: 12,
       },
       geo: {
@@ -190,7 +191,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           shadowColor: PALETTE.primary,
           shadowBlur: 6,
         },
-        // 鼠标悬停样式（用户主动 hover 时触发，轮播时通过 dispatchAction highlight 触发）
+        // 鼠标悬停样式 / 轮播选中样式（强制橙色高亮，覆盖 visualMap）
         emphasis: {
           label: {
             show: true,
@@ -202,11 +203,11 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             textShadowBlur: 4,
           },
           itemStyle: {
-            areaColor: '#ffaa44',        // 悬停时填充橙色（和流星呼应）
+            areaColor: '#ff8800',        // 选中省份亮橙色（强制覆盖 visualMap）
             borderColor: '#ffffff',       // 白色高亮边
             borderWidth: 2,
-            shadowBlur: 25,
-            shadowColor: '#ffaa44',
+            shadowBlur: 30,
+            shadowColor: '#ff8800',
           },
         },
         // 鼠标选中状态（点击）
@@ -216,9 +217,31 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
         },
         // 允许地图响应鼠标事件
         silent: false,
+        // selectedMode 可让点击保持选中
+        selectedMode: false,
       },
       series: [
-        { name: '省级负荷', type: 'map', geoIndex: 0, data: data },
+        {
+          name: '省级负荷', type: 'map', geoIndex: 0, data: data,
+          // series 层也配置 emphasis，确保高亮时 areaColor 生效（覆盖 visualMap）
+          emphasis: {
+            label: {
+              show: true,
+              color: '#ffffff',
+              fontSize: 13,
+              fontWeight: 700,
+              textShadowColor: 'rgba(0,0,0,0.6)',
+              textShadowBlur: 4,
+            },
+            itemStyle: {
+              areaColor: '#ff8800',
+              borderColor: '#ffffff',
+              borderWidth: 2,
+              shadowBlur: 30,
+              shadowColor: '#ff8800',
+            },
+          },
+        },
         {
           name: '脉冲', type: 'effectScatter', coordinateSystem: 'geo',
           data: rippleData, symbolSize: 14,
