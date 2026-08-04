@@ -230,7 +230,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
         },
-        // 光束飞线：各省 → 广东（线条重点在广东，终点更亮更粗）
+        // 光束飞线：各省 → 广东（带动画效果，流星从各省飞到广东）
         {
           name: '数据汇入',
           type: 'lines',
@@ -247,10 +247,19 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
                 { offset: 1, color: 'rgba(255, 136, 0, 1)' },        // 终点（广东）最亮
               ],
             },
-            width: 2,            // 加粗（1.5→2）
+            width: 2,
             curveness: 0.3,
-            shadowColor: 'rgba(255, 136, 0, 0.8)',  // 终点橙色光晕
-            shadowBlur: 10,      // 加大光晕（6→10）
+            shadowColor: 'rgba(255, 136, 0, 0.8)',
+            shadowBlur: 10,
+          },
+          // 流星飞行动效：从各省起点飞到广东终点
+          effect: {
+            show: true,
+            period: 6,             // 飞行周期 6 秒（确保走完整条路径）
+            trailLength: 0.4,      // 拖尾长度（0.4 = 40% 路径长）
+            symbol: 'circle',      // 圆点
+            symbolSize: 5,         // 圆点大小
+            color: '#ffaa44',      // 流星颜色（橙色）
           },
           zlevel: 3,
         },
