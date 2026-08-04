@@ -226,26 +226,27 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
         },
-        // 光束飞线：各省 → 广东（简单线条，无流星 effect）
+        // 光束飞线：各省 → 广东（线条重点在广东，终点更亮更粗）
         {
           name: '数据汇入',
           type: 'lines',
           coordinateSystem: 'geo',
           data: beamLines,
-          // 飞线轨迹：渐变橙色线条，从起点（淡）到广东（亮）
+          // 飞线轨迹：渐变橙色线条，终点（广东）更亮更粗
           lineStyle: {
             color: {
               type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
               colorStops: [
-                { offset: 0, color: 'rgba(255, 170, 68, 0.15)' },   // 起点淡
-                { offset: 0.5, color: 'rgba(255, 170, 68, 0.5)' },   // 中间
-                { offset: 1, color: 'rgba(255, 136, 0, 0.9)' },      // 终点亮
+                { offset: 0, color: 'rgba(255, 170, 68, 0.1)' },    // 起点很淡
+                { offset: 0.4, color: 'rgba(255, 170, 68, 0.35)' },  // 中段淡
+                { offset: 0.8, color: 'rgba(255, 170, 68, 0.85)' },  // 接近终点亮
+                { offset: 1, color: 'rgba(255, 136, 0, 1)' },        // 终点（广东）最亮
               ],
             },
-            width: 1.5,
+            width: 2,            // 加粗（1.5→2）
             curveness: 0.3,
-            shadowColor: 'rgba(255, 170, 68, 0.6)',
-            shadowBlur: 6,
+            shadowColor: 'rgba(255, 136, 0, 0.8)',  // 终点橙色光晕
+            shadowBlur: 10,      // 加大光晕（6→10）
           },
           zlevel: 3,
         },

@@ -385,7 +385,7 @@ canvas { display: block; }
   filter: blur(0.3px);
 }
 
-/* ====== 行星光晕背景（位于地图中心，科幻全息感） ====== */
+/* ====== 行星光晕背景（椭圆形，位于地图中下部，上方辐射光束） ====== */
 @keyframes haloRotate {
   from { transform: translate(-50%, -50%) rotate(0deg); }
   to { transform: translate(-50%, -50%) rotate(360deg); }
@@ -398,10 +398,15 @@ canvas { display: block; }
   0%, 100% { opacity: 0.85; transform: translate(-50%, -50%) scale(1); }
   50% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
 }
+@keyframes godraysPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
 
 .planet-halo {
   position: absolute;
-  top: 50%;
+  /* 位置：水平居中，垂直中下（地图中心偏下，呼应广东位置） */
+  top: 60%;
   left: 50%;
   width: 0;
   height: 0;
@@ -409,22 +414,45 @@ canvas { display: block; }
   pointer-events: none;
 }
 
-/* 光晕核心 —— 中心实心亮光盘 */
+/* 上方垂直辐射光束（God Rays） —— 从光晕中心向上扩散 */
+.halo-godrays {
+  position: absolute;
+  /* 光束从光晕中心向上延伸 */
+  bottom: 0;
+  left: 50%;
+  width: 200px;
+  height: 400px;
+  transform: translate(-50%, 0);
+  background: linear-gradient(
+    to top,
+    rgba(0, 255, 204, 0.5) 0%,
+    rgba(0, 212, 255, 0.3) 30%,
+    rgba(0, 136, 255, 0.15) 60%,
+    transparent 100%
+  );
+  /* 椭圆形扩散（中间宽，两端窄） */
+  -webkit-mask: radial-gradient(ellipse 100px 200px at bottom, black 0%, transparent 80%);
+  mask: radial-gradient(ellipse 100px 200px at bottom, black 0%, transparent 80%);
+  filter: blur(8px);
+  animation: godraysPulse 4s ease-in-out infinite;
+}
+
+/* 光晕核心 —— 椭圆实心亮光盘（宽:高 ≈ 2:1，扁圆形） */
 .halo-core {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 60px;
-  height: 60px;
+  width: 180px;
+  height: 90px;             /* 高度是宽度的一半，形成扁椭圆 */
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(0, 255, 204, 0.9) 0%, rgba(0, 212, 255, 0.6) 40%, rgba(0, 136, 255, 0.2) 70%, transparent 100%);
-  filter: blur(2px);
+  background: radial-gradient(ellipse, rgba(0, 255, 204, 0.9) 0%, rgba(0, 212, 255, 0.6) 40%, rgba(0, 136, 255, 0.2) 70%, transparent 100%);
+  filter: blur(3px);
   transform: translate(-50%, -50%);
   animation: haloBreath 4s ease-in-out infinite;
   box-shadow: 0 0 60px rgba(0, 255, 204, 0.6), 0 0 120px rgba(0, 212, 255, 0.4);
 }
 
-/* 多层同心圆环 */
+/* 多层同心椭圆环（宽:高 ≈ 2:1） */
 .halo-ring {
   position: absolute;
   top: 50%;
@@ -435,52 +463,21 @@ canvas { display: block; }
   transform: translate(-50%, -50%);
 }
 .halo-ring-1 {
-  width: 180px; height: 180px;
+  width: 320px; height: 160px;
   border-style: dashed;
   border-color: rgba(0, 255, 204, 0.5);
   animation: haloRotate 20s linear infinite;
 }
 .halo-ring-2 {
-  width: 320px; height: 320px;
+  width: 520px; height: 260px;
   border-color: rgba(0, 212, 255, 0.35);
   animation: haloRotateReverse 30s linear infinite;
 }
 .halo-ring-3 {
-  width: 480px; height: 480px;
+  width: 760px; height: 380px;
   border-style: dotted;
   border-color: rgba(0, 136, 255, 0.25);
   animation: haloRotate 45s linear infinite;
-}
-
-/* 外圈刻度环 —— 用 conic-gradient 模拟刻度 */
-.halo-ticks {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 560px;
-  height: 560px;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0deg, transparent 4deg,
-    rgba(0, 255, 204, 0.4) 4deg, rgba(0, 255, 204, 0.4) 5deg,
-    transparent 5deg, transparent 9deg,
-    rgba(0, 255, 204, 0.4) 9deg, rgba(0, 255, 204, 0.4) 10deg,
-    transparent 10deg, transparent 14deg,
-    rgba(0, 255, 204, 0.4) 14deg, rgba(0, 255, 204, 0.4) 15deg,
-    transparent 15deg, transparent 19deg,
-    rgba(0, 255, 204, 0.4) 19deg, rgba(0, 255, 204, 0.4) 20deg,
-    transparent 20deg, transparent 24deg,
-    rgba(0, 255, 204, 0.4) 24deg, rgba(0, 255, 204, 0.4) 25deg,
-    transparent 25deg, transparent 29deg,
-    rgba(0, 255, 204, 0.4) 29deg, rgba(0, 255, 204, 0.4) 30deg,
-    transparent 30deg
-  );
-  -webkit-mask: radial-gradient(circle, transparent 270px, black 272px, black 280px, transparent 282px);
-  mask: radial-gradient(circle, transparent 270px, black 272px, black 280px, transparent 282px);
-  transform: translate(-50%, -50%);
-  animation: haloRotate 60s linear infinite;
-  opacity: 0.6;
 }
 
 /* 数据中心脉冲光环 */
