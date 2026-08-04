@@ -226,32 +226,26 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
         },
-        // 光束飞线：各省 → 广东（只保留橙色流星，长拖尾，不透明）
+        // 光束飞线：各省 → 广东（简单线条，无流星 effect）
         {
           name: '数据汇入',
           type: 'lines',
           coordinateSystem: 'geo',
           data: beamLines,
+          // 飞线轨迹：渐变橙色线条，从起点（淡）到广东（亮）
           lineStyle: {
-            color: 'transparent',
-            width: 0,
+            color: {
+              type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
+              colorStops: [
+                { offset: 0, color: 'rgba(255, 170, 68, 0.15)' },   // 起点淡
+                { offset: 0.5, color: 'rgba(255, 170, 68, 0.5)' },   // 中间
+                { offset: 1, color: 'rgba(255, 136, 0, 0.9)' },      // 终点亮
+              ],
+            },
+            width: 1.5,
             curveness: 0.3,
-          },
-          effect: {
-            show: true,
-            period: 6,             // 周期，确保走完整条路径
-            trailLength: 0.35,    // 拖尾衰减范围缩短（0.5→0.35），整体更亮不透明
-            symbol: 'circle',
-            symbolSize: 5,        // 圆点加大（4→5），头部更亮
-            // 纯色不带 alpha，让流星更不透明（看清楚）
-            color: '#ffaa44',
-          },
-          itemStyle: {
-            color: '#ffaa44',
-            borderColor: '#ffffff',   // 白色边
-            borderWidth: 1,
-            shadowColor: '#ffaa44',
-            shadowBlur: 12,           // 光晕加大（8→12），拖尾余光更明显
+            shadowColor: 'rgba(255, 170, 68, 0.6)',
+            shadowBlur: 6,
           },
           zlevel: 3,
         },

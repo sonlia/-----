@@ -217,6 +217,14 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
           border: '1px solid rgba(0,212,255,0.3)', boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 0 60px rgba(0,212,255,0.04)',
         }}>
           <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
+          {/* 行星光晕背景 —— 位于地图中心，多层同心圆 + 刻度 + 旋转 */}
+          <div className="planet-halo">
+            <div className="halo-core"></div>
+            <div className="halo-ring halo-ring-1"></div>
+            <div className="halo-ring halo-ring-2"></div>
+            <div className="halo-ring halo-ring-3"></div>
+            <div className="halo-ticks"></div>
+          </div>
           {/* 地图标题 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', zIndex: 2 }}>
             <span style={{ fontSize: '15px', color: 'var(--primary)', fontWeight: 700, letterSpacing: '2px' }}>🇨🇳 全国项目分布</span>
