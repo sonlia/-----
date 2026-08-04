@@ -157,7 +157,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
         },
-        // 光束飞线：各省 → 广东（小圆点 + 长拖尾 + 白边 + 拖尾透明度衰减变慢）
+        // 光束飞线：各省 → 广东（只保留橙色流星，长拖尾，不透明）
         {
           name: '数据汇入',
           type: 'lines',
@@ -170,50 +170,19 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           },
           effect: {
             show: true,
-            period: 6,             // 周期加长，确保走完整条路径
-            trailLength: 0.3,     // 拖尾占路径30%，头部能完整到达广东后再重置
+            period: 6,             // 周期，确保走完整条路径
+            trailLength: 0.5,     // 拖尾加长（0.3→0.5），但不超过0.7避免中途重置
             symbol: 'circle',
-            symbolSize: 3,
-            color: 'rgba(0, 255, 204, 0.9)',
-          },
-          // 圆点白色描边 + 拖尾透明度衰减变慢（通过多次叠加 effect 实现）
-          // ECharts effect 的 trailLength 拖尾透明度衰减是固定的（线性），
-          // 要让"尾巴不那么透明"，只能通过 color 加 alpha 让整体更亮
-          itemStyle: {
-            color: '#00ffcc',
-            borderColor: '#ffffff',   // 白色边
-            borderWidth: 1,           // 边宽 1px
-            shadowColor: '#00ffcc',
-            shadowBlur: 6,
-          },
-          zlevel: 3,
-        },
-        // 第二层光束：橙色辅流
-        {
-          name: '数据汇入-辅流',
-          type: 'lines',
-          coordinateSystem: 'geo',
-          data: beamLines.filter((_, i) => i % 2 === 0),
-          polyline: false,
-          lineStyle: {
-            color: 'transparent',
-            width: 0,
-            curveness: 0.3,
-          },
-          effect: {
-            show: true,
-            period: 7,             // 橙色周期略长，错峰
-            trailLength: 0.3,
-            symbol: 'circle',
-            symbolSize: 2.5,
-            color: 'rgba(255, 170, 68, 0.9)',
+            symbolSize: 4,        // 圆点稍大
+            // 用纯色不带 alpha，让流星更不透明（看清楚）
+            color: '#ffaa44',
           },
           itemStyle: {
             color: '#ffaa44',
-            borderColor: '#ffffff',
+            borderColor: '#ffffff',   // 白色边
             borderWidth: 1,
             shadowColor: '#ffaa44',
-            shadowBlur: 5,
+            shadowBlur: 8,            // 光晕加大
           },
           zlevel: 3,
         },
