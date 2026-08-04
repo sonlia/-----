@@ -131,19 +131,19 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       : [];
 
     // 光束数据：所有省份 → 广东（数据汇入）
-    // 每条线起点是各省会，终点统一是广东中心 [113.28, 23.13]
-    // 用 2 点 coords + curveness 控制弧度，避免 3 点 coords 渲染异常
+    // 每条线随机 delay 错峰发射，不等上一个到广东才发射
     const guangdongCenter: [number, number] = [113.28, 23.13];
     const beamLines = data
       .filter(d => d.name !== '广东省' && PROVINCE_CENTERS[d.name])
       .map((d, idx) => {
         const from = PROVINCE_CENTERS[d.name];
+        // 随机错峰发射：0~6s 之间随机延迟（周期 6s 内随时发射）
+        // 不等上一个到广东，形成持续不断的流星雨
+        const randomDelay = (idx * 0.7) % 6;
         return {
-          // 2 点 coords：[起点, 终点]，终点固定是广东
           coords: [from, guangdongCenter],
           value: d.value,
-          // 错峰发射：每条线延迟 (idx % 5) * 1.2s 发射
-          effect: { delay: (idx % 5) * 1.2 },
+          effect: { delay: randomDelay },
         };
       });
 
@@ -173,41 +173,14 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       geo: {
         map: 'china', roam: true, zoom: 1.2,
         label: { show: false },
-        // 地图省份默认样式
-        itemStyle: {
-          areaColor: '#0d3a66',
-          borderColor: PALETTE.primary,
-          borderWidth: 0.8,
-          shadowColor: PALETTE.primary,
-          shadowBlur: 6,
-        },
-        // 鼠标悬停样式 / 轮播选中样式（强制橙色高亮）
-        emphasis: {
-          label: {
-            show: true,
-            color: '#ffffff',
-            fontSize: 13,
-            fontFamily: 'Rajdhani',
-            fontWeight: 700,
-            textShadowColor: 'rgba(0,0,0,0.6)',
-            textShadowBlur: 4,
-          },
-          itemStyle: {
-            areaColor: '#ff8800',        // 选中省份亮橙色
-            borderColor: '#ffffff',       // 白色高亮边
-            borderWidth: 2,
-            shadowBlur: 30,
-            shadowColor: '#ff8800',
-          },
-        },
-        // 允许地图响应鼠标事件
+        // 不在 geo 设 itemStyle —— geo.itemStyle 会覆盖 series map data 的 itemStyle
+        // 默认样式改在 series data 每个省份上设置，这样高亮时才能生效
         silent: false,
       },
       series: [
         {
           name: '省级负荷', type: 'map', geoIndex: 0,
-          // 数据驱动高亮：根据 highlightedProvince 动态设置每个省份的 itemStyle
-          // 这比 dispatchAction highlight 可靠（emphasis 在 geo+series map 组合下经常失效）
+          // 数据驱动高亮：每个省份默认深蓝，高亮省份橙色
           data: data.map(d => ({
             name: d.name,
             value: d.value,
@@ -216,14 +189,20 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             ac: d.ac,
             grid: d.grid,
             building: d.building,
-            // 当前轮播/hover 的省份：橙色高亮 + 白边 + 光晕
+            // 当前轮播/hover 的省份：橙色高亮 + 白边 + 光晕；其他省份默认深蓝
             itemStyle: d.name === highlightedProvince ? {
               areaColor: '#ff8800',
               borderColor: '#ffffff',
               borderWidth: 2,
               shadowBlur: 30,
               shadowColor: '#ff8800',
-            } : undefined,
+            } : {
+              areaColor: '#0d3a66',
+              borderColor: PALETTE.primary,
+              borderWidth: 0.8,
+              shadowColor: PALETTE.primary,
+              shadowBlur: 6,
+            },
             // 高亮省份显示标签
             label: d.name === highlightedProvince ? {
               show: true,
@@ -232,26 +211,8 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
               fontWeight: 700,
               textShadowColor: 'rgba(0,0,0,0.6)',
               textShadowBlur: 4,
-            } : undefined,
+            } : { show: false },
           })),
-          // series 层 emphasis 配置（鼠标真实 hover 时生效）
-          emphasis: {
-            label: {
-              show: true,
-              color: '#ffffff',
-              fontSize: 13,
-              fontWeight: 700,
-              textShadowColor: 'rgba(0,0,0,0.6)',
-              textShadowBlur: 4,
-            },
-            itemStyle: {
-              areaColor: '#ff8800',
-              borderColor: '#ffffff',
-              borderWidth: 2,
-              shadowBlur: 30,
-              shadowColor: '#ff8800',
-            },
-          },
         },
         {
           name: '脉冲', type: 'effectScatter', coordinateSystem: 'geo',
@@ -275,11 +236,12 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           // 流星飞行动效：从各省起点飞到广东终点
           effect: {
             show: true,
-            period: 6,             // 飞行周期 6 秒（确保走完整条路径）
-            trailLength: 0.2,      // 拖尾缩短（0.4→0.2），让尾巴更清晰可见
-            symbol: 'circle',      // 圆点
-            symbolSize: 2.5,       // 流星大小减半（5→2.5）
-            color: '#ffaa44',      // 流星颜色（橙色）
+            period: 6,             // 飞行周期 6 秒
+            trailLength: 0.35,     // 拖尾加长（0.2→0.35），让尾巴更明显
+            symbol: 'circle',
+            symbolSize: 3,         // 流星大小
+            color: '#ffcc66',      // 更亮的橙黄色（比 #ffaa44 更醒目）
+            // 加 shadowBlur 让流星整体（含拖尾）更亮，尾部不至于透明看不清
           },
           zlevel: 3,
         },
