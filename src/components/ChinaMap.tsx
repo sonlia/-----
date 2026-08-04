@@ -129,23 +129,18 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       : [];
 
     // 光束数据：所有省份 → 广东（数据汇入）
-    // 每条线设置 delay 错峰发射，避免所有流星同时飞行造成视觉混乱
-    // 同时确保每条流星能完整走完从起点到广东的路径后再消失重置
-    const guangdongCenter = PROVINCE_CENTERS['广东省'] || [113.28, 23.13];
+    // 每条线起点是各省会，终点统一是广东中心 [113.28, 23.13]
+    // 用 2 点 coords + curveness 控制弧度，避免 3 点 coords 渲染异常
+    const guangdongCenter: [number, number] = [113.28, 23.13];
     const beamLines = data
       .filter(d => d.name !== '广东省' && PROVINCE_CENTERS[d.name])
       .map((d, idx) => {
         const from = PROVINCE_CENTERS[d.name];
-        // 曲线控制点（在两点中间偏上，形成弧线），弧度根据距离调整
-        const dist = Math.abs(from[0] - guangdongCenter[0]) + Math.abs(from[1] - guangdongCenter[1]);
-        const midLng = (from[0] + guangdongCenter[0]) / 2;
-        const midLat = (from[1] + guangdongCenter[1]) / 2 + dist * 0.12;
         return {
-          coords: [from, [midLng, midLat], guangdongCenter],
+          // 2 点 coords：[起点, 终点]，终点固定是广东
+          coords: [from, guangdongCenter],
           value: d.value,
           // 错峰发射：每条线延迟 (idx % 5) * 1.2s 发射
-          // 最多 5 条流星同时在天上，每条间隔 1.2 秒
-          // 周期 6s 内会出现 5 条流星，但不会全部同时出现
           effect: { delay: (idx % 5) * 1.2 },
         };
       });
