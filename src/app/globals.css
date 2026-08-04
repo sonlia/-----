@@ -387,20 +387,22 @@ canvas { display: block; }
 
 /* ====== 科幻环形底座 + 超宽模糊动态光束（全局背景装饰，透明度 40%） ====== */
 
-/* 装饰容器：铺满父容器，位于所有面板之下 */
+/* 装饰容器：铺满父容器，位于所有面板之下，整体加 4 倍模糊 */
 .scene-bg-decor {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
+  /* 整体模糊：原各元素内部已有 blur，再叠加整体 blur 形成约 4 倍模糊效果 */
+  filter: blur(20px);
 }
 
-/* 位置容器：底座居中显示，略偏下呼应地图中心 */
+/* 位置容器：底座往下移动（原 55% → 75%，多下移 20% 距离） */
 .base-perspective,
 .light-container {
   position: absolute;
-  top: 55%;
+  top: 75%;
   left: 50%;
   width: 0;
   height: 0;
