@@ -385,27 +385,12 @@ canvas { display: block; }
   filter: blur(0.3px);
 }
 
-/* ====== 行星光晕背景（椭圆形，位于地图中下部，上方辐射光束） ====== */
-@keyframes haloRotate {
-  from { transform: translate(-50%, -50%) rotate(0deg); }
-  to { transform: translate(-50%, -50%) rotate(360deg); }
-}
-@keyframes haloRotateReverse {
-  from { transform: translate(-50%, -50%) rotate(360deg); }
-  to { transform: translate(-50%, -50%) rotate(0deg); }
-}
-@keyframes haloBreath {
-  0%, 100% { opacity: 0.85; transform: translate(-50%, -50%) scale(1); }
-  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
-}
-@keyframes godraysPulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.7; }
-}
+/* ====== 科幻环形底座 + 超宽模糊动态光束（参考 HTML 实现） ====== */
 
-.planet-halo {
+/* 位置容器：底座位于地图中下部，呼应广东位置 */
+.base-perspective,
+.light-container {
   position: absolute;
-  /* 位置：水平居中，垂直中下（地图中心偏下，呼应广东位置） */
   top: 60%;
   left: 50%;
   width: 0;
@@ -414,70 +399,205 @@ canvas { display: block; }
   pointer-events: none;
 }
 
-/* 上方垂直辐射光束（God Rays） —— 从光晕中心向上扩散 */
-.halo-godrays {
+/* --- 1. 倾斜透视的底座 --- */
+.base-perspective {
+  width: 500px;
+  height: 500px;
+  transform: translate(-50%, -50%) rotateX(70deg);
+  transform-style: preserve-3d;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: breathe-base 4s ease-in-out infinite alternate;
+}
+
+@keyframes breathe-base {
+  0% { transform: translate(-50%, -50%) rotateX(70deg) scale(1); filter: brightness(0.8); }
+  100% { transform: translate(-50%, -50%) rotateX(70deg) scale(1.02); filter: brightness(1.2); }
+}
+
+.ring-outer {
   position: absolute;
-  /* 光束从光晕中心向上延伸 */
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #05101e;
+  border: 6px solid rgba(0, 150, 255, 0.6);
+  box-shadow: inset 0 0 60px rgba(0, 80, 200, 0.4), 0 0 40px rgba(0, 150, 255, 0.4);
+  animation: pulse-ring 3s infinite alternate;
+}
+.ring-mid {
+  position: absolute;
+  width: 75%;
+  height: 75%;
+  border-radius: 50%;
+  background: rgba(2, 15, 30, 0.9);
+  border: 2px solid rgba(0, 150, 255, 0.5);
+  box-shadow: inset 0 0 50px rgba(0, 120, 255, 0.2);
+  animation: pulse-ring 4s infinite alternate-reverse;
+}
+.ring-inner {
+  position: absolute;
+  width: 40%;
+  height: 40%;
+  border-radius: 50%;
+  background: rgba(0, 10, 20, 0.8);
+  border: 3px solid rgba(0, 180, 255, 0.9);
+  box-shadow: inset 0 0 60px rgba(0, 150, 255, 0.4), 0 0 40px rgba(0, 180, 255, 0.3);
+}
+.ring-inner-core {
+  position: absolute;
+  width: 30%;
+  height: 30%;
+  border-radius: 50%;
+  border: 2px dashed rgba(0, 180, 255, 0.6);
+  background: rgba(0, 50, 100, 0.2);
+}
+
+@keyframes pulse-ring {
+  0% { opacity: 0.6; box-shadow: inset 0 0 30px rgba(0, 80, 200, 0.2); }
+  100% { opacity: 1; box-shadow: inset 0 0 80px rgba(0, 150, 255, 0.6); }
+}
+
+/* --- 2. 向四周发射的光线 --- */
+.ray {
+  position: absolute;
+  width: 3px;
+  height: 180px;
+  background: linear-gradient(to top, rgba(0, 150, 255, 0.9), rgba(0, 100, 255, 0.4), transparent);
+  transform-origin: bottom center;
+  filter: blur(1px);
+  box-shadow: 0 0 15px rgba(0, 150, 255, 0.8);
+  animation: ray-flow 1.5s linear infinite;
+}
+.ray-1 { bottom: 50%; left: 50%; transform: translateX(-50%) rotate(-45deg); animation-delay: 0s; }
+.ray-2 { bottom: 50%; left: 50%; transform: translateX(-50%) rotate(-25deg); animation-delay: 0.3s; }
+.ray-3 { bottom: 50%; left: 50%; transform: translateX(-50%) rotate(25deg); animation-delay: 0.6s; }
+.ray-4 { bottom: 50%; left: 50%; transform: translateX(-50%) rotate(45deg); animation-delay: 0.9s; }
+
+@keyframes ray-flow {
+  0% { height: 0px; opacity: 0; }
+  50% { height: 180px; opacity: 1; }
+  100% { height: 0px; opacity: 0; }
+}
+
+/* --- 3. 超宽模糊动态光束 --- */
+
+/* 底层大面积环境光晕 */
+.beam-ambient-glow {
+  position: absolute;
   bottom: 0;
   left: 50%;
-  width: 200px;
-  height: 400px;
-  transform: translate(-50%, 0);
+  transform: translateX(-50%);
+  width: 900px;
+  height: 1800px;
+  background: radial-gradient(ellipse at bottom, rgba(0, 100, 255, 0.2) 0%, transparent 80%);
+  clip-path: polygon(30% 100%, 70% 100%, 99.5% 0%, 0.5% 0%);
+  filter: blur(140px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+/* 光束外层光晕 */
+.beam-glow {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  height: 1800px;
   background: linear-gradient(
     to top,
-    rgba(0, 255, 204, 0.5) 0%,
-    rgba(0, 212, 255, 0.3) 30%,
-    rgba(0, 136, 255, 0.15) 60%,
+    rgba(0, 100, 255, 0.5) 0%,
+    rgba(0, 80, 255, 0.2) 50%,
     transparent 100%
   );
-  /* 椭圆形扩散（中间宽，两端窄） */
-  -webkit-mask: radial-gradient(ellipse 100px 200px at bottom, black 0%, transparent 80%);
-  mask: radial-gradient(ellipse 100px 200px at bottom, black 0%, transparent 80%);
-  filter: blur(8px);
-  animation: godraysPulse 4s ease-in-out infinite;
+  clip-path: polygon(30% 100%, 70% 100%, 99.5% 0%, 0.5% 0%);
+  filter: blur(80px);
+  mix-blend-mode: screen;
+  animation: glow-pulse 3s ease-in-out infinite alternate;
 }
 
-/* 光晕核心 —— 椭圆实心亮光盘（宽:高 ≈ 2:1，扁圆形） */
-.halo-core {
+@keyframes glow-pulse {
+  0% { filter: blur(60px); opacity: 0.7; }
+  100% { filter: blur(100px); opacity: 1; }
+}
+
+/* 核心主光束 */
+.beam {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 1800px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 150, 255, 0.9) 0%,
+    rgba(0, 100, 255, 0.5) 30%,
+    rgba(0, 80, 255, 0.1) 60%,
+    transparent 100%
+  );
+  clip-path: polygon(30% 100%, 70% 100%, 99.5% 0%, 0.5% 0%);
+  filter: blur(20px);
+  mix-blend-mode: screen;
+}
+
+/* 流动能量条 */
+.beam-flow-line {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 300px;
+  height: 300px;
+  background: linear-gradient(to top, rgba(0, 180, 255, 0), rgba(0, 180, 255, 0.8), rgba(0, 180, 255, 0));
+  clip-path: polygon(30% 100%, 70% 100%, 100% 0%, 0% 0%);
+  filter: blur(25px);
+  mix-blend-mode: screen;
+  transform: translateX(-50%) scale(1);
+  animation: flow-up 2.5s linear infinite;
+}
+
+.beam-flow-line:nth-child(4) { animation-delay: 1.25s; width: 400px; filter: blur(35px); opacity: 0.6; }
+.beam-flow-line:nth-child(5) { animation-delay: 0.6s; width: 150px; filter: blur(15px); opacity: 0.8; }
+
+@keyframes flow-up {
+  0% {
+    transform: translateX(-50%) scaleY(0);
+    opacity: 0;
+    bottom: -10%;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50%) scaleY(7);
+    opacity: 0;
+    bottom: 100%;
+  }
+}
+
+/* --- 4. 中心发光点 --- */
+.center-core {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 180px;
-  height: 90px;             /* 高度是宽度的一半，形成扁椭圆 */
-  border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(0, 255, 204, 0.9) 0%, rgba(0, 212, 255, 0.6) 40%, rgba(0, 136, 255, 0.2) 70%, transparent 100%);
-  filter: blur(3px);
   transform: translate(-50%, -50%);
-  animation: haloBreath 4s ease-in-out infinite;
-  box-shadow: 0 0 60px rgba(0, 255, 204, 0.6), 0 0 120px rgba(0, 212, 255, 0.4);
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, rgba(200, 230, 255, 0.9) 0%, rgba(0, 150, 255, 0.8) 40%, rgba(0, 80, 255, 0.5) 100%);
+  border-radius: 50%;
+  box-shadow:
+    0 0 60px 30px rgba(0, 150, 255, 0.8),
+    0 0 150px 100px rgba(0, 100, 255, 0.5),
+    0 0 400px 250px rgba(0, 80, 255, 0.2);
+  z-index: 20;
+  animation: core-pulse 1.5s ease-in-out infinite alternate;
 }
 
-/* 多层同心椭圆环（宽:高 ≈ 2:1） */
-.halo-ring {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 212, 255, 0.4);
-  box-shadow: 0 0 20px rgba(0, 212, 255, 0.3), inset 0 0 20px rgba(0, 212, 255, 0.1);
-  transform: translate(-50%, -50%);
-}
-.halo-ring-1 {
-  width: 320px; height: 160px;
-  border-style: dashed;
-  border-color: rgba(0, 255, 204, 0.5);
-  animation: haloRotate 20s linear infinite;
-}
-.halo-ring-2 {
-  width: 520px; height: 260px;
-  border-color: rgba(0, 212, 255, 0.35);
-  animation: haloRotateReverse 30s linear infinite;
-}
-.halo-ring-3 {
-  width: 760px; height: 380px;
-  border-style: dotted;
-  border-color: rgba(0, 136, 255, 0.25);
-  animation: haloRotate 45s linear infinite;
+@keyframes core-pulse {
+  0% { box-shadow: 0 0 30px 15px rgba(0, 150, 255, 0.6), 0 0 100px 80px rgba(0, 100, 255, 0.3); }
+  100% { box-shadow: 0 0 80px 40px rgba(0, 150, 255, 0.9), 0 0 200px 120px rgba(0, 100, 255, 0.6), 0 0 400px 250px rgba(0, 80, 255, 0.2); }
 }
 
 /* 数据中心脉冲光环 */

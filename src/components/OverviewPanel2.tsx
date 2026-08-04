@@ -217,13 +217,25 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
           border: '1px solid rgba(0,212,255,0.3)', boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 0 60px rgba(0,212,255,0.04)',
         }}>
           <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
-          {/* 行星光晕背景 —— 椭圆形，位于地图中下部，上方有辐射光束 */}
-          <div className="planet-halo">
-            <div className="halo-godrays"></div>
-            <div className="halo-core"></div>
-            <div className="halo-ring halo-ring-1"></div>
-            <div className="halo-ring halo-ring-2"></div>
-            <div className="halo-ring halo-ring-3"></div>
+          {/* 科幻环形底座 + 超宽模糊动态光束（参考 HTML 实现） */}
+          <div className="light-container">
+            <div className="beam-ambient-glow"></div>
+            <div className="beam-glow"></div>
+            <div className="beam"></div>
+            <div className="beam-flow-line"></div>
+            <div className="beam-flow-line"></div>
+            <div className="beam-flow-line"></div>
+          </div>
+          <div className="base-perspective">
+            <div className="ring-outer"></div>
+            <div className="ring-mid"></div>
+            <div className="ring-inner"></div>
+            <div className="ring-inner-core"></div>
+            <div className="ray ray-1"></div>
+            <div className="ray ray-2"></div>
+            <div className="ray ray-3"></div>
+            <div className="ray ray-4"></div>
+            <div className="center-core"></div>
           </div>
           {/* 地图标题 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', zIndex: 2 }}>
