@@ -91,18 +91,22 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       ? [[...PROVINCE_CENTERS[rippleProvince], data.find(d => d.name === rippleProvince)?.value || 0]]
       : [];
 
-    // 光束数据：所有省份 → 广东（数据汇入）
+    // 光束数据：所有省份 → 广东（数据汇入，参考全息数据可视化图增强汇聚感）
+    // 每条线附带随机延迟，让流光错峰发射，形成持续不断的流星雨效果
     const guangdongCenter = PROVINCE_CENTERS['广东省'] || [113.28, 23.13];
     const beamLines = data
       .filter(d => d.name !== '广东省' && PROVINCE_CENTERS[d.name])
-      .map(d => {
+      .map((d, idx) => {
         const from = PROVINCE_CENTERS[d.name];
-        // 曲线控制点（在两点中间偏上，形成弧线）
+        // 曲线控制点（在两点中间偏上，形成弧线），弧度根据距离调整
+        const dist = Math.abs(from[0] - guangdongCenter[0]) + Math.abs(from[1] - guangdongCenter[1]);
         const midLng = (from[0] + guangdongCenter[0]) / 2;
-        const midLat = (from[1] + guangdongCenter[1]) / 2 + Math.abs(from[0] - guangdongCenter[0]) * 0.15;
+        const midLat = (from[1] + guangdongCenter[1]) / 2 + dist * 0.12;
         return {
           coords: [from, [midLng, midLat], guangdongCenter],
           value: d.value,
+          // 让每条线有不同的动画延迟（symbol周期偏移），实现持续流星雨效果
+          effect: { period: 4 + (idx % 5) * 0.5, delay: idx * 0.3 },
         };
       });
 
@@ -154,36 +158,59 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
         },
-        // 光束飞线：各省 → 广东（流星动效：头部大且亮，尾部细而暗）
+        // 光束飞线：各省 → 广东（参考全息图，亮头+渐变拖尾+持续流星雨）
         {
           name: '数据汇入',
           type: 'lines',
           coordinateSystem: 'geo',
           data: beamLines,
-          // 飞线轨迹（极淡的路径暗示，整体透明度大幅降低）
+          // 飞线轨迹（路径较亮，配合 effect 的拖尾形成"管道"感）
           lineStyle: {
             color: {
               type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
               colorStops: [
-                { offset: 0, color: 'rgba(0, 255, 204, 0.005)' },  // 起点几乎不可见
-                { offset: 0.5, color: 'rgba(0, 255, 204, 0.04)' },  // 中间仅余微光
-                { offset: 1, color: 'rgba(0, 255, 204, 0.12)' },    // 终点淡淡的提示
+                { offset: 0, color: 'rgba(0, 255, 204, 0.02)' },
+                { offset: 0.5, color: 'rgba(0, 212, 255, 0.18)' },
+                { offset: 1, color: 'rgba(0, 255, 204, 0.35)' },
               ],
             },
-            width: 1,
+            width: 1.2,
             curveness: 0.3,
+            shadowColor: 'rgba(0, 212, 255, 0.5)',
+            shadowBlur: 8,
           },
-          // 流星飞行动效：头大且亮，尾短而细，整体亮度与透明度降低
+          // 流星飞行动效：头大且亮，长拖尾形成动态流光感
           effect: {
             show: true,
-            period: 5,            // 飞行周期
-            trailLength: 0.28,    // 短尾：尾部更细更短，形成流星拖尾感
-            // 自定义水滴形 symbol：头部为圆形（粗），尾部收敛为尖点（细）
-            symbol: 'path://M 10,0 Q 4,-6 -4,-5 Q -16,-3 -22,0 Q -16,3 -4,5 Q 4,6 10,0 Z',
-            symbolSize: 12,       // 头部更大更亮
-            color: 'rgba(0, 255, 204, 0.55)',  // 整体透明度降低（原为不透明纯色）
-            // 注意：trailLength 会自动生成从亮到透明的渐变拖尾，
-            // 配合水滴形 symbol，尾部在视觉上自然收细
+            period: 4,             // 默认飞行周期（每条线 effect.period 覆盖）
+            trailLength: 0.5,      // 加长拖尾，形成流光轨迹
+            // 水滴形 symbol：头部为圆形（粗），尾部收敛为尖点（细）
+            symbol: 'path://M 12,0 Q 5,-7 -5,-6 Q -18,-3 -25,0 Q -18,3 -5,6 Q 5,7 12,0 Z',
+            symbolSize: 14,        // 头部更大更亮
+            color: '#00ffcc',      // 流星本体高亮
+            // trailLength 会自动生成从亮到透明的渐变拖尾
+          },
+          zlevel: 3,
+        },
+        // 第二层光束：橙色辅流，错峰发射，与青色形成冷暖对比（参考图特征）
+        {
+          name: '数据汇入-辅流',
+          type: 'lines',
+          coordinateSystem: 'geo',
+          data: beamLines.filter((_, i) => i % 2 === 0),  // 取一半线路发射橙色辅流
+          polyline: false,
+          lineStyle: {
+            color: 'transparent',  // 辅流不显示路径线，只显示流星本体
+            width: 0,
+            curveness: 0.3,
+          },
+          effect: {
+            show: true,
+            period: 5.5,
+            trailLength: 0.45,
+            symbol: 'path://M 10,0 Q 4,-6 -4,-5 Q -15,-3 -22,0 Q -15,3 -4,5 Q 4,6 10,0 Z',
+            symbolSize: 11,
+            color: 'rgba(255, 170, 68, 0.9)',
           },
           zlevel: 3,
         },
