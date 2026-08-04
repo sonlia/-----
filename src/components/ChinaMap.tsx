@@ -173,10 +173,10 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             show: true,
             period: 4,
             trailLength: 0.15,
-            // 流星 path：头部正圆 + 尾巴从圆点边缘平滑线性收细到尾尖
-            // 头部圆心 (8,0) 半径 8；上轮廓从 (8,-8) 用二次贝塞尔平滑过渡到 (-60,0)
-            // 整个形状是一笔画完的封闭路径，头尾自然衔接，避免丁字形断裂感
-            symbol: 'path://M -60,0 L 0,3 A 3,3 0 1,0 0,-3 L -60,0 Z',
+            // 流星 path：尾尖 + 三角形身体 + 右侧半圆头（sweep=1 顺时针，弧经过右侧）
+            // M -60,0(尾尖) → L 0,3(身体右下角) → A 弧顺时针经过 (3,0) 到 0,-3(身体右上角) → L -60,0(回尾尖)
+            // sweep=1 让圆弧凸向右侧（正x），形成明显的圆头；sweep=0 会画在左侧被尾巴挡住，看起来像三角形
+            symbol: 'path://M -60,0 L 0,3 A 3,3 0 1,1 0,-3 L -60,0 Z',
             symbolSize: 24,        // 整体放大
             color: 'rgba(0, 255, 204, 0.7)',
           },
@@ -198,8 +198,8 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             show: true,
             period: 5.5,
             trailLength: 0.15,
-            // 头部圆点 + 尾巴从圆点边缘平滑收细
-            symbol: 'path://M -50,0 L 0,2.5 A 2.5,2.5 0 1,0 0,-2.5 L -50,0 Z',
+            // 流星 path：尾尖 + 三角形身体 + 右侧半圆头（sweep=1）
+            symbol: 'path://M -50,0 L 0,2.5 A 2.5,2.5 0 1,1 0,-2.5 L -50,0 Z',
             symbolSize: 20,
             color: 'rgba(255, 170, 68, 0.65)',
           },
