@@ -158,7 +158,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
         },
-        // 光束飞线：各省 → 广东（头部圆点 + 尾巴从圆点边缘平滑收细）
+        // 光束飞线：各省 → 广东（最简效果：内置 circle symbol + trailLength 拖尾）
         {
           name: '数据汇入',
           type: 'lines',
@@ -172,14 +172,10 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           effect: {
             show: true,
             period: 4,
-            trailLength: 0.15,
-            // 流星 path：圆头在右侧凸出，尾巴向左收细
-            // 几何中心放在原点 (0,0)，避免 ECharts 按 bbox 居中后圆头跑到运动方向后面
-            // bbox: x ∈ [-30, 3]，中心约 -13.5；平移 +13.5 让中心落在原点
-            // 圆头：圆心 (16.5, 0) 半径 3；身体：从 (13.5, ±1.5) 到 (-16.5, 0) 收尖
-            symbol: 'path://M -16.5,0 L 13.5,1.5 A 3,3 0 1,1 13.5,-1.5 L -16.5,0 Z',
-            symbolSize: 30,        // 整体放大
-            color: 'rgba(0, 255, 204, 0.7)',
+            trailLength: 0.5,    // 拖尾长度
+            symbol: 'circle',    // ECharts 内置圆形，最稳定
+            symbolSize: 6,       // 圆点大小
+            color: '#00ffcc',
           },
           zlevel: 3,
         },
@@ -198,11 +194,10 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           effect: {
             show: true,
             period: 5.5,
-            trailLength: 0.15,
-            // 流星 path：圆头在右侧，尾巴向左收细，几何中心居中
-            symbol: 'path://M -13.5,0 L 11,1.2 A 2.5,2.5 0 1,1 11,-1.2 L -13.5,0 Z',
-            symbolSize: 25,
-            color: 'rgba(255, 170, 68, 0.65)',
+            trailLength: 0.5,
+            symbol: 'circle',
+            symbolSize: 5,
+            color: '#ffaa44',
           },
           zlevel: 3,
         },
