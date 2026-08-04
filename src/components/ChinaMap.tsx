@@ -154,34 +154,36 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
         },
-        // 光束飞线：各省 → 广东（流星动效：头小亮，尾部渐变变暗）
+        // 光束飞线：各省 → 广东（流星动效：头部大且亮，尾部细而暗）
         {
           name: '数据汇入',
           type: 'lines',
           coordinateSystem: 'geo',
           data: beamLines,
-          // 飞线轨迹（渐变线：从起点到终点逐渐变暗）
+          // 飞线轨迹（极淡的路径暗示，整体透明度大幅降低）
           lineStyle: {
             color: {
               type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
               colorStops: [
-                { offset: 0, color: 'rgba(0, 255, 204, 0.01)' },  // 起点几乎透明
-                { offset: 0.5, color: 'rgba(0, 255, 204, 0.15)' }, // 中间淡
-                { offset: 1, color: 'rgba(0, 255, 204, 0.4)' },    // 终点较亮
+                { offset: 0, color: 'rgba(0, 255, 204, 0.005)' },  // 起点几乎不可见
+                { offset: 0.5, color: 'rgba(0, 255, 204, 0.04)' },  // 中间仅余微光
+                { offset: 1, color: 'rgba(0, 255, 204, 0.12)' },    // 终点淡淡的提示
               ],
             },
             width: 1,
             curveness: 0.3,
           },
-          // 流星飞行动效
+          // 流星飞行动效：头大且亮，尾短而细，整体亮度与透明度降低
           effect: {
             show: true,
-            period: 5,          // 飞行周期
-            trailLength: 0.7,   // 尾迹长（渐变拖尾）
-            symbol: 'circle',   // 圆形头部
-            symbolSize: 4,      // 头部小而亮
-            color: '#00ffcc',   // 流星颜色与轨迹一致（青色）
-            // trailLength 会自动生成从亮到透明的渐变拖尾
+            period: 5,            // 飞行周期
+            trailLength: 0.28,    // 短尾：尾部更细更短，形成流星拖尾感
+            // 自定义水滴形 symbol：头部为圆形（粗），尾部收敛为尖点（细）
+            symbol: 'path://M 10,0 Q 4,-6 -4,-5 Q -16,-3 -22,0 Q -16,3 -4,5 Q 4,6 10,0 Z',
+            symbolSize: 12,       // 头部更大更亮
+            color: 'rgba(0, 255, 204, 0.55)',  // 整体透明度降低（原为不透明纯色）
+            // 注意：trailLength 会自动生成从亮到透明的渐变拖尾，
+            // 配合水滴形 symbol，尾部在视觉上自然收细
           },
           zlevel: 3,
         },
