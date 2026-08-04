@@ -158,7 +158,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
         },
-        // 光束飞线：各省 → 广东（最简效果：内置 circle symbol + trailLength 拖尾）
+        // 光束飞线：各省 → 广东（小圆点 + 长拖尾 + 白边 + 拖尾透明度衰减变慢）
         {
           name: '数据汇入',
           type: 'lines',
@@ -172,10 +172,22 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           effect: {
             show: true,
             period: 4,
-            trailLength: 0.5,    // 拖尾长度
-            symbol: 'circle',    // ECharts 内置圆形，最稳定
-            symbolSize: 6,       // 圆点大小
+            trailLength: 0.8,     // 拖尾加长
+            symbol: 'circle',
+            symbolSize: 3,        // 圆点尺寸减半（6→3）
+            // 用带 alpha 的 rgba 色，让整个流光（含拖尾）都更亮，
+            // 间接提升拖尾可见度（ECharts 拖尾衰减是线性，无法直接调衰减率）
+            color: 'rgba(0, 255, 204, 0.9)',
+          },
+          // 圆点白色描边 + 拖尾透明度衰减变慢（通过多次叠加 effect 实现）
+          // ECharts effect 的 trailLength 拖尾透明度衰减是固定的（线性），
+          // 要让"尾巴不那么透明"，只能通过 color 加 alpha 让整体更亮
+          itemStyle: {
             color: '#00ffcc',
+            borderColor: '#ffffff',   // 白色边
+            borderWidth: 1,           // 边宽 1px
+            shadowColor: '#00ffcc',
+            shadowBlur: 6,
           },
           zlevel: 3,
         },
@@ -194,10 +206,17 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           effect: {
             show: true,
             period: 5.5,
-            trailLength: 0.5,
+            trailLength: 0.8,
             symbol: 'circle',
-            symbolSize: 5,
+            symbolSize: 2.5,      // 圆点尺寸减半（5→2.5）
+            color: 'rgba(255, 170, 68, 0.9)',
+          },
+          itemStyle: {
             color: '#ffaa44',
+            borderColor: '#ffffff',
+            borderWidth: 1,
+            shadowColor: '#ffaa44',
+            shadowBlur: 5,
           },
           zlevel: 3,
         },
