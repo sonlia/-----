@@ -246,9 +246,9 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           effect: {
             show: true,
             period: 6,             // 飞行周期 6 秒（确保走完整条路径）
-            trailLength: 0.4,      // 拖尾长度（0.4 = 40% 路径长）
+            trailLength: 0.2,      // 拖尾缩短（0.4→0.2），让尾巴更清晰可见
             symbol: 'circle',      // 圆点
-            symbolSize: 5,         // 圆点大小
+            symbolSize: 2.5,       // 流星大小减半（5→2.5）
             color: '#ffaa44',      // 流星颜色（橙色）
           },
           zlevel: 3,
