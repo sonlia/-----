@@ -158,28 +158,27 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
         },
-        // 光束飞线：各省 → 广东（头部圆点 + 尾巴无渐变，先看长度）
+        // 光束飞线：各省 → 广东（头部圆点 + 尾巴从圆点边缘平滑收细）
         {
           name: '数据汇入',
           type: 'lines',
           coordinateSystem: 'geo',
           data: beamLines,
-          // 飞线轨迹完全透明（运动轨迹隐藏，只显示流星本体）
           lineStyle: {
             color: 'transparent',
             width: 0,
             curveness: 0.3,
           },
-          // 流星飞行动效：头部圆点 + 尾巴（先去掉渐变，看长度）
           effect: {
             show: true,
             period: 4,
-            trailLength: 0.15,     // 极小拖尾
-            // 流星 path：头部正圆 + 直条尾巴（尾巴粗细一致，无渐变）
-            // 头部圆心 (10,0) 半径 8；尾巴从 x=2 到 x=-60，y=±1.5（等宽条状）
-            symbol: 'path://M 18,0 A 8,8 0 1,1 2,0 A 8,8 0 1,1 18,0 Z M 2,-1.5 L -60,-1.5 L -60,1.5 L 2,1.5 Z',
+            trailLength: 0.15,
+            // 流星 path：头部正圆 + 尾巴从圆点边缘平滑线性收细到尾尖
+            // 头部圆心 (8,0) 半径 8；上轮廓从 (8,-8) 用二次贝塞尔平滑过渡到 (-60,0)
+            // 整个形状是一笔画完的封闭路径，头尾自然衔接，避免丁字形断裂感
+            symbol: 'path://M 16,0 A 8,8 0 1,1 0,0 A 8,8 0 1,1 16,0 Z M 8,-8 Q -10,-5 -60,0 Q -10,5 8,8 Z',
             symbolSize: 22,
-            color: 'rgba(0, 255, 204, 0.7)',  // 整体半透明（无渐变）
+            color: 'rgba(0, 255, 204, 0.7)',
           },
           zlevel: 3,
         },
@@ -199,8 +198,8 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             show: true,
             period: 5.5,
             trailLength: 0.15,
-            // 头部圆点 + 等宽直条尾巴（无渐变）
-            symbol: 'path://M 15,0 A 6.5,6.5 0 1,1 2,0 A 6.5,6.5 0 1,1 15,0 Z M 2,-1.2 L -50,-1.2 L -50,1.2 L 2,1.2 Z',
+            // 头部圆点 + 尾巴从圆点边缘平滑收细
+            symbol: 'path://M 13,0 A 6.5,6.5 0 1,1 0,0 A 6.5,6.5 0 1,1 13,0 Z M 6.5,-6.5 Q -8,-4 -50,0 Q -8,4 6.5,6.5 Z',
             symbolSize: 18,
             color: 'rgba(255, 170, 68, 0.65)',
           },
