@@ -122,7 +122,6 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
 
   const option = useMemo(() => {
     if (!registered) return {};
-    const maxVal = Math.max(...data.map(d => d.value));
     // 涟漪点数据
     const rippleData = rippleProvince && PROVINCE_CENTERS[rippleProvince]
       ? [[...PROVINCE_CENTERS[rippleProvince], data.find(d => d.name === rippleProvince)?.value || 0]]
@@ -171,27 +170,20 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             `</div>`;
         },
       },
-      visualMap: {
-        type: 'continuous', min: 0, max: maxVal,
-        text: ['高', '低'], realtime: false, calculable: true,
-        left: 10, bottom: 10,
-        textStyle: { color: PALETTE.textMid, fontSize: 9, fontFamily: 'Rajdhani' },
-        // 默认省份颜色统一用深蓝色系，让选中橙色高亮更明显
-        inRange: { color: ['#0a1f3d', '#0d3a66', '#0d3a66', '#0d3a66', '#0d3a66'] },
-        itemHeight: 80, itemWidth: 12,
-      },
+      // 去掉 visualMap —— 它会强制覆盖 areaColor，导致 emphasis 高亮无效
+      // 改用 series data itemStyle + emphasis 控制省份颜色
       geo: {
         map: 'china', roam: true, zoom: 1.2,
         label: { show: false },
         // 地图省份默认样式
         itemStyle: {
-          areaColor: '#0a1f3d',
+          areaColor: '#0d3a66',
           borderColor: PALETTE.primary,
           borderWidth: 0.8,
           shadowColor: PALETTE.primary,
           shadowBlur: 6,
         },
-        // 鼠标悬停样式 / 轮播选中样式（强制橙色高亮，覆盖 visualMap）
+        // 鼠标悬停样式 / 轮播选中样式（强制橙色高亮）
         emphasis: {
           label: {
             show: true,
@@ -203,27 +195,20 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             textShadowBlur: 4,
           },
           itemStyle: {
-            areaColor: '#ff8800',        // 选中省份亮橙色（强制覆盖 visualMap）
+            areaColor: '#ff8800',        // 选中省份亮橙色
             borderColor: '#ffffff',       // 白色高亮边
             borderWidth: 2,
             shadowBlur: 30,
             shadowColor: '#ff8800',
           },
         },
-        // 鼠标选中状态（点击）
-        select: {
-          label: { show: true, color: '#ffffff', fontSize: 13, fontWeight: 700 },
-          itemStyle: { areaColor: '#ff8800', borderColor: '#ffffff', borderWidth: 2, shadowBlur: 30, shadowColor: '#ff8800' },
-        },
         // 允许地图响应鼠标事件
         silent: false,
-        // selectedMode 可让点击保持选中
-        selectedMode: false,
       },
       series: [
         {
           name: '省级负荷', type: 'map', geoIndex: 0, data: data,
-          // series 层也配置 emphasis，确保高亮时 areaColor 生效（覆盖 visualMap）
+          // series 层 emphasis 配置（确保 highlight seriesIndex 0 时生效）
           emphasis: {
             label: {
               show: true,
