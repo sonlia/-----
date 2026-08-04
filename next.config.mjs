@@ -5,9 +5,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Next.js 16 已移除 eslint 配置项，lint 通过 .eslintrc 单独处理
   // 允许跨域隔离（WebGPU 需要）
   async headers() {
     return [
