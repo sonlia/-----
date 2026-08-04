@@ -158,7 +158,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           itemStyle: { color: '#00ffcc', shadowColor: '#00ffcc', shadowBlur: 15 },
           zlevel: 2,
         },
-        // 光束飞线：各省 → 广东（头大尾细彗星状，运动轨迹完全隐藏）
+        // 光束飞线：各省 → 广东（流星形态：头稍大、身体一体渐变半透明）
         {
           name: '数据汇入',
           type: 'lines',
@@ -170,16 +170,18 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             width: 0,
             curveness: 0.3,
           },
-          // 流星飞行动效：头大且亮，尾巴细且渐变透明
+          // 流星飞行动效：完整流星形状（头身一体），身体半透明渐变
           effect: {
             show: true,
             period: 4,             // 默认飞行周期（每条线 effect.period 覆盖）
-            trailLength: 0.6,      // 较长拖尾，但通过 symbol 形状让尾部收细
-            // 水滴形 symbol：头部大圆形（饱满），尾部急速收尖
-            symbol: 'path://M 14,0 Q 8,-8 -2,-7 Q -16,-4 -28,0 Q -16,4 -2,7 Q 8,8 14,0 Z',
-            symbolSize: 16,        // 头部大且亮
-            color: '#00ffcc',      // 流星本体高亮青色
-            // trailLength 会自动生成从亮到透明的渐变拖尾
+            trailLength: 0.15,     // 极小拖尾，仅做衔接（避免残影跟 symbol 分离）
+            // 完整流星形状 path：头部饱满圆形，身体从头到尾线性收细
+            // 整个 symbol 是一个整体形状（非头部+残影的组合）
+            // 头部宽 28（直径），身体长 70，尾部收细到 1
+            symbol: 'path://M 14,0 Q 12,-7 4,-7 Q -10,-5 -25,-2 Q -55,-0.5 -70,0 Q -55,0.5 -25,2 Q -10,5 4,7 Q 12,7 14,0 Z',
+            symbolSize: 22,        // 整体放大，头部更显眼
+            color: 'rgba(0, 255, 204, 0.45)',  // 半透明身体（流星整体）
+            // trailLength 极小，主要靠 symbol 本身的形状形成完整流星
           },
           zlevel: 3,
         },
@@ -199,11 +201,11 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           effect: {
             show: true,
             period: 5.5,
-            trailLength: 0.55,
-            // 水滴形 symbol：头部大，尾部尖
-            symbol: 'path://M 12,0 Q 6,-7 -2,-6 Q -14,-3 -24,0 Q -14,3 -2,6 Q 6,7 12,0 Z',
-            symbolSize: 13,
-            color: 'rgba(255, 170, 68, 0.95)',
+            trailLength: 0.15,
+            // 完整流星形状（头身一体）
+            symbol: 'path://M 12,0 Q 10,-6 3,-6 Q -8,-4 -22,-1.5 Q -48,-0.4 -60,0 Q -48,0.4 -22,1.5 Q -8,4 3,6 Q 10,6 12,0 Z',
+            symbolSize: 18,
+            color: 'rgba(255, 170, 68, 0.42)',  // 半透明橙色身体
           },
           zlevel: 3,
         },
