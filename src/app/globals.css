@@ -385,13 +385,22 @@ canvas { display: block; }
   filter: blur(0.3px);
 }
 
-/* ====== 科幻环形底座 + 超宽模糊动态光束（参考 HTML 实现） ====== */
+/* ====== 科幻环形底座 + 超宽模糊动态光束（全局背景装饰，透明度 40%） ====== */
 
-/* 位置容器：底座位于地图中下部，呼应广东位置 */
+/* 装饰容器：铺满父容器，位于所有面板之下 */
+.scene-bg-decor {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 位置容器：底座居中显示，略偏下呼应地图中心 */
 .base-perspective,
 .light-container {
   position: absolute;
-  top: 60%;
+  top: 55%;
   left: 50%;
   width: 0;
   height: 0;
