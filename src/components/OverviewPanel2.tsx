@@ -79,8 +79,8 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
     <div style={{ position: 'absolute', top: '120px', left: '20px', right: '20px', bottom: '20px', display: 'flex', flexDirection: 'column', gap: '14px', zIndex: 40, overflow: 'hidden' }}>
       {/* 流光动态背景 */}
       <div className="flow-bg"></div>
-      {/* 全局科幻环形底座 + 超宽模糊动态光束（透明度 40%，位于所有面板之下） */}
-      <div className="scene-bg-decor" style={{ opacity: 0.4 }}>
+      {/* 全局科幻环形底座 + 超宽模糊动态光束（透明度 70%，位于所有面板之下） */}
+      <div className="scene-bg-decor" style={{ opacity: 0.7 }}>
         <div className="light-container">
           <div className="beam-ambient-glow"></div>
           <div className="beam-glow"></div>
