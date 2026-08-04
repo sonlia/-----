@@ -173,11 +173,12 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             show: true,
             period: 4,
             trailLength: 0.15,
-            // 流星 path：尾尖 + 三角形身体 + 右侧半圆头（sweep=1 顺时针，弧经过右侧）
-            // M -60,0(尾尖) → L 0,3(身体右下角) → A 弧顺时针经过 (3,0) 到 0,-3(身体右上角) → L -60,0(回尾尖)
-            // sweep=1 让圆弧凸向右侧（正x），形成明显的圆头；sweep=0 会画在左侧被尾巴挡住，看起来像三角形
-            symbol: 'path://M -60,0 L 0,3 A 3,3 0 1,1 0,-3 L -60,0 Z',
-            symbolSize: 24,        // 整体放大
+            // 流星 path：圆头在右侧凸出，尾巴向左收细
+            // 几何中心放在原点 (0,0)，避免 ECharts 按 bbox 居中后圆头跑到运动方向后面
+            // bbox: x ∈ [-30, 3]，中心约 -13.5；平移 +13.5 让中心落在原点
+            // 圆头：圆心 (16.5, 0) 半径 3；身体：从 (13.5, ±1.5) 到 (-16.5, 0) 收尖
+            symbol: 'path://M -16.5,0 L 13.5,1.5 A 3,3 0 1,1 13.5,-1.5 L -16.5,0 Z',
+            symbolSize: 30,        // 整体放大
             color: 'rgba(0, 255, 204, 0.7)',
           },
           zlevel: 3,
@@ -198,9 +199,9 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             show: true,
             period: 5.5,
             trailLength: 0.15,
-            // 流星 path：尾尖 + 三角形身体 + 右侧半圆头（sweep=1）
-            symbol: 'path://M -50,0 L 0,2.5 A 2.5,2.5 0 1,1 0,-2.5 L -50,0 Z',
-            symbolSize: 20,
+            // 流星 path：圆头在右侧，尾巴向左收细，几何中心居中
+            symbol: 'path://M -13.5,0 L 11,1.2 A 2.5,2.5 0 1,1 11,-1.2 L -13.5,0 Z',
+            symbolSize: 25,
             color: 'rgba(255, 170, 68, 0.65)',
           },
           zlevel: 3,
