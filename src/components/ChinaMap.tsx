@@ -176,8 +176,8 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             // 流星 path：头部正圆 + 尾巴从圆点边缘平滑线性收细到尾尖
             // 头部圆心 (8,0) 半径 8；上轮廓从 (8,-8) 用二次贝塞尔平滑过渡到 (-60,0)
             // 整个形状是一笔画完的封闭路径，头尾自然衔接，避免丁字形断裂感
-            symbol: 'path://M 16,0 A 8,8 0 1,1 0,0 A 8,8 0 1,1 16,0 Z M 8,-8 Q -10,-5 -60,0 Q -10,5 8,8 Z',
-            symbolSize: 22,
+            symbol: 'path://M -60,0 L 0,3 A 3,3 0 1,0 0,-3 L -60,0 Z',
+            symbolSize: 24,        // 整体放大
             color: 'rgba(0, 255, 204, 0.7)',
           },
           zlevel: 3,
@@ -199,8 +199,8 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             period: 5.5,
             trailLength: 0.15,
             // 头部圆点 + 尾巴从圆点边缘平滑收细
-            symbol: 'path://M 13,0 A 6.5,6.5 0 1,1 0,0 A 6.5,6.5 0 1,1 13,0 Z M 6.5,-6.5 Q -8,-4 -50,0 Q -8,4 6.5,6.5 Z',
-            symbolSize: 18,
+            symbol: 'path://M -50,0 L 0,2.5 A 2.5,2.5 0 1,0 0,-2.5 L -50,0 Z',
+            symbolSize: 20,
             color: 'rgba(255, 170, 68, 0.65)',
           },
           zlevel: 3,
