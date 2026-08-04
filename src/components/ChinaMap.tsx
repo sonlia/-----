@@ -72,6 +72,8 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
   const carouselIdx = useRef(0);
   // 用于触发 option 重建
   const [rippleProvince, setRippleProvince] = useState<string>('');
+  // 标记鼠标是否悬停在地图上（有焦点时不轮播）
+  const isHovered = useRef(false);
 
   useEffect(() => {
     fetch('/maps/china.json')
@@ -83,6 +85,41 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       .catch(err => console.error('加载中国地图失败:', err));
   }, []);
 
+  // 监听鼠标悬停/移出，控制轮播开关
+  useEffect(() => {
+    if (!registered) return;
+    const chart = chartRef.current?.getEchartsInstance();
+    if (!chart) return;
+
+    const onMouseOver = (params: any) => {
+      // 只对 map series 的省份悬停生效（忽略流星、涟漪点等其他 series）
+      if (params.seriesType === 'map' || params.componentType === 'series') {
+        if (params.seriesName === '省级负荷' || params.seriesIndex === 0) {
+          isHovered.current = true;
+          // 鼠标悬停时同步更新涟漪点位置
+          if (params.name) setRippleProvince(params.name);
+        }
+      }
+    };
+    const onMouseOut = () => {
+      isHovered.current = false;
+    };
+
+    chart.on('mouseover', onMouseOver);
+    chart.on('mouseout', onMouseOut);
+    // 鼠标离开整个图表区域时也清除焦点
+    chart.getZr().on('mouseout', (e: any) => {
+      if (!e.relatedTarget) {
+        isHovered.current = false;
+      }
+    });
+
+    return () => {
+      chart.off('mouseover', onMouseOver);
+      chart.off('mouseout', onMouseOut);
+    };
+  }, [registered]);
+
   const option = useMemo(() => {
     if (!registered) return {};
     const maxVal = Math.max(...data.map(d => d.value));
@@ -92,8 +129,8 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       : [];
 
     // 光束数据：所有省份 → 广东（数据汇入）
-    // 注意：不再为每条线设置 effect.period/delay，统一用全局 period，
-    // 确保流星能完整走完从起点到广东的整条路径后再消失重置
+    // 每条线设置 delay 错峰发射，避免所有流星同时飞行造成视觉混乱
+    // 同时确保每条流星能完整走完从起点到广东的路径后再消失重置
     const guangdongCenter = PROVINCE_CENTERS['广东省'] || [113.28, 23.13];
     const beamLines = data
       .filter(d => d.name !== '广东省' && PROVINCE_CENTERS[d.name])
@@ -106,6 +143,10 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
         return {
           coords: [from, [midLng, midLat], guangdongCenter],
           value: d.value,
+          // 错峰发射：每条线延迟 (idx % 5) * 1.2s 发射
+          // 最多 5 条流星同时在天上，每条间隔 1.2 秒
+          // 周期 6s 内会出现 5 条流星，但不会全部同时出现
+          effect: { delay: (idx % 5) * 1.2 },
         };
       });
 
@@ -141,12 +182,40 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       geo: {
         map: 'china', roam: true, zoom: 1.2,
         label: { show: false },
-        itemStyle: { areaColor: '#0a1f3d', borderColor: PALETTE.primary, borderWidth: 0.8, shadowColor: PALETTE.primary, shadowBlur: 6 },
-        // emphasis 样式 = 鼠标悬停效果（轮播时通过 dispatchAction 触发）
-        emphasis: {
-          label: { show: true, color: '#00ffcc', fontSize: 12, fontFamily: 'Rajdhani', fontWeight: 700 },
-          itemStyle: { areaColor: '#00ffcc', borderColor: '#00ffcc', borderWidth: 2, shadowBlur: 20, shadowColor: '#00ffcc' },
+        // 地图省份默认样式
+        itemStyle: {
+          areaColor: '#0a1f3d',
+          borderColor: PALETTE.primary,
+          borderWidth: 0.8,
+          shadowColor: PALETTE.primary,
+          shadowBlur: 6,
         },
+        // 鼠标悬停样式（用户主动 hover 时触发，轮播时通过 dispatchAction highlight 触发）
+        emphasis: {
+          label: {
+            show: true,
+            color: '#ffffff',
+            fontSize: 13,
+            fontFamily: 'Rajdhani',
+            fontWeight: 700,
+            textShadowColor: 'rgba(0,0,0,0.6)',
+            textShadowBlur: 4,
+          },
+          itemStyle: {
+            areaColor: '#ffaa44',        // 悬停时填充橙色（和流星呼应）
+            borderColor: '#ffffff',       // 白色高亮边
+            borderWidth: 2,
+            shadowBlur: 25,
+            shadowColor: '#ffaa44',
+          },
+        },
+        // 鼠标选中状态（点击）
+        select: {
+          label: { show: true, color: '#ffffff', fontSize: 13, fontWeight: 700 },
+          itemStyle: { areaColor: '#ff8800', borderColor: '#ffffff', borderWidth: 2, shadowBlur: 30, shadowColor: '#ff8800' },
+        },
+        // 允许地图响应鼠标事件
+        silent: false,
       },
       series: [
         { name: '省级负荷', type: 'map', geoIndex: 0, data: data },
@@ -171,10 +240,10 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           effect: {
             show: true,
             period: 6,             // 周期，确保走完整条路径
-            trailLength: 0.5,     // 拖尾加长（0.3→0.5），但不超过0.7避免中途重置
+            trailLength: 0.35,    // 拖尾衰减范围缩短（0.5→0.35），整体更亮不透明
             symbol: 'circle',
-            symbolSize: 4,        // 圆点稍大
-            // 用纯色不带 alpha，让流星更不透明（看清楚）
+            symbolSize: 5,        // 圆点加大（4→5），头部更亮
+            // 纯色不带 alpha，让流星更不透明（看清楚）
             color: '#ffaa44',
           },
           itemStyle: {
@@ -182,7 +251,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             borderColor: '#ffffff',   // 白色边
             borderWidth: 1,
             shadowColor: '#ffaa44',
-            shadowBlur: 8,            // 光晕加大
+            shadowBlur: 12,           // 光晕加大（8→12），拖尾余光更明显
           },
           zlevel: 3,
         },
@@ -213,9 +282,13 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
   }, [registered, data, rippleProvince]);
 
   // 周期性轮播：模拟鼠标 hover 效果，8秒轮换
+  // 智能控制：鼠标悬停在地图上时（有焦点）停止轮播，离开后继续
   useEffect(() => {
     if (!registered) return;
     const interval = setInterval(() => {
+      // 有焦点时不轮播（鼠标正在悬停某个省份）
+      if (isHovered.current) return;
+
       const chart = chartRef.current?.getEchartsInstance();
       if (!chart) return;
 
@@ -230,6 +303,8 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
 
       // 延迟100ms后高亮新的（让前一个先消失）
       setTimeout(() => {
+        // 如果延迟期间鼠标移入了地图，则取消本次轮播高亮
+        if (isHovered.current) return;
         // 3. 高亮当前省份（触发 emphasis 样式 = 模拟鼠标悬停）
         chart.dispatchAction({
           type: 'highlight',
