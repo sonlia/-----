@@ -394,15 +394,15 @@ canvas { display: block; }
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  /* 整体模糊适度（减少10px：6px→无，移除整体blur） */
-  /* 移除整体 blur，让底座更清晰 */
+  /* 整体模糊 +5px */
+  filter: blur(5px);
 }
 
-/* 位置容器：底座往下移动30%（top 60%→90%） */
+/* 位置容器：底座位置 70% */
 .base-perspective,
 .light-container {
   position: absolute;
-  top: 90%;
+  top: 70%;
   left: 50%;
   width: 0;
   height: 0;
