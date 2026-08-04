@@ -91,8 +91,9 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       ? [[...PROVINCE_CENTERS[rippleProvince], data.find(d => d.name === rippleProvince)?.value || 0]]
       : [];
 
-    // 光束数据：所有省份 → 广东（数据汇入，参考全息数据可视化图增强汇聚感）
-    // 每条线附带随机延迟，让流光错峰发射，形成持续不断的流星雨效果
+    // 光束数据：所有省份 → 广东（数据汇入）
+    // 注意：不再为每条线设置 effect.period/delay，统一用全局 period，
+    // 确保流星能完整走完从起点到广东的整条路径后再消失重置
     const guangdongCenter = PROVINCE_CENTERS['广东省'] || [113.28, 23.13];
     const beamLines = data
       .filter(d => d.name !== '广东省' && PROVINCE_CENTERS[d.name])
@@ -105,8 +106,6 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
         return {
           coords: [from, [midLng, midLat], guangdongCenter],
           value: d.value,
-          // 让每条线有不同的动画延迟（symbol周期偏移），实现持续流星雨效果
-          effect: { period: 4 + (idx % 5) * 0.5, delay: idx * 0.3 },
         };
       });
 
@@ -171,12 +170,10 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           },
           effect: {
             show: true,
-            period: 4,
-            trailLength: 0.8,     // 拖尾加长
+            period: 6,             // 周期加长，确保走完整条路径
+            trailLength: 0.3,     // 拖尾占路径30%，头部能完整到达广东后再重置
             symbol: 'circle',
-            symbolSize: 3,        // 圆点尺寸减半（6→3）
-            // 用带 alpha 的 rgba 色，让整个流光（含拖尾）都更亮，
-            // 间接提升拖尾可见度（ECharts 拖尾衰减是线性，无法直接调衰减率）
+            symbolSize: 3,
             color: 'rgba(0, 255, 204, 0.9)',
           },
           // 圆点白色描边 + 拖尾透明度衰减变慢（通过多次叠加 effect 实现）
@@ -205,10 +202,10 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           },
           effect: {
             show: true,
-            period: 5.5,
-            trailLength: 0.8,
+            period: 7,             // 橙色周期略长，错峰
+            trailLength: 0.3,
             symbol: 'circle',
-            symbolSize: 2.5,      // 圆点尺寸减半（5→2.5）
+            symbolSize: 2.5,
             color: 'rgba(255, 170, 68, 0.9)',
           },
           itemStyle: {
