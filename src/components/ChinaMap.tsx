@@ -284,7 +284,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
     };
   }, [registered, data, rippleProvince]);
 
-  // 周期性轮播：模拟鼠标 hover 效果，8秒轮换
+  // 周期性轮播：直接模拟鼠标 hover 事件到省份像素坐标，触发真实高亮
   // 智能控制：鼠标悬停在地图上时（有焦点）停止轮播，离开后继续
   useEffect(() => {
     if (!registered) return;
@@ -299,27 +299,55 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       const province = data[idx];
       carouselIdx.current++;
 
-      // 1. 先取消上一个高亮
+      // 1. 先取消上一个高亮（模拟鼠标移出）
       chart.dispatchAction({ type: 'downplay' });
-      // 2. 隐藏上一个 tooltip
       chart.dispatchAction({ type: 'hideTip' });
 
       // 延迟100ms后高亮新的（让前一个先消失）
       setTimeout(() => {
         // 如果延迟期间鼠标移入了地图，则取消本次轮播高亮
         if (isHovered.current) return;
-        // 3. 高亮当前省份（触发 emphasis 样式 = 模拟鼠标悬停）
+
+        // 方案A：用 highlight + showTip dispatchAction
         chart.dispatchAction({
           type: 'highlight',
           seriesIndex: 0,
           name: province.name,
         });
-        // 4. 显示 tooltip
         chart.dispatchAction({
           type: 'showTip',
           seriesIndex: 0,
           name: province.name,
         });
+
+        // 方案B：直接模拟鼠标移动到省份中心像素坐标（真实 hover 事件）
+        // 通过 convertToPixel 把经纬度转成像素坐标，用 zr.handler.trigger 触发 mousemove
+        try {
+          const center = PROVINCE_CENTERS[province.name];
+          if (center) {
+            const pixel = chart.convertToPixel('geo', center);
+            if (pixel && pixel.length === 2) {
+              const zr = chart.getZr();
+              // 模拟真实鼠标移动事件（offsetX/Y 是相对 canvas 的坐标）
+              const fakeEvent = {
+                offsetX: pixel[0],
+                offsetY: pixel[1],
+                clientX: pixel[0],
+                clientY: pixel[1],
+                target: zr.painter.getViewportRoot()?.firstChild || null,
+                preventDefault: () => {},
+                stopPropagation: () => {},
+              };
+              // zr.handler.trigger 是内部 API，能完整触发 hover 流程
+              if (zr.handler && typeof zr.handler.trigger === 'function') {
+                zr.handler.trigger('mousemove', fakeEvent);
+              }
+            }
+          }
+        } catch (e) {
+          // convertToPixel 可能因为地图未完全加载而失败，忽略
+        }
+
         // 5. 更新涟漪效果
         setRippleProvince(province.name);
       }, 100);
