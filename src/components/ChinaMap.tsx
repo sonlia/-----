@@ -129,8 +129,9 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       if (params.seriesType === 'map') {
         cancelClearHover();  // 取消延迟清除
         isHovered.current = true;
-        // 鼠标 hover 时同步设置高亮省份（和轮播用同一套样式）
+        // 鼠标 hover 时立即覆盖轮播高亮（只显示用户 hover 的区域）
         if (params.name) {
+          console.log('[hover] 设置高亮:', params.name, '（覆盖轮播）');
           setHighlightedProvince(params.name);
           setRippleProvince(params.name);
         }
@@ -147,8 +148,18 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       if (params.seriesType === 'map' && params.name) {
         cancelClearHover();
         isHovered.current = true;
+        console.log('[click] 设置高亮:', params.name, '（覆盖轮播）');
         setHighlightedProvince(params.name);
         setRippleProvince(params.name);
+        // 显示 tooltip
+        const chart = chartRef.current?.getEchartsInstance();
+        if (chart) {
+          chart.dispatchAction({
+            type: 'showTip',
+            seriesIndex: 0,
+            name: params.name,
+          });
+        }
       }
     };
 
@@ -345,12 +356,13 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
   }, [registered, data, rippleProvince, highlightedProvince]);
 
   // 周期性轮播：数据驱动高亮 + requestAnimationFrame 确保状态更新与 ECharts 渲染同步
-  // 核心思路：先更新 React 状态，等待渲染完成后再派发 ECharts 动作
+  // 智能控制：鼠标有焦点时完全跳过（不清除、不设置），只显示用户 hover/click 的区域
   useEffect(() => {
     if (!registered) return;
     const interval = setInterval(() => {
+      // 鼠标有焦点时完全跳过轮播（不干扰用户 hover/click 的高亮）
       if (isHovered.current) {
-        console.log('[轮播] 鼠标有焦点，跳过');
+        console.log('[轮播] 鼠标有焦点，完全跳过');
         return;
       }
 
@@ -362,7 +374,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       carouselIdx.current++;
       console.log('[轮播] 选中:', province.name);
 
-      // --- 步骤1: 先清除所有高亮和 Tooltip，并立即更新状态 ---
+      // --- 步骤1: 先清除所有高亮和 Tooltip ---
       setHighlightedProvince('');
       setRippleProvince('');
       chart.dispatchAction({ type: 'hideTip' });
@@ -370,10 +382,15 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
 
       // --- 步骤2: 用 requestAnimationFrame 确保状态更新和 DOM 渲染完成 ---
       requestAnimationFrame(() => {
+        // 鼠标有焦点时取消本次轮播（不清除用户的高亮）
+        if (isHovered.current) {
+          console.log('[轮播] 渲染期间鼠标有焦点，取消（保留用户高亮）');
+          return;
+        }
         // 再用短延时确保 React 批处理更新完成
         setTimeout(() => {
           if (isHovered.current) {
-            console.log('[轮播] 渲染期间鼠标移入，取消');
+            console.log('[轮播] 延迟期间鼠标有焦点，取消（保留用户高亮）');
             return;
           }
 
@@ -383,12 +400,16 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
 
           // 2. 在下一个宏任务中派发 ECharts 动作，确保新 option 已应用
           setTimeout(() => {
-            if (isHovered.current) return;
+            // 派发前再次检查，有焦点则不派发（避免覆盖用户高亮）
+            if (isHovered.current) {
+              console.log('[轮播] 派发前鼠标有焦点，取消（保留用户高亮）');
+              return;
+            }
 
             const latestChart = chartRef.current?.getEchartsInstance();
             if (!latestChart) return;
 
-            // 查找当前省份在最新数据中的准确索引（避免顺序变化导致 idx 错误）
+            // 查找当前省份在最新数据中的准确索引
             const currentData = (latestChart.getOption() as any)?.series?.[0]?.data || [];
             const currentIdx = currentData.findIndex((d: any) => d.name === province.name);
             if (currentIdx === -1) {
