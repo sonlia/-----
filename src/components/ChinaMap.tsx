@@ -103,32 +103,62 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       .catch(err => console.error('加载中国地图失败:', err));
   }, []);
 
-  // 监听鼠标悬停/移出，控制轮播开关
+  // 监听鼠标悬停/移出/点击，控制轮播开关和高亮
   useEffect(() => {
     if (!registered) return;
     const chart = chartRef.current?.getEchartsInstance();
     if (!chart) return;
 
+    // 延迟清除焦点，避免鼠标在省份间移动时 isHovered 短暂为 false 导致轮播误触发
+    let clearHoverTimer: any = null;
+    const scheduleClearHover = () => {
+      if (clearHoverTimer) clearTimeout(clearHoverTimer);
+      clearHoverTimer = setTimeout(() => {
+        isHovered.current = false;
+      }, 200);  // 200ms 内没进入新省份才清除焦点
+    };
+    const cancelClearHover = () => {
+      if (clearHoverTimer) {
+        clearTimeout(clearHoverTimer);
+        clearHoverTimer = null;
+      }
+    };
+
     const onMouseOver = (params: any) => {
       // 只对 map 类型的省份悬停生效（忽略 effectScatter 涟漪点、lines 流光等）
       if (params.seriesType === 'map') {
+        cancelClearHover();  // 取消延迟清除
         isHovered.current = true;
-        // 鼠标悬停时同步更新涟漪点位置
-        if (params.name) setRippleProvince(params.name);
+        // 鼠标 hover 时同步设置高亮省份（和轮播用同一套样式）
+        if (params.name) {
+          setHighlightedProvince(params.name);
+          setRippleProvince(params.name);
+        }
       }
     };
     const onMouseOut = (params: any) => {
       // 只对 map 类型的移出才清除焦点（避免移到流光上就清除）
       if (params.seriesType === 'map' || !params.seriesType) {
-        isHovered.current = false;
+        scheduleClearHover();  // 延迟清除，避免省份间移动闪烁
+      }
+    };
+    // 点击省份：触发和悬停一样的选中效果 + tooltip，并保持焦点
+    const onChartClick = (params: any) => {
+      if (params.seriesType === 'map' && params.name) {
+        cancelClearHover();
+        isHovered.current = true;
+        setHighlightedProvince(params.name);
+        setRippleProvince(params.name);
       }
     };
 
     chart.on('mouseover', onMouseOver);
     chart.on('mouseout', onMouseOut);
-    // 鼠标离开整个 canvas 时清除焦点
+    chart.on('click', onChartClick);
+    // 鼠标离开整个 canvas 时立即清除焦点
     chart.getZr().on('mouseout', (e: any) => {
       if (!e.toElement && !e.relatedTarget) {
+        cancelClearHover();
         isHovered.current = false;
       }
     });
@@ -136,6 +166,8 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
     return () => {
       chart.off('mouseover', onMouseOver);
       chart.off('mouseout', onMouseOut);
+      chart.off('click', onChartClick);
+      if (clearHoverTimer) clearTimeout(clearHoverTimer);
     };
   }, [registered]);
 
