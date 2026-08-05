@@ -129,11 +129,17 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       if (params.seriesType === 'map') {
         cancelClearHover();  // 取消延迟清除
         isHovered.current = true;
-        // 鼠标 hover 时立即覆盖轮播高亮（只显示用户 hover 的区域）
+        // 鼠标 hover 时立即清除之前的高亮（轮播的、上一次 hover 的），再设置新的
         if (params.name) {
-          console.log('[hover] 设置高亮:', params.name, '（覆盖轮播）');
-          setHighlightedProvince(params.name);
-          setRippleProvince(params.name);
+          console.log('[hover] 清除旧高亮 → 设置新高亮:', params.name);
+          // 先清除（触发 option 重建，所有省份恢复默认蓝色）
+          setHighlightedProvince('');
+          setRippleProvince('');
+          // 用 requestAnimationFrame 确保清除先渲染，再设置新高亮
+          requestAnimationFrame(() => {
+            setHighlightedProvince(params.name);
+            setRippleProvince(params.name);
+          });
         }
       }
     };
@@ -148,18 +154,23 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       if (params.seriesType === 'map' && params.name) {
         cancelClearHover();
         isHovered.current = true;
-        console.log('[click] 设置高亮:', params.name, '（覆盖轮播）');
-        setHighlightedProvince(params.name);
-        setRippleProvince(params.name);
-        // 显示 tooltip
-        const chart = chartRef.current?.getEchartsInstance();
-        if (chart) {
-          chart.dispatchAction({
-            type: 'showTip',
-            seriesIndex: 0,
-            name: params.name,
-          });
-        }
+        console.log('[click] 清除旧高亮 → 设置新高亮:', params.name);
+        // 先清除之前的高亮，再设置新的
+        setHighlightedProvince('');
+        setRippleProvince('');
+        requestAnimationFrame(() => {
+          setHighlightedProvince(params.name);
+          setRippleProvince(params.name);
+          // 显示 tooltip
+          const chart = chartRef.current?.getEchartsInstance();
+          if (chart) {
+            chart.dispatchAction({
+              type: 'showTip',
+              seriesIndex: 0,
+              name: params.name,
+            });
+          }
+        });
       }
     };
 
