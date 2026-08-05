@@ -271,13 +271,15 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
     };
   }, [registered, data, rippleProvince, highlightedProvince]);
 
-  // 周期性轮播：数据驱动高亮（不用 dispatchAction，直接 setHighlightedProvince 触发 option 重建）
-  // 智能控制：鼠标悬停在地图上时（有焦点）停止轮播，离开后继续
+  // 周期性轮播：数据驱动高亮 + requestAnimationFrame 确保状态更新与 ECharts 渲染同步
+  // 核心思路：先更新 React 状态，等待渲染完成后再派发 ECharts 动作
   useEffect(() => {
     if (!registered) return;
     const interval = setInterval(() => {
-      // 有焦点时不轮播（鼠标正在悬停某个省份）
-      if (isHovered.current) return;
+      if (isHovered.current) {
+        console.log('[轮播] 鼠标有焦点，跳过');
+        return;
+      }
 
       const chart = chartRef.current?.getEchartsInstance();
       if (!chart) return;
@@ -285,28 +287,57 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       const idx = carouselIdx.current % data.length;
       const province = data[idx];
       carouselIdx.current++;
+      console.log('[轮播] 选中:', province.name);
 
-      // 1. 先取消上一个高亮和 tooltip
+      // --- 步骤1: 先清除所有高亮和 Tooltip，并立即更新状态 ---
       setHighlightedProvince('');
+      setRippleProvince('');
       chart.dispatchAction({ type: 'hideTip' });
+      chart.dispatchAction({ type: 'downplay', seriesIndex: 0 });
 
-      // 延迟100ms后高亮新的（让前一个先消失）
-      setTimeout(() => {
-        // 如果延迟期间鼠标移入了地图，则取消本次轮播高亮
-        if (isHovered.current) return;
+      // --- 步骤2: 用 requestAnimationFrame 确保状态更新和 DOM 渲染完成 ---
+      requestAnimationFrame(() => {
+        // 再用短延时确保 React 批处理更新完成
+        setTimeout(() => {
+          if (isHovered.current) {
+            console.log('[轮播] 渲染期间鼠标移入，取消');
+            return;
+          }
 
-        // 2. 数据驱动高亮：设置 highlightedProvince 触发 option 重建
-        //    data 里对应省份会变橙色 + 白边 + 光晕 + 标签
-        setHighlightedProvince(province.name);
-        // 3. 显示 tooltip（dispatchAction showTip 仍然有效）
-        chart.dispatchAction({
-          type: 'showTip',
-          seriesIndex: 0,
-          name: province.name,
-        });
-        // 4. 更新涟漪效果
-        setRippleProvince(province.name);
-      }, 100);
+          // 1. 更新高亮省份状态（触发最终的 option 重建）
+          setHighlightedProvince(province.name);
+          setRippleProvince(province.name);
+
+          // 2. 在下一个宏任务中派发 ECharts 动作，确保新 option 已应用
+          setTimeout(() => {
+            if (isHovered.current) return;
+
+            const latestChart = chartRef.current?.getEchartsInstance();
+            if (!latestChart) return;
+
+            // 查找当前省份在最新数据中的准确索引（避免顺序变化导致 idx 错误）
+            const currentData = (latestChart.getOption() as any)?.series?.[0]?.data || [];
+            const currentIdx = currentData.findIndex((d: any) => d.name === province.name);
+            if (currentIdx === -1) {
+              console.warn('[轮播] 未找到省份数据:', province.name);
+              return;
+            }
+
+            // 派发 highlight 和 showTip 动作
+            latestChart.dispatchAction({
+              type: 'highlight',
+              seriesIndex: 0,
+              dataIndex: currentIdx,
+            });
+            latestChart.dispatchAction({
+              type: 'showTip',
+              seriesIndex: 0,
+              dataIndex: currentIdx,
+            });
+            console.log('[轮播] 已派发 highlight + showTip:', province.name, 'idx:', currentIdx);
+          }, 50);
+        }, 50);
+      });
     }, 8000); // 8秒轮换
 
     return () => clearInterval(interval);
