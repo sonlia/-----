@@ -275,31 +275,9 @@ canvas { display: block; }
   overflow: hidden;
 }
 
-/* 横向扫光带（鲜亮青色） */
-.flow-bg::before {
-  content: '';
-  position: absolute;
-  top: 15%;
-  left: 0;
-  width: 40%;
-  height: 80px;
-  background: linear-gradient(90deg, transparent, rgba(0, 255, 204, 0.35), rgba(0, 212, 255, 0.5), rgba(0, 255, 204, 0.35), transparent);
-  filter: blur(8px);
-  animation: sweepBandH 7s linear infinite;
-}
-
-/* 横向扫光带（鲜亮橙色，错峰） */
-.flow-bg::after {
-  content: '';
-  position: absolute;
-  top: 60%;
-  left: 0;
-  width: 35%;
-  height: 60px;
-  background: linear-gradient(90deg, transparent, rgba(255, 170, 68, 0.3), rgba(255, 136, 0, 0.45), rgba(255, 170, 68, 0.3), transparent);
-  filter: blur(10px);
-  animation: sweepBandH 9s linear infinite 3s;
-}
+/* 横向扫光带已去掉（用户反馈不需要从左往右的蓝色和橘色扫光） */
+.flow-bg::before { display: none; }
+.flow-bg::after { display: none; }
 
 /* 面板边缘流光扫描 */
 @keyframes edgeScan {

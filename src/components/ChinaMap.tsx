@@ -218,15 +218,13 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
               ac: d.ac,
               grid: d.grid,
               building: d.building,
-              // 高亮：明黄 #ffcc00 + 白边 + 光晕 + 模糊；非高亮：蓝色渐变
+              // 高亮：纯橘红 #ff5500 + 白边 + 光晕；非高亮：蓝色渐变
               itemStyle: {
-                areaColor: isHighlight ? '#ffcc00' : defaultBlue,
+                areaColor: isHighlight ? '#ff5500' : defaultBlue,
                 borderColor: isHighlight ? '#ffffff' : PALETTE.primary,
                 borderWidth: isHighlight ? 2 : 0.8,
                 shadowBlur: isHighlight ? 30 : 6,
-                shadowColor: isHighlight ? '#ffcc00' : PALETTE.primary,
-                // 选中时加模糊（ECharts itemStyle 不支持 filter，用 shadowBlur 模拟光晕扩散）
-                opacity: isHighlight ? 0.85 : 1,
+                shadowColor: isHighlight ? '#ff5500' : PALETTE.primary,
               },
               label: isHighlight ? {
                 show: true,
@@ -238,7 +236,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
               } : { show: false },
             };
           }),
-          // emphasis: 鼠标真实 hover 时也显示明黄高亮（和轮播一致）
+          // emphasis: 鼠标真实 hover 时也显示纯橘红高亮（和轮播一致）
           emphasis: {
             label: {
               show: true,
@@ -249,11 +247,11 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
               textShadowBlur: 4,
             },
             itemStyle: {
-              areaColor: '#ffcc00',
+              areaColor: '#ff5500',
               borderColor: '#ffffff',
               borderWidth: 2,
               shadowBlur: 30,
-              shadowColor: '#ffcc00',
+              shadowColor: '#ff5500',
             },
           },
         },
