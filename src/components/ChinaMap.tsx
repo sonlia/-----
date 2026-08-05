@@ -4,6 +4,22 @@ import * as echarts from 'echarts';
 import ReactECharts from 'echarts-for-react';
 import { PALETTE, commonTooltip } from './EChart';
 
+// 颜色插值函数：根据 ratio 在两个 hex 颜色之间线性插值，返回 hex 格式
+function interpolateColor(color1: string, color2: string, ratio: number): string {
+  const hex2rgb = (hex: string) => {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  };
+  const [r1, g1, b1] = hex2rgb(color1);
+  const [r2, g2, b2] = hex2rgb(color2);
+  const r = Math.round(r1 + (r2 - r1) * ratio);
+  const g = Math.round(g1 + (g2 - g1) * ratio);
+  const b = Math.round(b1 + (b2 - b1) * ratio);
+  // 返回 hex 格式（ECharts areaColor 兼容性更好）
+  const toHex = (n: number) => n.toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
 interface ChinaMapProps {
   data?: Array<{
     name: string;
@@ -144,6 +160,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
 
   const option = useMemo(() => {
     if (!registered) return {};
+    const maxVal = Math.max(...data.map(d => d.value));
     // 涟漪点数据
     const rippleData = rippleProvince && PROVINCE_CENTERS[rippleProvince]
       ? [[...PROVINCE_CENTERS[rippleProvince], data.find(d => d.name === rippleProvince)?.value || 0]]
@@ -248,39 +265,56 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       series: [
         {
           name: '省级负荷', type: 'map', geoIndex: 0,
-          // 数据驱动高亮：每个省份默认深蓝，高亮省份橙色
-          data: data.map(d => ({
-            name: d.name,
-            value: d.value,
-            pv: d.pv,
-            charging: d.charging,
-            ac: d.ac,
-            grid: d.grid,
-            building: d.building,
-            // 当前轮播/hover 的省份：橙色高亮 + 白边 + 光晕；其他省份默认深蓝
-            itemStyle: d.name === highlightedProvince ? {
-              areaColor: '#ff8800',
-              borderColor: '#ffffff',
-              borderWidth: 2,
-              shadowBlur: 30,
-              shadowColor: '#ff8800',
-            } : {
-              areaColor: '#0d3a66',
-              borderColor: PALETTE.primary,
-              borderWidth: 0.8,
-              shadowColor: PALETTE.primary,
-              shadowBlur: 6,
-            },
-            // 高亮省份显示标签
-            label: d.name === highlightedProvince ? {
+          // 数据驱动高亮：非高亮省份根据 value 蓝色渐变，高亮省份明黄色
+          data: data.map(d => {
+            // 根据 value 计算蓝色深浅（深蓝 #0a1f3d → 亮蓝 #2a7ab5）
+            const ratio = maxVal > 0 ? d.value / maxVal : 0;
+            const defaultBlue = interpolateColor('#0a1f3d', '#2a7ab5', ratio);
+            const isHighlight = d.name === highlightedProvince;
+            return {
+              name: d.name,
+              value: d.value,
+              pv: d.pv,
+              charging: d.charging,
+              ac: d.ac,
+              grid: d.grid,
+              building: d.building,
+              // 高亮：明黄 #ffcc00 + 白边 + 光晕；非高亮：蓝色渐变
+              itemStyle: {
+                areaColor: isHighlight ? '#ffcc00' : defaultBlue,
+                borderColor: isHighlight ? '#ffffff' : PALETTE.primary,
+                borderWidth: isHighlight ? 2 : 0.8,
+                shadowBlur: isHighlight ? 30 : 6,
+                shadowColor: isHighlight ? '#ffcc00' : PALETTE.primary,
+              },
+              label: isHighlight ? {
+                show: true,
+                color: '#ffffff',
+                fontSize: 13,
+                fontWeight: 700,
+                textShadowColor: 'rgba(0,0,0,0.6)',
+                textShadowBlur: 4,
+              } : { show: false },
+            };
+          }),
+          // emphasis: 鼠标真实 hover 时也显示明黄高亮（和轮播一致）
+          emphasis: {
+            label: {
               show: true,
               color: '#ffffff',
               fontSize: 13,
               fontWeight: 700,
               textShadowColor: 'rgba(0,0,0,0.6)',
               textShadowBlur: 4,
-            } : { show: false },
-          })),
+            },
+            itemStyle: {
+              areaColor: '#ffcc00',
+              borderColor: '#ffffff',
+              borderWidth: 2,
+              shadowBlur: 30,
+              shadowColor: '#ffcc00',
+            },
+          },
         },
         {
           name: '脉冲', type: 'effectScatter', coordinateSystem: 'geo',
@@ -301,15 +335,14 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             width: 0,
             curveness: 0.3,
           },
-          // 流星飞行动效：从各省起点飞到广东终点
+          // 流星飞行动效：亮蓝色流星，纤细精致，与蓝色科技主题协调
           effect: {
             show: true,
             period: 6,             // 飞行周期 6 秒
-            trailLength: 0.35,     // 拖尾加长（0.2→0.35），让尾巴更明显
+            trailLength: 0.2,      // 拖尾缩短（0.35→0.2），更利落精致
             symbol: 'circle',
-            symbolSize: 3,         // 流星大小
-            color: '#ffcc66',      // 更亮的橙黄色（比 #ffaa44 更醒目）
-            // 加 shadowBlur 让流星整体（含拖尾）更亮，尾部不至于透明看不清
+            symbolSize: 2,         // 流星更细（3→2）
+            color: '#00d4ff',      // 亮蓝色（与地图边框、脉冲颜色呼应）
           },
           zlevel: 3,
         },
