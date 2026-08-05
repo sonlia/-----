@@ -7,8 +7,8 @@
   --warn: #ffaa44;
   --danger: #ff4d6d;
   --success: #00ff88;
-  --bg-dark: #051937;      /* 纯蓝色背景（原 #02070f 暗黑） */
-  --bg-deep: #0a2150;      /* 更深的纯蓝 */
+  --bg-dark: #050d1a;      /* 深空背景色（比原 #051937 更深，营造太空感） */
+  --bg-deep: #02060f;      /* 更深的深空 */
   --bg-panel: rgba(8, 18, 38, 0.4);
   --bg-panel-solid: rgba(8, 18, 38, 0.7);
   --text-main: #e8f4ff;
@@ -27,7 +27,7 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #051937;
+  background: #050d1a;
   font-family: 'Rajdhani', 'Microsoft YaHei', 'PingFang SC', sans-serif;
   color: var(--text-main);
   user-select: none;
