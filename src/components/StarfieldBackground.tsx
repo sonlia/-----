@@ -45,8 +45,8 @@ export default function StarfieldBackground() {
           y: Math.random() * canvas.height,
           // 粒子尺寸加大（原 0.3~2.1 → 0.5~3.5）
           size: Math.random() * 3 + 0.5,
-          // 基础亮度提高（原 0.2~0.8 → 0.4~1.0）
-          baseOpacity: Math.random() * 0.6 + 0.4,
+          // 基础亮度降低（原 0.4~1.0 → 0.2~0.5），让星辰不那么抢眼
+          baseOpacity: Math.random() * 0.3 + 0.2,
           opacity: 0,
           twinkleSpeed: Math.random() * 0.03 + 0.008,
           twinklePhase: Math.random() * Math.PI * 2,
@@ -81,7 +81,7 @@ export default function StarfieldBackground() {
         ctx.beginPath();
         ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
         ctx.fillStyle = s.color;
-        ctx.globalAlpha = Math.min(1, s.opacity + 0.2);  // 整体亮度 +0.2
+        ctx.globalAlpha = s.opacity;  // 不再 +0.2，降低整体亮度
         ctx.shadowBlur = s.size * 4;
         ctx.shadowColor = s.color;
         ctx.fill();

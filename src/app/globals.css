@@ -9,7 +9,7 @@
   --success: #00ff88;
   --bg-dark: #050d1a;      /* 深空背景色（比原 #051937 更深，营造太空感） */
   --bg-deep: #02060f;      /* 更深的深空 */
-  --bg-panel: rgba(8, 18, 38, 0.4);
+  --bg-panel: rgba(8, 18, 38, 0.55);  /* 面板透明度 0.4→0.55 */
   --bg-panel-solid: rgba(8, 18, 38, 0.7);
   --text-main: #e8f4ff;
   --text-mid: #8aa5c4;
@@ -69,7 +69,7 @@ canvas { display: block; }
 
 .panel {
   position: absolute;
-  background: rgba(8, 18, 38, 0.4);
+  background: rgba(8, 18, 38, 0.55);  /* 透明度 0.4→0.55 */
   border: 1px solid var(--border-line);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);

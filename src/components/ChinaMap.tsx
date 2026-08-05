@@ -218,13 +218,15 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
               ac: d.ac,
               grid: d.grid,
               building: d.building,
-              // 高亮：明黄 #ffcc00 + 白边 + 光晕；非高亮：蓝色渐变
+              // 高亮：明黄 #ffcc00 + 白边 + 光晕 + 模糊；非高亮：蓝色渐变
               itemStyle: {
                 areaColor: isHighlight ? '#ffcc00' : defaultBlue,
                 borderColor: isHighlight ? '#ffffff' : PALETTE.primary,
                 borderWidth: isHighlight ? 2 : 0.8,
                 shadowBlur: isHighlight ? 30 : 6,
                 shadowColor: isHighlight ? '#ffcc00' : PALETTE.primary,
+                // 选中时加模糊（ECharts itemStyle 不支持 filter，用 shadowBlur 模拟光晕扩散）
+                opacity: isHighlight ? 0.85 : 1,
               },
               label: isHighlight ? {
                 show: true,
@@ -293,7 +295,8 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           data: [[...guangdongCenter, 999]],
           symbolSize: 20,
           rippleEffect: { brushType: 'stroke', period: 2.5, scale: 5 },
-          itemStyle: { color: '#ff8800', shadowColor: '#ff8800', shadowBlur: 25 },
+          // 加大模糊（shadowBlur 25→40）+ 半透明，营造柔和光晕
+          itemStyle: { color: '#ff8800', shadowColor: '#ff8800', shadowBlur: 40, opacity: 0.85 },
           label: {
             show: true,
             formatter: '数据中心',
