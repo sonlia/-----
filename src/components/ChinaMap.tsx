@@ -103,25 +103,6 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       .catch(err => console.error('加载中国地图失败:', err));
   }, []);
 
-  // 中层：ECharts graphic 旋转科技环 —— 用 rotation 状态驱动动画
-  const [ringRotation, setRingRotation] = useState(0);
-  useEffect(() => {
-    if (!registered) return;
-    let raf: number;
-    let lastTime = 0;
-    const animate = (time: number) => {
-      if (lastTime) {
-        // 每秒旋转 30 度（约 12 秒一圈）
-        const delta = (time - lastTime) / 1000 * 30;
-        setRingRotation(r => (r + delta) % 360);
-      }
-      lastTime = time;
-      raf = requestAnimationFrame(animate);
-    };
-    raf = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(raf);
-  }, [registered]);
-
   // 监听鼠标悬停/移出，控制轮播开关
   useEffect(() => {
     if (!registered) return;
@@ -213,55 +194,6 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
         // 默认样式改在 series data 每个省份上设置，这样高亮时才能生效
         silent: false,
       },
-      // 中层：ECharts graphic 旋转科技环（与地图坐标无关，纯装饰）
-      graphic: [
-        {
-          type: 'group',
-          left: 'center',
-          top: 'center',
-          rotation: ringRotation * Math.PI / 180,  // 弧度
-          children: [
-            {
-              type: 'circle',
-              shape: { cx: 0, cy: 0, r: 200 },
-              style: { fill: 'none', stroke: '#00ccff', lineWidth: 1, opacity: 0.25 },
-            },
-            {
-              type: 'circle',
-              shape: { cx: 0, cy: 0, r: 200 },
-              shape2: { startAngle: 0, endAngle: Math.PI * 0.4 },
-              style: { fill: 'none', stroke: '#00ccff', lineWidth: 2, opacity: 0.6 },
-              // 用 arc 段画亮弧
-            },
-          ],
-        },
-        {
-          type: 'group',
-          left: 'center',
-          top: 'center',
-          rotation: -ringRotation * Math.PI / 180 * 0.7,  // 反向，速度不同
-          children: [
-            {
-              type: 'circle',
-              shape: { cx: 0, cy: 0, r: 160 },
-              style: { fill: 'none', stroke: '#0088ff', lineWidth: 1, opacity: 0.2, lineDash: [4, 6] },
-            },
-          ],
-        },
-        {
-          type: 'group',
-          left: 'center',
-          top: 'center',
-          rotation: ringRotation * Math.PI / 180 * 1.3,  // 更快
-          children: [
-            {
-              type: 'circle',
-              shape: { cx: 0, cy: 0, r: 120 },
-              style: { fill: 'none', stroke: '#00ffcc', lineWidth: 1, opacity: 0.15, lineDash: [2, 8] },
-            },
-          ],
-        },
-      ],
       series: [
         {
           name: '省级负荷', type: 'map', geoIndex: 0,
@@ -370,7 +302,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
         },
       ],
     };
-  }, [registered, data, rippleProvince, highlightedProvince, ringRotation]);
+  }, [registered, data, rippleProvince, highlightedProvince]);
 
   // 周期性轮播：数据驱动高亮 + requestAnimationFrame 确保状态更新与 ECharts 渲染同步
   // 核心思路：先更新 React 状态，等待渲染完成后再派发 ECharts 动作
@@ -452,5 +384,5 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
     );
   }
 
-  return <ReactECharts ref={chartRef} option={option} notMerge={false} lazyUpdate={true} style={{ height: typeof height === 'number' ? `${height}px` : height, width: '100%' }} opts={{ renderer: 'canvas' }} />;
+  return <ReactECharts ref={chartRef} option={option} notMerge={true} lazyUpdate={false} style={{ height: typeof height === 'number' ? `${height}px` : height, width: '100%' }} opts={{ renderer: 'canvas' }} />;
 }
