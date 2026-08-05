@@ -5,43 +5,53 @@
 #   1. 幂等启动：重复启动会先停止旧进程再启动
 #   2. 端口复用：自动释放指定端口
 #   3. 后台运行：SSH 断开后服务继续运行（nohup + disown）
-#   4. 自定义端口：./start.sh -p 8888
+#   4. 自定义端口：./start.sh 8888 或 ./start.sh -p 8888
 # ============================================================
 
 # 默认配置
 DEFAULT_PORT=3000
 PORT=$DEFAULT_PORT
 
-# 获取脚本所在目录（自动定位项目目录，不依赖运行位置）
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 获取脚本所在目录（兼容 bash 和 sh，用 $0 代替 BASH_SOURCE）
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$SCRIPT_DIR"
 LOG_FILE="/tmp/energy-cockpit.log"
 PID_FILE="/tmp/energy-cockpit.pid"
 
 # === 解析命令行参数 ===
-while getopts "p:h" opt; do
-  case $opt in
-    p) PORT="$OPTARG" ;;
-    h)
-      echo "用法: ./start.sh [-p 端口号]"
-      echo "  -p  指定端口号（默认: $DEFAULT_PORT）"
+# 支持两种用法：
+#   ./start.sh -p 8888   (标准用法)
+#   ./start.sh 8888      (简写用法，直接跟端口号)
+for arg in "$@"; do
+  case "$arg" in
+    -p)
+      # -p 后面跟端口号，下一个参数是端口
+      ;;
+    -h|--help)
+      echo "用法: ./start.sh [端口号] 或 ./start.sh -p [端口号]"
+      echo "  -p  指定端口号（可省略，直接写端口号）"
       echo ""
       echo "示例:"
       echo "  ./start.sh              # 使用默认端口 $DEFAULT_PORT"
-      echo "  ./start.sh -p 8888      # 使用端口 8888"
+      echo "  ./start.sh 8888         # 使用端口 8888（简写）"
+      echo "  ./start.sh -p 8888      # 使用端口 8888（标准）"
       echo "  ./start.sh -p 8080      # 使用端口 8080"
       exit 0
       ;;
-    \?)
-      echo "无效选项: -$OPTARG" >&2
-      echo "使用 ./start.sh -h 查看帮助"
-      exit 1
-      ;;
-    :)
-      echo "选项 -$OPTARG 需要参数。" >&2
-      exit 1
+    [0-9]*)
+      # 纯数字 = 端口号
+      PORT="$arg"
       ;;
   esac
+done
+
+# 兼容 -p 端口号 的标准用法（遍历参数找 -p 后的数字）
+PREV_ARG=""
+for arg in "$@"; do
+  if [ "$PREV_ARG" = "-p" ]; then
+    PORT="$arg"
+  fi
+  PREV_ARG="$arg"
 done
 
 # 切换到项目目录（脚本所在目录）

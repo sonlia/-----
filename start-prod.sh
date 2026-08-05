@@ -6,7 +6,7 @@
 #   2. 幂等启动：重复启动会先停止旧进程再启动
 #   3. 端口复用：自动释放指定端口
 #   4. 后台运行：SSH 断开后服务继续运行（nohup + disown）
-#   5. 自定义端口：./start-prod.sh -p 8888
+#   5. 自定义端口：./start-prod.sh 8888 或 ./start-prod.sh -p 8888
 #   6. 自动构建：首次启动或代码更新后自动 build
 # ============================================================
 
@@ -14,42 +14,54 @@
 DEFAULT_PORT=3000
 PORT=$DEFAULT_PORT
 
-# 获取脚本所在目录（自动定位项目目录，不依赖运行位置）
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 获取脚本所在目录（兼容 bash 和 sh，用 $0 代替 BASH_SOURCE）
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$SCRIPT_DIR"
 LOG_FILE="/tmp/energy-cockpit-prod.log"
 PID_FILE="/tmp/energy-cockpit-prod.pid"
 BUILD_FLAG="/tmp/energy-cockpit-prod.built"
 
 # === 解析命令行参数 ===
+# 支持两种用法：
+#   ./start-prod.sh -p 8888 -b   (标准用法)
+#   ./start-prod.sh 8888         (简写用法，直接跟端口号)
 FORCE_BUILD=false
-while getopts "p:bh" opt; do
-  case $opt in
-    p) PORT="$OPTARG" ;;
-    b) FORCE_BUILD=true ;;  # 强制重新构建
-    h)
-      echo "用法: ./start-prod.sh [-p 端口号] [-b] [-h]"
-      echo "  -p  指定端口号（默认: $DEFAULT_PORT）"
+for arg in "$@"; do
+  case "$arg" in
+    -p)
+      # -p 后面跟端口号，下一个参数是端口
+      ;;
+    -b)
+      FORCE_BUILD=true
+      ;;
+    -h|--help)
+      echo "用法: ./start-prod.sh [端口号] [-b] 或 ./start-prod.sh -p [端口号] [-b]"
+      echo "  -p  指定端口号（可省略，直接写端口号）"
       echo "  -b  强制重新构建（next build）"
       echo "  -h  显示帮助"
       echo ""
       echo "示例:"
-      echo "  ./start-prod.sh              # 使用默认端口 $DEFAULT_PORT 启动生产环境"
-      echo "  ./start-prod.sh -p 8888      # 使用端口 8888"
-      echo "  ./start-prod.sh -b           # 强制重新构建后启动"
-      echo "  ./start-prod.sh -p 8888 -b   # 端口 8888 + 强制构建"
+      echo "  ./start-prod.sh              # 默认端口 $DEFAULT_PORT"
+      echo "  ./start-prod.sh 8888         # 端口 8888（简写）"
+      echo "  ./start-prod.sh -p 8888      # 端口 8888（标准）"
+      echo "  ./start-prod.sh -b           # 强制重新构建"
+      echo "  ./start-prod.sh 8888 -b      # 端口 8888 + 强制构建"
       exit 0
       ;;
-    \?)
-      echo "无效选项: -$OPTARG" >&2
-      echo "使用 ./start-prod.sh -h 查看帮助"
-      exit 1
-      ;;
-    :)
-      echo "选项 -$OPTARG 需要参数。" >&2
-      exit 1
+    [0-9]*)
+      # 纯数字 = 端口号
+      PORT="$arg"
       ;;
   esac
+done
+
+# 兼容 -p 端口号 的标准用法（遍历参数找 -p 后的数字）
+PREV_ARG=""
+for arg in "$@"; do
+  if [ "$PREV_ARG" = "-p" ]; then
+    PORT="$arg"
+  fi
+  PREV_ARG="$arg"
 done
 
 # 切换到项目目录
