@@ -190,8 +190,14 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       geo: {
         map: 'china', roam: true, zoom: 1.2,
         label: { show: false },
-        // 不在 geo 设 itemStyle —— geo.itemStyle 会覆盖 series map data 的 itemStyle
-        // 默认样式改在 series data 每个省份上设置，这样高亮时才能生效
+        // geo 默认 itemStyle（兜底，未在 data 中定义的省份显示此颜色）
+        itemStyle: {
+          areaColor: '#1a3a5c',
+          borderColor: PALETTE.primary,
+          borderWidth: 0.8,
+          shadowColor: PALETTE.primary,
+          shadowBlur: 6,
+        },
         silent: false,
       },
       series: [
@@ -199,9 +205,10 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           name: '省级负荷', type: 'map', geoIndex: 0,
           // 数据驱动高亮：非高亮省份根据 value 蓝色渐变，高亮省份明黄色
           data: data.map(d => {
-            // 根据 value 计算蓝色深浅（深蓝 #0a1f3d → 亮蓝 #2a7ab5）
+            // 根据 value 计算蓝色深浅（中蓝 #1a3a5c → 亮蓝 #3a9ad4）
+            // 用较亮的蓝色范围，避免在深空背景下看起来像灰色
             const ratio = maxVal > 0 ? d.value / maxVal : 0;
-            const defaultBlue = interpolateColor('#0a1f3d', '#2a7ab5', ratio);
+            const defaultBlue = interpolateColor('#1a3a5c', '#3a9ad4', ratio);
             const isHighlight = d.name === highlightedProvince;
             return {
               name: d.name,

@@ -80,30 +80,8 @@ export default function OverviewPanel2({ kpiPower }: OverviewPanel2Props) {
     <div style={{ position: 'absolute', top: '120px', left: '20px', right: '20px', bottom: '20px', display: 'flex', flexDirection: 'column', gap: '14px', zIndex: 40, overflow: 'hidden' }}>
       {/* 流光动态背景 */}
       <div className="flow-bg"></div>
-      {/* 底层：深空星尘粒子 Canvas */}
+      {/* 最底层：深空星尘粒子 Canvas（代替底座） */}
       <StarfieldBackground />
-      {/* 全局科幻环形底座 + 超宽模糊动态光束（透明度 70%，位于所有面板之下） */}
-      <div className="scene-bg-decor" style={{ opacity: 0.7 }}>
-        <div className="light-container">
-          <div className="beam-ambient-glow"></div>
-          <div className="beam-glow"></div>
-          <div className="beam"></div>
-          <div className="beam-flow-line"></div>
-          <div className="beam-flow-line"></div>
-          <div className="beam-flow-line"></div>
-        </div>
-        <div className="base-perspective">
-          <div className="ring-outer"></div>
-          <div className="ring-mid"></div>
-          <div className="ring-inner"></div>
-          <div className="ring-inner-core"></div>
-          <div className="ray ray-1"></div>
-          <div className="ray ray-2"></div>
-          <div className="ray ray-3"></div>
-          <div className="ray ray-4"></div>
-          <div className="center-core"></div>
-        </div>
-      </div>
       {/* 飘浮粒子（固定位置避免SSR hydration mismatch） - 整体透明度降到25% */}
       {[
         { left: '12%', top: '15%', delay: '0s', dur: '4s', c: 'rgba(0,255,204,0.25)', size: 12 },
