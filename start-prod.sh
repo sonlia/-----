@@ -86,23 +86,48 @@ if [ -f "$PID_FILE" ]; then
   rm -f "$PID_FILE"
 fi
 
-# 方法2：通过端口查找进程（只停止占用本端口的进程，不影响其他程序）
+# 方法2：通过端口查找进程并 kill（多种工具备选，确保能 kill 指定端口）
+KILLED_BY_PORT=false
 if command -v lsof >/dev/null 2>&1; then
+  # lsof 方式（最常用）
   PORT_PIDS=$(lsof -ti :$PORT 2>/dev/null || true)
   if [ -n "$PORT_PIDS" ]; then
-    echo "  - 发现端口 $PORT 被占用 (PID: $PORT_PIDS)，正在停止..."
+    echo "  - [lsof] 发现端口 $PORT 被占用 (PID: $PORT_PIDS)，正在停止..."
     echo "$PORT_PIDS" | xargs kill -9 2>/dev/null || true
     sleep 2
-    echo "  - 端口占用进程已停止"
+    KILLED_BY_PORT=true
+    echo "  - [lsof] 端口占用进程已停止"
+  fi
+elif command -v ss >/dev/null 2>&1; then
+  # ss 方式（lsof 没装时用 ss）
+  PORT_PIDS=$(ss -tlnp 2>/dev/null | grep ":$PORT " | grep -oP 'pid=\K[0-9]+' | sort -u || true)
+  if [ -n "$PORT_PIDS" ]; then
+    echo "  - [ss] 发现端口 $PORT 被占用 (PID: $PORT_PIDS)，正在停止..."
+    echo "$PORT_PIDS" | xargs kill -9 2>/dev/null || true
+    sleep 2
+    KILLED_BY_PORT=true
+    echo "  - [ss] 端口占用进程已停止"
   fi
 elif command -v fuser >/dev/null 2>&1; then
+  # fuser 方式（最后备选）
   if fuser -k ${PORT}/tcp 2>/dev/null; then
-    echo "  - 通过 fuser 停止端口 $PORT 占用进程"
+    KILLED_BY_PORT=true
+    echo "  - [fuser] 停止端口 $PORT 占用进程"
     sleep 2
   fi
 fi
 
-echo "  ✓ 本端口旧进程清理完成"
+# 方法3：再次确认端口已释放（如果还被占用，强制 kill 兜底）
+if command -v lsof >/dev/null 2>&1; then
+  STILL_OCCUPIED=$(lsof -ti :$PORT 2>/dev/null || true)
+  if [ -n "$STILL_OCCUPIED" ]; then
+    echo "  - ⚠ 端口 $PORT 仍被占用 (PID: $STILL_OCCUPIED)，强制 kill..."
+    echo "$STILL_OCCUPIED" | xargs kill -9 2>/dev/null || true
+    sleep 2
+  fi
+fi
+
+echo "  ✓ 本端口旧进程清理完成（端口 $PORT 已释放）"
 
 # === 2. 检查依赖 ===
 echo "[2/4] 检查依赖..."
