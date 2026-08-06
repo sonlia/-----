@@ -4,6 +4,21 @@ import * as echarts from 'echarts';
 import ReactECharts from 'echarts-for-react';
 import { PALETTE, commonTooltip } from './EChart';
 
+// 颜色插值函数：根据 ratio 在两个 hex 颜色之间线性插值，返回 hex 格式
+function interpolateColor(color1: string, color2: string, ratio: number): string {
+  const hex2rgb = (hex: string) => {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  };
+  const [r1, g1, b1] = hex2rgb(color1);
+  const [r2, g2, b2] = hex2rgb(color2);
+  const r = Math.round(r1 + (r2 - r1) * ratio);
+  const g = Math.round(g1 + (g2 - g1) * ratio);
+  const b = Math.round(b1 + (b2 - b1) * ratio);
+  const toHex = (n: number) => n.toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
 interface ChinaMapProps {
   data?: Array<{
     name: string;
@@ -125,6 +140,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
 
   const option = useMemo(() => {
     if (!registered) return {};
+    const maxVal = Math.max(...data.map(d => d.value));
     // 涟漪点数据
     const rippleData = rippleProvince && PROVINCE_CENTERS[rippleProvince]
       ? [[...PROVINCE_CENTERS[rippleProvince], data.find(d => d.name === rippleProvince)?.value || 0]]
@@ -173,8 +189,14 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       geo: {
         map: 'china', roam: true, zoom: 2.28, center: [104, 30],
         label: { show: false },
-        // 不在 geo 设 itemStyle —— geo.itemStyle 会覆盖 series map data 的 itemStyle
-        // 默认样式改在 series data 每个省份上设置，这样高亮时才能生效
+        // geo 默认 itemStyle（兜底，未在 data 中定义的省份显示此颜色）
+        itemStyle: {
+          areaColor: '#1a3a5c',
+          borderColor: PALETTE.primary,
+          borderWidth: 0.8,
+          shadowColor: PALETTE.primary,
+          shadowBlur: 6,
+        },
         silent: false,
       },
       series: [
@@ -189,20 +211,19 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             ac: d.ac,
             grid: d.grid,
             building: d.building,
-            // 当前轮播/hover 的省份：橙色高亮 + 白边 + 光晕；其他省份默认深蓝
-            itemStyle: d.name === highlightedProvince ? {
-              areaColor: '#ff8800',
-              borderColor: '#ffffff',
-              borderWidth: 2,
-              shadowBlur: 30,
-              shadowColor: '#ff8800',
-            } : {
-              areaColor: '#0d3a66',
-              borderColor: PALETTE.primary,
-              borderWidth: 0.8,
-              shadowColor: PALETTE.primary,
-              shadowBlur: 6,
-            },
+            // 当前轮播/hover 的省份：纯橘色 #ff5500 + 白边 + 光晕；其他省份蓝色渐变
+            itemStyle: (() => {
+              const ratio = maxVal > 0 ? d.value / maxVal : 0;
+              const defaultBlue = interpolateColor('#1a3a5c', '#3a9ad4', ratio);
+              const isHighlight = d.name === highlightedProvince;
+              return {
+                areaColor: isHighlight ? '#ff5500' : defaultBlue,
+                borderColor: isHighlight ? '#ffffff' : PALETTE.primary,
+                borderWidth: isHighlight ? 2 : 0.8,
+                shadowBlur: isHighlight ? 30 : 6,
+                shadowColor: isHighlight ? '#ff5500' : PALETTE.primary,
+              };
+            })(),
             // 高亮省份显示标签
             label: d.name === highlightedProvince ? {
               show: true,
@@ -213,6 +234,24 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
               textShadowBlur: 4,
             } : { show: false },
           })),
+          // emphasis: 鼠标真实 hover 时也显示纯橘色高亮（和轮播一致）
+          emphasis: {
+            label: {
+              show: true,
+              color: '#ffffff',
+              fontSize: 13,
+              fontWeight: 700,
+              textShadowColor: 'rgba(0,0,0,0.6)',
+              textShadowBlur: 4,
+            },
+            itemStyle: {
+              areaColor: '#ff5500',
+              borderColor: '#ffffff',
+              borderWidth: 2,
+              shadowBlur: 30,
+              shadowColor: '#ff5500',
+            },
+          },
         },
         {
           name: '脉冲', type: 'effectScatter', coordinateSystem: 'geo',
@@ -320,5 +359,5 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
     );
   }
 
-  return <ReactECharts ref={chartRef} option={option} notMerge={false} lazyUpdate={true} style={{ height: typeof height === 'number' ? `${height}px` : height, width: '100%' }} opts={{ renderer: 'canvas' }} />;
+  return <ReactECharts ref={chartRef} option={option} notMerge={true} lazyUpdate={false} style={{ height: typeof height === 'number' ? `${height}px` : height, width: '100%' }} opts={{ renderer: 'canvas' }} />;
 }
