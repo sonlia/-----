@@ -171,7 +171,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       // 去掉 visualMap —— 它会强制覆盖 areaColor，导致 emphasis 高亮无效
       // 改用 series data itemStyle + emphasis 控制省份颜色
       geo: {
-        map: 'china', roam: true, zoom: 2.28, center: [104, 36],
+        map: 'china', roam: true, zoom: 2.28, center: [104, 30],
         label: { show: false },
         // 不在 geo 设 itemStyle —— geo.itemStyle 会覆盖 series map data 的 itemStyle
         // 默认样式改在 series data 每个省份上设置，这样高亮时才能生效
