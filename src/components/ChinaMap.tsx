@@ -4,22 +4,6 @@ import * as echarts from 'echarts';
 import ReactECharts from 'echarts-for-react';
 import { PALETTE, commonTooltip } from './EChart';
 
-// 颜色插值函数：根据 ratio 在两个 hex 颜色之间线性插值，返回 hex 格式
-function interpolateColor(color1: string, color2: string, ratio: number): string {
-  const hex2rgb = (hex: string) => {
-    const h = hex.replace('#', '');
-    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
-  };
-  const [r1, g1, b1] = hex2rgb(color1);
-  const [r2, g2, b2] = hex2rgb(color2);
-  const r = Math.round(r1 + (r2 - r1) * ratio);
-  const g = Math.round(g1 + (g2 - g1) * ratio);
-  const b = Math.round(b1 + (b2 - b1) * ratio);
-  // 返回 hex 格式（ECharts areaColor 兼容性更好）
-  const toHex = (n: number) => n.toString(16).padStart(2, '0');
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
 interface ChinaMapProps {
   data?: Array<{
     name: string;
@@ -103,84 +87,32 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       .catch(err => console.error('加载中国地图失败:', err));
   }, []);
 
-  // 监听鼠标悬停/移出/点击，控制轮播开关和高亮
+  // 监听鼠标悬停/移出，控制轮播开关
   useEffect(() => {
     if (!registered) return;
     const chart = chartRef.current?.getEchartsInstance();
     if (!chart) return;
 
-    // 延迟清除焦点，避免鼠标在省份间移动时 isHovered 短暂为 false 导致轮播误触发
-    let clearHoverTimer: any = null;
-    const scheduleClearHover = () => {
-      if (clearHoverTimer) clearTimeout(clearHoverTimer);
-      clearHoverTimer = setTimeout(() => {
-        isHovered.current = false;
-      }, 200);  // 200ms 内没进入新省份才清除焦点
-    };
-    const cancelClearHover = () => {
-      if (clearHoverTimer) {
-        clearTimeout(clearHoverTimer);
-        clearHoverTimer = null;
-      }
-    };
-
     const onMouseOver = (params: any) => {
       // 只对 map 类型的省份悬停生效（忽略 effectScatter 涟漪点、lines 流光等）
       if (params.seriesType === 'map') {
-        cancelClearHover();  // 取消延迟清除
         isHovered.current = true;
-        // 鼠标 hover 时立即清除之前的高亮（轮播的、上一次 hover 的），再设置新的
-        if (params.name) {
-          console.log('[hover] 清除旧高亮 → 设置新高亮:', params.name);
-          // 先清除（触发 option 重建，所有省份恢复默认蓝色）
-          setHighlightedProvince('');
-          setRippleProvince('');
-          // 用 requestAnimationFrame 确保清除先渲染，再设置新高亮
-          requestAnimationFrame(() => {
-            setHighlightedProvince(params.name);
-            setRippleProvince(params.name);
-          });
-        }
+        // 鼠标悬停时同步更新涟漪点位置
+        if (params.name) setRippleProvince(params.name);
       }
     };
     const onMouseOut = (params: any) => {
       // 只对 map 类型的移出才清除焦点（避免移到流光上就清除）
       if (params.seriesType === 'map' || !params.seriesType) {
-        scheduleClearHover();  // 延迟清除，避免省份间移动闪烁
-      }
-    };
-    // 点击省份：触发和悬停一样的选中效果 + tooltip，并保持焦点
-    const onChartClick = (params: any) => {
-      if (params.seriesType === 'map' && params.name) {
-        cancelClearHover();
-        isHovered.current = true;
-        console.log('[click] 清除旧高亮 → 设置新高亮:', params.name);
-        // 先清除之前的高亮，再设置新的
-        setHighlightedProvince('');
-        setRippleProvince('');
-        requestAnimationFrame(() => {
-          setHighlightedProvince(params.name);
-          setRippleProvince(params.name);
-          // 显示 tooltip
-          const chart = chartRef.current?.getEchartsInstance();
-          if (chart) {
-            chart.dispatchAction({
-              type: 'showTip',
-              seriesIndex: 0,
-              name: params.name,
-            });
-          }
-        });
+        isHovered.current = false;
       }
     };
 
     chart.on('mouseover', onMouseOver);
     chart.on('mouseout', onMouseOut);
-    chart.on('click', onChartClick);
-    // 鼠标离开整个 canvas 时立即清除焦点
+    // 鼠标离开整个 canvas 时清除焦点
     chart.getZr().on('mouseout', (e: any) => {
       if (!e.toElement && !e.relatedTarget) {
-        cancelClearHover();
         isHovered.current = false;
       }
     });
@@ -188,14 +120,11 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
     return () => {
       chart.off('mouseover', onMouseOver);
       chart.off('mouseout', onMouseOut);
-      chart.off('click', onChartClick);
-      if (clearHoverTimer) clearTimeout(clearHoverTimer);
     };
   }, [registered]);
 
   const option = useMemo(() => {
     if (!registered) return {};
-    const maxVal = Math.max(...data.map(d => d.value));
     // 涟漪点数据
     const rippleData = rippleProvince && PROVINCE_CENTERS[rippleProvince]
       ? [[...PROVINCE_CENTERS[rippleProvince], data.find(d => d.name === rippleProvince)?.value || 0]]
@@ -242,72 +171,48 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       // 去掉 visualMap —— 它会强制覆盖 areaColor，导致 emphasis 高亮无效
       // 改用 series data itemStyle + emphasis 控制省份颜色
       geo: {
-        map: 'china', roam: true, zoom: 1.9, center: [104, 42],
+        map: 'china', roam: true, zoom: 2.28, center: [104, 36],
         label: { show: false },
-        // geo 默认 itemStyle（兜底，未在 data 中定义的省份显示此颜色）
-        itemStyle: {
-          areaColor: '#1a3a5c',
-          borderColor: PALETTE.primary,
-          borderWidth: 0.8,
-          shadowColor: PALETTE.primary,
-          shadowBlur: 6,
-        },
+        // 不在 geo 设 itemStyle —— geo.itemStyle 会覆盖 series map data 的 itemStyle
+        // 默认样式改在 series data 每个省份上设置，这样高亮时才能生效
         silent: false,
       },
       series: [
         {
           name: '省级负荷', type: 'map', geoIndex: 0,
-          // 数据驱动高亮：非高亮省份根据 value 蓝色渐变，高亮省份明黄色
-          data: data.map(d => {
-            // 根据 value 计算蓝色深浅（中蓝 #1a3a5c → 亮蓝 #3a9ad4）
-            // 用较亮的蓝色范围，避免在深空背景下看起来像灰色
-            const ratio = maxVal > 0 ? d.value / maxVal : 0;
-            const defaultBlue = interpolateColor('#1a3a5c', '#3a9ad4', ratio);
-            const isHighlight = d.name === highlightedProvince;
-            return {
-              name: d.name,
-              value: d.value,
-              pv: d.pv,
-              charging: d.charging,
-              ac: d.ac,
-              grid: d.grid,
-              building: d.building,
-              // 高亮：纯橘红 #ff5500 + 白边 + 光晕；非高亮：蓝色渐变
-              itemStyle: {
-                areaColor: isHighlight ? '#ff5500' : defaultBlue,
-                borderColor: isHighlight ? '#ffffff' : PALETTE.primary,
-                borderWidth: isHighlight ? 2 : 0.8,
-                shadowBlur: isHighlight ? 30 : 6,
-                shadowColor: isHighlight ? '#ff5500' : PALETTE.primary,
-              },
-              label: isHighlight ? {
-                show: true,
-                color: '#ffffff',
-                fontSize: 13,
-                fontWeight: 700,
-                textShadowColor: 'rgba(0,0,0,0.6)',
-                textShadowBlur: 4,
-              } : { show: false },
-            };
-          }),
-          // emphasis: 鼠标真实 hover 时也显示纯橘红高亮（和轮播一致）
-          emphasis: {
-            label: {
+          // 数据驱动高亮：每个省份默认深蓝，高亮省份橙色
+          data: data.map(d => ({
+            name: d.name,
+            value: d.value,
+            pv: d.pv,
+            charging: d.charging,
+            ac: d.ac,
+            grid: d.grid,
+            building: d.building,
+            // 当前轮播/hover 的省份：橙色高亮 + 白边 + 光晕；其他省份默认深蓝
+            itemStyle: d.name === highlightedProvince ? {
+              areaColor: '#ff8800',
+              borderColor: '#ffffff',
+              borderWidth: 2,
+              shadowBlur: 30,
+              shadowColor: '#ff8800',
+            } : {
+              areaColor: '#0d3a66',
+              borderColor: PALETTE.primary,
+              borderWidth: 0.8,
+              shadowColor: PALETTE.primary,
+              shadowBlur: 6,
+            },
+            // 高亮省份显示标签
+            label: d.name === highlightedProvince ? {
               show: true,
               color: '#ffffff',
               fontSize: 13,
               fontWeight: 700,
               textShadowColor: 'rgba(0,0,0,0.6)',
               textShadowBlur: 4,
-            },
-            itemStyle: {
-              areaColor: '#ff5500',
-              borderColor: '#ffffff',
-              borderWidth: 2,
-              shadowBlur: 30,
-              shadowColor: '#ff5500',
-            },
-          },
+            } : { show: false },
+          })),
         },
         {
           name: '脉冲', type: 'effectScatter', coordinateSystem: 'geo',
@@ -328,14 +233,15 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
             width: 0,
             curveness: 0.3,
           },
-          // 流星飞行动效：亮蓝色流星，纤细精致，与蓝色科技主题协调
+          // 流星飞行动效：从各省起点飞到广东终点
           effect: {
             show: true,
             period: 6,             // 飞行周期 6 秒
-            trailLength: 0.2,      // 拖尾缩短（0.35→0.2），更利落精致
+            trailLength: 0.35,     // 拖尾加长（0.2→0.35），让尾巴更明显
             symbol: 'circle',
-            symbolSize: 2,         // 流星更细（3→2）
-            color: '#00d4ff',      // 亮蓝色（与地图边框、脉冲颜色呼应）
+            symbolSize: 3,         // 流星大小
+            color: '#ffcc66',      // 更亮的橙黄色（比 #ffaa44 更醒目）
+            // 加 shadowBlur 让流星整体（含拖尾）更亮，尾部不至于透明看不清
           },
           zlevel: 3,
         },
@@ -347,8 +253,7 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
           data: [[...guangdongCenter, 999]],
           symbolSize: 20,
           rippleEffect: { brushType: 'stroke', period: 2.5, scale: 5 },
-          // 加大模糊（shadowBlur 25→40）+ 半透明，营造柔和光晕
-          itemStyle: { color: '#ff8800', shadowColor: '#ff8800', shadowBlur: 40, opacity: 0.85 },
+          itemStyle: { color: '#ff8800', shadowColor: '#ff8800', shadowBlur: 25 },
           label: {
             show: true,
             formatter: '数据中心',
@@ -366,16 +271,13 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
     };
   }, [registered, data, rippleProvince, highlightedProvince]);
 
-  // 周期性轮播：数据驱动高亮 + requestAnimationFrame 确保状态更新与 ECharts 渲染同步
-  // 智能控制：鼠标有焦点时完全跳过（不清除、不设置），只显示用户 hover/click 的区域
+  // 周期性轮播：数据驱动高亮（不用 dispatchAction，直接 setHighlightedProvince 触发 option 重建）
+  // 智能控制：鼠标悬停在地图上时（有焦点）停止轮播，离开后继续
   useEffect(() => {
     if (!registered) return;
     const interval = setInterval(() => {
-      // 鼠标有焦点时完全跳过轮播（不干扰用户 hover/click 的高亮）
-      if (isHovered.current) {
-        console.log('[轮播] 鼠标有焦点，完全跳过');
-        return;
-      }
+      // 有焦点时不轮播（鼠标正在悬停某个省份）
+      if (isHovered.current) return;
 
       const chart = chartRef.current?.getEchartsInstance();
       if (!chart) return;
@@ -383,66 +285,28 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
       const idx = carouselIdx.current % data.length;
       const province = data[idx];
       carouselIdx.current++;
-      console.log('[轮播] 选中:', province.name);
 
-      // --- 步骤1: 先清除所有高亮和 Tooltip ---
+      // 1. 先取消上一个高亮和 tooltip
       setHighlightedProvince('');
-      setRippleProvince('');
       chart.dispatchAction({ type: 'hideTip' });
-      chart.dispatchAction({ type: 'downplay', seriesIndex: 0 });
 
-      // --- 步骤2: 用 requestAnimationFrame 确保状态更新和 DOM 渲染完成 ---
-      requestAnimationFrame(() => {
-        // 鼠标有焦点时取消本次轮播（不清除用户的高亮）
-        if (isHovered.current) {
-          console.log('[轮播] 渲染期间鼠标有焦点，取消（保留用户高亮）');
-          return;
-        }
-        // 再用短延时确保 React 批处理更新完成
-        setTimeout(() => {
-          if (isHovered.current) {
-            console.log('[轮播] 延迟期间鼠标有焦点，取消（保留用户高亮）');
-            return;
-          }
+      // 延迟100ms后高亮新的（让前一个先消失）
+      setTimeout(() => {
+        // 如果延迟期间鼠标移入了地图，则取消本次轮播高亮
+        if (isHovered.current) return;
 
-          // 1. 更新高亮省份状态（触发最终的 option 重建）
-          setHighlightedProvince(province.name);
-          setRippleProvince(province.name);
-
-          // 2. 在下一个宏任务中派发 ECharts 动作，确保新 option 已应用
-          setTimeout(() => {
-            // 派发前再次检查，有焦点则不派发（避免覆盖用户高亮）
-            if (isHovered.current) {
-              console.log('[轮播] 派发前鼠标有焦点，取消（保留用户高亮）');
-              return;
-            }
-
-            const latestChart = chartRef.current?.getEchartsInstance();
-            if (!latestChart) return;
-
-            // 查找当前省份在最新数据中的准确索引
-            const currentData = (latestChart.getOption() as any)?.series?.[0]?.data || [];
-            const currentIdx = currentData.findIndex((d: any) => d.name === province.name);
-            if (currentIdx === -1) {
-              console.warn('[轮播] 未找到省份数据:', province.name);
-              return;
-            }
-
-            // 派发 highlight 和 showTip 动作
-            latestChart.dispatchAction({
-              type: 'highlight',
-              seriesIndex: 0,
-              dataIndex: currentIdx,
-            });
-            latestChart.dispatchAction({
-              type: 'showTip',
-              seriesIndex: 0,
-              dataIndex: currentIdx,
-            });
-            console.log('[轮播] 已派发 highlight + showTip:', province.name, 'idx:', currentIdx);
-          }, 50);
-        }, 50);
-      });
+        // 2. 数据驱动高亮：设置 highlightedProvince 触发 option 重建
+        //    data 里对应省份会变橙色 + 白边 + 光晕 + 标签
+        setHighlightedProvince(province.name);
+        // 3. 显示 tooltip（dispatchAction showTip 仍然有效）
+        chart.dispatchAction({
+          type: 'showTip',
+          seriesIndex: 0,
+          name: province.name,
+        });
+        // 4. 更新涟漪效果
+        setRippleProvince(province.name);
+      }, 100);
     }, 8000); // 8秒轮换
 
     return () => clearInterval(interval);
@@ -456,5 +320,5 @@ export default function ChinaMap({ data = DEFAULT_PROVINCES, height = 400 }: Chi
     );
   }
 
-  return <ReactECharts ref={chartRef} option={option} notMerge={true} lazyUpdate={false} style={{ height: typeof height === 'number' ? `${height}px` : height, width: '100%' }} opts={{ renderer: 'canvas' }} />;
+  return <ReactECharts ref={chartRef} option={option} notMerge={false} lazyUpdate={true} style={{ height: typeof height === 'number' ? `${height}px` : height, width: '100%' }} opts={{ renderer: 'canvas' }} />;
 }
