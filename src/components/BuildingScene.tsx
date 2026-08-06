@@ -223,7 +223,7 @@ export default function BuildingScene() {
               m.userData.deviceInfo = makeDeviceInfo(m, 'wall', 0);
               T.modelRoot.remove(groups.wall);
               T.modelRoot.add(m);
-              T.selectableObjects.push(m);
+              // wall 不加入 selectableObjects（墙体不支持选择）
             }
           }
           // 合并桌椅
@@ -238,7 +238,7 @@ export default function BuildingScene() {
               m.userData.deviceInfo = makeDeviceInfo(m, 'furniture', 0);
               T.modelRoot.remove(groups.furniture);
               T.modelRoot.add(m);
-              T.selectableObjects.push(m);
+              // furniture 不加入 selectableObjects（桌椅不支持选择）
             }
           }
           // 合并 logo
@@ -1743,8 +1743,8 @@ export default function BuildingScene() {
       </div>
       )}
 
-      {/* 右侧设备列表面板 - 仅楼宇模块 */}
-      {activeModule === 'building' && showList && (
+      {/* 右侧设备列表面板 - 仅楼宇模块，且未选中设备时显示（避免和设备详情重叠） */}
+      {activeModule === 'building' && showList && !selectedDevice && (
         <div className="panel right-panel">
           <span className="panel-corner-tr"></span><span className="panel-corner-bl"></span>
           <div className="panel-title">设备状态总览<span className="title-en">{totalDevices} UNITS</span></div>
