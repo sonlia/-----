@@ -1539,7 +1539,7 @@ export default function BuildingScene() {
       <div className="header">
         <div className="header-left">
           <div className="logo-mark"><div className="logo-inner"></div></div>
-          <div className="header-title">
+          <div className="header-title" style={{ cursor: 'pointer' }} onClick={() => window.location.href = '/admin'}>
             <h1>综合能源驾驶舱</h1>
             <div className="subtitle">COMPREHENSIVE <span className="accent">ENERGY COCKPIT</span> · WebGPU 3D VISUALIZATION</div>
           </div>
