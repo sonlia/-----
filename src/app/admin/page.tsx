@@ -105,23 +105,37 @@ export default function AdminPage() {
 }
 
 // === 项目表单 ===
+// 省份-城市数据（和 RegionTreeSelector 一致）
+const PROVINCE_CITY: Record<string, string[]> = {
+  '广东省': ['深圳市', '广州市', '东莞市', '佛山市', '珠海市'],
+  '江苏省': ['南京市', '苏州市', '无锡市', '常州市'],
+  '浙江省': ['杭州市', '宁波市', '温州市', '嘉兴市'],
+  '北京市': ['北京市'],
+  '上海市': ['上海市'],
+  '山东省': ['济南市', '青岛市', '烟台市'],
+  '四川省': ['成都市', '绵阳市'],
+  '湖北省': ['武汉市', '宜昌市'],
+};
+
 function ProjectForm({ onCreated }: { onCreated: () => void }) {
-  const [province, setProvince] = useState('');
-  const [city, setCity] = useState('');
+  const [province, setProvince] = useState('广东省');
+  const [city, setCity] = useState('深圳市');
   const [name, setName] = useState('');
-  const [address, setAddress] = useState('');
   const submit = async () => {
     if (!province || !city || !name) return;
-    await fetch('/api/admin/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ province, city, name, address }) });
-    setProvince(''); setCity(''); setName(''); setAddress('');
+    await fetch('/api/admin/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ province, city, name }) });
+    setName('');
     onCreated();
   };
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-      <input style={inputStyle} placeholder="省份" value={province} onChange={e => setProvince(e.target.value)} />
-      <input style={inputStyle} placeholder="城市" value={city} onChange={e => setCity(e.target.value)} />
+      <select style={inputStyle} value={province} onChange={e => { setProvince(e.target.value); setCity(PROVINCE_CITY[e.target.value]?.[0] || ''); }}>
+        {Object.keys(PROVINCE_CITY).map(p => <option key={p} value={p}>{p}</option>)}
+      </select>
+      <select style={inputStyle} value={city} onChange={e => setCity(e.target.value)}>
+        {(PROVINCE_CITY[province] || []).map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
       <input style={inputStyle} placeholder="项目名" value={name} onChange={e => setName(e.target.value)} />
-      <input style={inputStyle} placeholder="地址" value={address} onChange={e => setAddress(e.target.value)} />
       <button style={{ ...btnPrimary, gridColumn: '1/3' }} onClick={submit}>+ 添加项目</button>
     </div>
   );
