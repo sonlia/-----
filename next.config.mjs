@@ -4,7 +4,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // better-sqlite3 是 native 模块，需要在服务端运行
+  // better-sqlite3 是 native 模块，需要在服务端运行，不被打包
   serverExternalPackages: ['better-sqlite3'],
   // 允许跨域隔离（WebGPU 需要）
   async headers() {
