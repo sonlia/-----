@@ -3,7 +3,8 @@ import { useState, useMemo } from 'react';
 
 /**
  * 三级树形区域选择器（省份 → 城市 → 项目）
- * 替代原来的时间维度+区域两个下拉框
+ * 默认全部为「全部」，统计全国所有项目
+ * 选中具体项目时通过 onChange 回调通知父组件
  */
 
 // 区域数据树（省份 → 城市 → 项目）
@@ -33,36 +34,65 @@ const REGION_TREE: Record<string, Record<string, string[]>> = {
   },
 };
 
-export default function RegionTreeSelector() {
-  const [province, setProvince] = useState('广东省');
-  const [city, setCity] = useState('深圳市');
-  const [project, setProject] = useState('深圳湾科技园');
+const ALL = '全部';
 
-  // 当前省份下的城市列表
-  const cities = useMemo(() => {
-    return Object.keys(REGION_TREE[province] || {});
+interface RegionSelection {
+  province: string;
+  city: string;
+  project: string;
+  // 是否选中了具体项目（三级都不是"全部"）
+  isSpecific: boolean;
+}
+
+export default function RegionTreeSelector({ onChange }: { onChange?: (sel: RegionSelection) => void } = {}) {
+  const [province, setProvince] = useState(ALL);
+  const [city, setCity] = useState(ALL);
+  const [project, setProject] = useState(ALL);
+
+  // 省份选项：全部 + 所有省份
+  const provinceOptions = [ALL, ...Object.keys(REGION_TREE)];
+
+  // 当前省份下的城市列表（选了具体省份才显示城市选项）
+  const cityOptions = useMemo(() => {
+    if (province === ALL) return [ALL];
+    return [ALL, ...Object.keys(REGION_TREE[province] || {})];
   }, [province]);
 
-  // 当前城市下的项目列表
-  const projects = useMemo(() => {
-    return (REGION_TREE[province] || {})[city] || [];
+  // 当前城市下的项目列表（选了具体城市才显示项目选项）
+  const projectOptions = useMemo(() => {
+    if (province === ALL || city === ALL) return [ALL];
+    return [ALL, ...((REGION_TREE[province] || {})[city] || [])];
   }, [province, city]);
 
-  // 选择省份时，自动选第一个城市和项目
-  const onProvinceChange = (p: string) => {
-    setProvince(p);
-    const cityList = Object.keys(REGION_TREE[p] || {});
-    const firstCity = cityList[0] || '';
-    setCity(firstCity);
-    const projList = (REGION_TREE[p] || {})[firstCity] || [];
-    setProject(projList[0] || '');
+  // 通知父组件
+  const notifyChange = (p: string, c: string, proj: string) => {
+    if (onChange) {
+      onChange({
+        province: p, city: c, project: proj,
+        isSpecific: p !== ALL && c !== ALL && proj !== ALL,
+      });
+    }
   };
 
-  // 选择城市时，自动选第一个项目
+  // 选择省份
+  const onProvinceChange = (p: string) => {
+    setProvince(p);
+    setCity(ALL);
+    setProject(ALL);
+    notifyChange(p, ALL, ALL);
+  };
+
+  // 选择城市
   const onCityChange = (c: string) => {
     setCity(c);
-    const projList = (REGION_TREE[province] || {})[c] || [];
-    setProject(projList[0] || '');
+    setProject(ALL);
+    notifyChange(province, c, ALL);
+  };
+
+  // 选择项目
+  const onProjectChange = (proj: string) => {
+    setProject(proj);
+    notifyChange(province, city, proj);
   };
 
   const selectStyle: React.CSSProperties = {
@@ -83,21 +113,21 @@ export default function RegionTreeSelector() {
       <span style={{ fontSize: '11px', color: 'var(--text-dim)', letterSpacing: '1px' }}>📍 区域</span>
       {/* 省份 */}
       <select value={province} onChange={(e) => onProvinceChange(e.target.value)} style={selectStyle}>
-        {Object.keys(REGION_TREE).map(p => (
+        {provinceOptions.map(p => (
           <option key={p} value={p} style={{ background: '#0a1a2e', color: '#e8f4ff' }}>{p}</option>
         ))}
       </select>
       <span style={{ color: 'var(--text-dim)', fontSize: '11px' }}>›</span>
-      {/* 城市 */}
+      {/* 城市（省份选"全部"时只显示"全部"） */}
       <select value={city} onChange={(e) => onCityChange(e.target.value)} style={selectStyle}>
-        {cities.map(c => (
+        {cityOptions.map(c => (
           <option key={c} value={c} style={{ background: '#0a1a2e', color: '#e8f4ff' }}>{c}</option>
         ))}
       </select>
       <span style={{ color: 'var(--text-dim)', fontSize: '11px' }}>›</span>
-      {/* 项目 */}
-      <select value={project} onChange={(e) => setProject(e.target.value)} style={selectStyle}>
-        {projects.map(p => (
+      {/* 项目（城市选"全部"时只显示"全部"） */}
+      <select value={project} onChange={(e) => onProjectChange(e.target.value)} style={selectStyle}>
+        {projectOptions.map(p => (
           <option key={p} value={p} style={{ background: '#0a1a2e', color: '#e8f4ff' }}>{p}</option>
         ))}
       </select>
