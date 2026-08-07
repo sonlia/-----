@@ -1,5 +1,5 @@
-import BuildingScene from '@/components/BuildingScene';
+import { redirect } from 'next/navigation';
 
 export default function Home() {
-  return <BuildingScene />;
+  redirect('/admin');
 }
