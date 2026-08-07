@@ -446,12 +446,99 @@ function EnergyForm({ projectId, onCreated }: { projectId: number; onCreated: ()
   );
 }
 
+// 设备参数模板（按设备类型）
+const DEVICE_PARAM_TEMPLATES: Record<string, { label: string; key: string; unit?: string }[]> = {
+  chiller: [
+    { label: '冷冻进水温度', key: 'frozen_in_temp', unit: '℃' },
+    { label: '冷冻出水温度', key: 'frozen_out_temp', unit: '℃' },
+    { label: '冷却进水温度', key: 'cooling_in_temp', unit: '℃' },
+    { label: '冷却出水温度', key: 'cooling_out_temp', unit: '℃' },
+    { label: '出水温度设定', key: 'target_temp', unit: '℃' },
+    { label: '蒸发温度', key: 'evap_temp', unit: '℃' },
+    { label: '冷凝温度', key: 'cond_temp', unit: '℃' },
+    { label: '压缩机油温', key: 'oil_temp', unit: '℃' },
+    { label: '蒸发压力', key: 'evap_pressure', unit: 'kPa' },
+    { label: '冷凝压力', key: 'cond_pressure', unit: 'kPa' },
+    { label: '油压差', key: 'oil_pressure_diff', unit: 'kPa' },
+    { label: '电流', key: 'current', unit: 'A' },
+    { label: '电压', key: 'voltage', unit: 'V' },
+    { label: '功率', key: 'power', unit: 'kW' },
+    { label: '运行时间', key: 'run_hours', unit: 'h' },
+  ],
+  frozen_pump: [
+    { label: '运行频率', key: 'freq', unit: 'Hz' },
+    { label: '运行功率', key: 'power', unit: 'kW' },
+    { label: '运行时间', key: 'run_hours', unit: 'H' },
+    { label: '电流', key: 'current', unit: 'A' },
+    { label: '电压', key: 'voltage', unit: 'V' },
+    { label: '电机扭矩', key: 'torque', unit: 'N·m' },
+  ],
+  cooling_pump: [
+    { label: '运行频率', key: 'freq', unit: 'Hz' },
+    { label: '运行功率', key: 'power', unit: 'kW' },
+    { label: '运行时间', key: 'run_hours', unit: 'H' },
+    { label: '电流', key: 'current', unit: 'A' },
+    { label: '电压', key: 'voltage', unit: 'V' },
+    { label: '电机扭矩', key: 'torque', unit: 'N·m' },
+  ],
+  cooling_tower: [
+    { label: '运行频率', key: 'freq', unit: 'Hz' },
+    { label: '运行功率', key: 'power', unit: 'kW' },
+    { label: '运行时间', key: 'run_hours', unit: 'H' },
+    { label: '电流', key: 'current', unit: 'A' },
+    { label: '电压', key: 'voltage', unit: 'V' },
+    { label: '电机扭矩', key: 'torque', unit: 'N·m' },
+  ],
+  ahu: [
+    { label: '设定温度', key: 'set_temp', unit: '℃' },
+    { label: '反馈温度', key: 'feedback_temp', unit: '℃' },
+    { label: '冷水开度', key: 'cold_valve', unit: '%' },
+    { label: '冷水反馈开度', key: 'cold_feedback', unit: '%' },
+    { label: '热水开度', key: 'hot_valve', unit: '%' },
+    { label: '热水反馈开度', key: 'hot_feedback', unit: '%' },
+  ],
+};
+
 function DeviceCard({ device, onDeleted }: { device: Device; onDeleted: () => void }) {
   const [showParams, setShowParams] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showInput, setShowInput] = useState(false);
   const [metrics, setMetrics] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [paramValues, setParamValues] = useState<Record<string, string>>({});
+
   const typeLabel = DEVICE_TYPE_LABELS[device.device_type] || device.device_type;
   const subtypeLabel = device.chiller_subtype ? ` · ${CHILLER_SUBTYPES[device.chiller_subtype] || ''}` : '';
   const statusColor = device.is_offline ? '#4a6485' : device.is_fault ? '#ff4d6d' : device.running_status === 'running' ? '#00ff88' : '#ffaa44';
+  const paramTemplate = DEVICE_PARAM_TEMPLATES[device.device_type] || [];
+
+  const loadMetrics = async () => {
+    const res = await fetch(`/api/admin/metrics?device_id=${device.id}`);
+    const json = await res.json();
+    if (json.success) setMetrics(json.data);
+  };
+
+  const loadHistory = async () => {
+    const res = await fetch(`/api/admin/metrics?device_id=${device.id}&history=1&limit=20`);
+    const json = await res.json();
+    if (json.success) setHistory(json.data || []);
+  };
+
+  const submitParams = async () => {
+    const params: Record<string, string> = {};
+    paramTemplate.forEach(p => {
+      const val = paramValues[p.key];
+      if (val) params[`${p.label}(${p.unit || ''})`] = val;
+    });
+    if (Object.keys(params).length === 0) return;
+    await fetch('/api/admin/metrics', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: device.id, params }),
+    });
+    setParamValues({});
+    setShowInput(false);
+    loadMetrics();
+  };
 
   return (
     <div style={{ padding: '8px 10px', marginBottom: '4px', borderRadius: '4px', background: 'rgba(0,212,255,0.05)', border: '1px solid rgba(0,212,255,0.15)' }}>
@@ -461,18 +548,22 @@ function DeviceCard({ device, onDeleted }: { device: Device; onDeleted: () => vo
           <span style={{ fontSize: '11px', color: '#8aa5c4', marginLeft: '6px' }}>{typeLabel}{subtypeLabel}</span>
           <span style={{ fontSize: '11px', color: '#4a6485', marginLeft: '6px' }}>#{device.code}</span>
         </div>
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           <span style={{ fontSize: '11px', color: statusColor, fontWeight: 600 }}>
             {device.is_offline ? '离线' : device.is_fault ? '故障' : STATUS_LABELS[device.running_status] || device.running_status}
           </span>
-          <button style={{ ...btnPrimary, padding: '2px 8px', fontSize: '11px', background: 'rgba(0,212,255,0.2)', color: '#00d4ff' }} onClick={async () => {
-            if (!showParams) {
-              const res = await fetch(`/api/admin/metrics?device_id=${device.id}`);
-              const json = await res.json();
-              if (json.success) setMetrics(json.data);
-            }
-            setShowParams(!showParams);
-          }}>{showParams ? '收起' : '参数'}</button>
+          <button style={{ ...btnPrimary, padding: '2px 6px', fontSize: '10px', background: 'rgba(0,212,255,0.2)', color: '#00d4ff' }} onClick={async () => {
+            if (!showParams) loadMetrics();
+            setShowParams(!showParams); setShowHistory(false); setShowInput(false);
+          }}>最新</button>
+          <button style={{ ...btnPrimary, padding: '2px 6px', fontSize: '10px', background: 'rgba(0,255,136,0.2)', color: '#00ff88' }} onClick={async () => {
+            if (!showInput) { setShowParams(false); setShowHistory(false); }
+            setShowInput(!showInput);
+          }}>录入</button>
+          <button style={{ ...btnPrimary, padding: '2px 6px', fontSize: '10px', background: 'rgba(255,170,68,0.2)', color: '#ffaa44' }} onClick={async () => {
+            if (!showHistory) loadHistory();
+            setShowHistory(!showHistory); setShowParams(false); setShowInput(false);
+          }}>历史</button>
           <button style={btnDanger} onClick={async () => {
             if (!confirm(`删除设备「${device.name}」？`)) return;
             await fetch(`/api/admin/devices?id=${device.id}`, { method: 'DELETE' });
@@ -480,15 +571,54 @@ function DeviceCard({ device, onDeleted }: { device: Device; onDeleted: () => vo
           }}>删除</button>
         </div>
       </div>
+
+      {/* 最新数据 */}
       {showParams && (
-        <div style={{ marginTop: '6px', padding: '6px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px' }}>
+        <div style={{ marginTop: '6px', padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px' }}>
           {metrics ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px' }}>
-              {Object.entries(metrics.params || {}).map(([k, v]: any) => (
-                <div key={k} style={{ fontSize: '10px' }}><span style={{ color: '#8aa5c4' }}>{k}: </span><span style={{ color: '#00ffcc' }}>{v}</span></div>
-              ))}
+            <>
+              <div style={{ fontSize: '10px', color: '#4a6485', marginBottom: '4px' }}>⏱ {metrics.timestamp}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px' }}>
+                {Object.entries(metrics.params || {}).map(([k, v]: any) => (
+                  <div key={k} style={{ fontSize: '10px' }}><span style={{ color: '#8aa5c4' }}>{k}: </span><span style={{ color: '#00ffcc', fontWeight: 600 }}>{v}</span></div>
+                ))}
+              </div>
+            </>
+          ) : <div style={{ fontSize: '10px', color: '#4a6485' }}>暂无时序数据，点击「录入」添加</div>}
+        </div>
+      )}
+
+      {/* 录入参数 */}
+      {showInput && (
+        <div style={{ marginTop: '6px', padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px' }}>
+          <div style={{ fontSize: '11px', color: '#00ff88', marginBottom: '6px' }}>📝 录入时序参数</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px' }}>
+            {paramTemplate.map(p => (
+              <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                <span style={{ fontSize: '9px', color: '#8aa5c4', whiteSpace: 'nowrap' }}>{p.label}</span>
+                <input style={{ ...inputStyle, fontSize: '10px', padding: '2px 4px', width: '50px' }} placeholder={p.unit || ''} value={paramValues[p.key] || ''} onChange={e => setParamValues(prev => ({ ...prev, [p.key]: e.target.value }))} />
+              </div>
+            ))}
+          </div>
+          <button style={{ ...btnPrimary, marginTop: '6px', padding: '3px 12px', fontSize: '11px' }} onClick={submitParams}>提交参数</button>
+        </div>
+      )}
+
+      {/* 历史数据 */}
+      {showHistory && (
+        <div style={{ marginTop: '6px', padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+          <div style={{ fontSize: '11px', color: '#ffaa44', marginBottom: '6px' }}>📊 历史时序数据（最近20条）</div>
+          {history.length > 0 ? history.map((h, i) => (
+            <div key={i} style={{ padding: '4px 0', borderBottom: '1px solid rgba(0,212,255,0.1)' }}>
+              <div style={{ fontSize: '9px', color: '#4a6485' }}>{h.timestamp}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {Object.entries(h.params || {}).slice(0, 5).map(([k, v]: any) => (
+                  <span key={k} style={{ fontSize: '9px', color: '#8aa5c4' }}>{k}: <span style={{ color: '#00ffcc' }}>{v}</span></span>
+                ))}
+                {Object.keys(h.params || {}).length > 5 && <span style={{ fontSize: '9px', color: '#4a6485' }}>...</span>}
+              </div>
             </div>
-          ) : <div style={{ fontSize: '10px', color: '#4a6485' }}>暂无时序数据</div>}
+          )) : <div style={{ fontSize: '10px', color: '#4a6485' }}>暂无历史数据</div>}
         </div>
       )}
     </div>
