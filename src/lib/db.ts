@@ -137,6 +137,37 @@ function initSchema(db: Database.Database) {
     );
   `);
 
+  // 9. 大屏模块配置表（控制大屏显示哪些模块及顺序）
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sys_modules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      module_key TEXT NOT NULL UNIQUE,     -- 模块标识: overview2/building/solar/charging/ac/load/grid/carbon
+      label TEXT NOT NULL,                  -- 显示名称
+      icon TEXT,                            -- 图标 emoji
+      sort_order INTEGER DEFAULT 0,         -- 排序
+      is_visible INTEGER DEFAULT 1,         -- 是否在大屏显示 0/1
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // 初始化默认模块（如果表为空）
+  const count = db.prepare('SELECT COUNT(*) as c FROM sys_modules').get() as any;
+  if (count.c === 0) {
+    const defaults = [
+      { key: 'overview2', label: '全景总览', icon: '🗺', sort: 1 },
+      { key: 'overview', label: '总览2', icon: '📊', sort: 2 },
+      { key: 'building', label: '节能管理', icon: '🏢', sort: 3 },
+      { key: 'solar', label: '光伏发电', icon: '☀', sort: 4 },
+      { key: 'charging', label: '充电桩', icon: '🔌', sort: 5 },
+      { key: 'ac', label: '空调节能', icon: '❄', sort: 6 },
+      { key: 'load', label: '负荷管理', icon: '🎛', sort: 7 },
+      { key: 'grid', label: '配网管理', icon: '⚡', sort: 8 },
+      { key: 'carbon', label: '碳监测', icon: '🌱', sort: 9 },
+    ];
+    const stmt = db.prepare('INSERT INTO sys_modules (module_key, label, icon, sort_order) VALUES (?, ?, ?, ?)');
+    defaults.forEach(d => stmt.run(d.key, d.label, d.icon, d.sort));
+  }
+
   // 索引
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_metrics_device_time ON ac_device_metrics(device_id, timestamp);
@@ -336,4 +367,34 @@ export function getEnergyStats(projectId: number) {
   } : null;
 
   return { total_kwh, total_cost, yoy, mom, monthly: rows };
+}
+
+// === 大屏模块配置 ===
+export function getModules() {
+  return getDB().prepare('SELECT * FROM sys_modules ORDER BY sort_order ASC').all();
+}
+
+export function getVisibleModules() {
+  return getDB().prepare('SELECT * FROM sys_modules WHERE is_visible = 1 ORDER BY sort_order ASC').all();
+}
+
+export function addModule(data: { module_key: string; label: string; icon: string; sort_order: number }) {
+  const result = getDB().prepare('INSERT INTO sys_modules (module_key, label, icon, sort_order) VALUES (?, ?, ?, ?)').run(data.module_key, data.label, data.icon, data.sort_order);
+  return { id: result.lastInsertRowid, ...data };
+}
+
+export function updateModule(id: number, data: { label?: string; icon?: string; sort_order?: number; is_visible?: number }) {
+  const sets: string[] = [];
+  const vals: any[] = [];
+  if (data.label !== undefined) { sets.push('label = ?'); vals.push(data.label); }
+  if (data.icon !== undefined) { sets.push('icon = ?'); vals.push(data.icon); }
+  if (data.sort_order !== undefined) { sets.push('sort_order = ?'); vals.push(data.sort_order); }
+  if (data.is_visible !== undefined) { sets.push('is_visible = ?'); vals.push(data.is_visible); }
+  if (sets.length === 0) return;
+  vals.push(id);
+  getDB().prepare(`UPDATE sys_modules SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+}
+
+export function deleteModule(id: number) {
+  getDB().prepare('DELETE FROM sys_modules WHERE id = ?').run(id);
 }
