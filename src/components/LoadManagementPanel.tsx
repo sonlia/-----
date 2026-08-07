@@ -1,5 +1,5 @@
 'use client';
-import ModuleSelector from './ModuleSelector';
+import RegionTreeSelector from './RegionTreeSelector';
 import { useMemo, useState } from 'react';
 import EChart, { PALETTE, commonGrid, commonTooltip, commonAxis } from './EChart';
 
@@ -24,8 +24,6 @@ const LOAD_TYPES = [
 ];
 
 export default function LoadManagementPanel({ kpiPower }: LoadManagementPanelProps) {
-  const [selTime, setSelTime] = useState('今日');
-  const [selZone, setSelZone] = useState('全部区域');
   const power = parseFloat(kpiPower || '0');
   const totalLoad = BUSES.reduce((s, b) => s + b.load, 0);
   const totalControllable = BUSES.reduce((s, b) => s + b.controllable, 0);
@@ -200,7 +198,7 @@ export default function LoadManagementPanel({ kpiPower }: LoadManagementPanelPro
 
   return (
     <div style={{ position: 'absolute', top: '120px', left: '20px', right: '20px', bottom: '20px', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 40, overflow: 'hidden' }}>
-      <ModuleSelector selectors={[{ label: '时间维度', options: ['今日', '本周', '本月', '本年'], value: selTime, onChange: setSelTime }, { label: '区域', options: ['全部区域', '1F大厅', '2F办公区', '3F会议区', '4F机房', '5F餐厅'], value: selZone, onChange: setSelZone }]} />
+      <RegionTreeSelector />
       {/* 顶部 KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr', gap: '10px' }}>
         {[

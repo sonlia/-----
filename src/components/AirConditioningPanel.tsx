@@ -1,38 +1,13 @@
 'use client';
 import { useMemo, useState } from 'react';
 import EChart, { PALETTE, commonGrid, commonTooltip, commonAxis } from './EChart';
+import RegionTreeSelector from './RegionTreeSelector';
 
 interface AirConditioningPanelProps { kpiPower: string; }
 
-// 下拉框选择器组件（复用）
-function PanelSelector({ label, options, value, onChange }: { label: string; options: string[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-      <span style={{ fontSize: '11px', color: 'var(--text-dim)', letterSpacing: '1px' }}>{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        style={{
-          padding: '4px 10px', fontSize: '11px', fontWeight: 600,
-          background: 'var(--bg-panel)', color: 'var(--primary)',
-          border: '1px solid var(--border-line)', borderRadius: '4px',
-          cursor: 'pointer', outline: 'none',
-          fontFamily: 'Rajdhani', letterSpacing: '0.5px',
-        }}
-      >
-        {options.map(opt => <option key={opt} value={opt} style={{ background: '#0a1a2e', color: '#e8f4ff' }}>{opt}</option>)}
-      </select>
-    </div>
-  );
-}
-
 export default function AirConditioningPanel({ kpiPower }: AirConditioningPanelProps) {
-  const [timeRange, setTimeRange] = useState('今日');
-  const [zone, setZone] = useState('全部区域');
-  const [floor, setFloor] = useState('全部楼层');
-
   const panelStyle: React.CSSProperties = { position: 'relative', padding: '14px 16px' };
-  const multiplier = timeRange === '今日' ? 1 : timeRange === '本周' ? 7 : timeRange === '本月' ? 30 : 365;
+  const multiplier = 1;
 
   // 空调总功率
   const acTotalPower = 45.6;
@@ -102,12 +77,8 @@ export default function AirConditioningPanel({ kpiPower }: AirConditioningPanelP
 
   return (
     <div style={{ position: 'absolute', top: '120px', left: '20px', right: '20px', bottom: '20px', display: 'flex', flexDirection: 'column', gap: '14px', zIndex: 40, overflow: 'hidden' }}>
-      {/* 下拉框选择器 */}
-      <div style={{ display: 'flex', gap: '16px', alignItems: 'center', background: 'var(--bg-panel)', border: '1px solid var(--border-line)', borderRadius: '6px', padding: '8px 16px', backdropFilter: 'blur(14px)' }}>
-        <PanelSelector label="时间维度" options={['今日', '本周', '本月', '本年']} value={timeRange} onChange={setTimeRange} />
-        <PanelSelector label="区域" options={['全部区域', '1F大厅', '2F办公区', '3F会议区', '4F机房', '5F餐厅']} value={zone} onChange={setZone} />
-        <PanelSelector label="楼层" options={['全部楼层', '1F', '2F', '3F', '4F', '5F']} value={floor} onChange={setFloor} />
-      </div>
+      {/* 区域树形选择器 */}
+      <RegionTreeSelector />
 
       {/* 顶部 4 KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '14px' }}>
