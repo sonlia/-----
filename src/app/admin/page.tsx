@@ -312,7 +312,6 @@ function TreeRow({ node, depth, selected, onSelect, expanded, onToggle, onRefres
   const isExpanded = expanded.has(node.id);
   const isSelected = selected?.id === node.id;
   const hasChildren = node.children && node.children.length > 0;
-  const canAdd = ['province', 'city', 'project', 'floor', 'room', 'station'].includes(node.type);
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', padding: '4px 6px', borderRadius: '4px', cursor: 'pointer', background: isSelected ? 'rgba(0,212,255,0.15)' : 'transparent', border: '1px solid ' + (isSelected ? 'rgba(0,212,255,0.4)' : 'transparent'), marginLeft: `${depth * 16}px`, fontSize: '12px', gap: '4px' }} onClick={() => { onSelect(node); if (hasChildren) onToggle(node.id); }}>
@@ -321,7 +320,6 @@ function TreeRow({ node, depth, selected, onSelect, expanded, onToggle, onRefres
         <span style={{ fontWeight: isSelected ? 600 : 400 }}>{node.label}</span>
         {node.meta && <span style={{ fontSize: '10px', color: '#4a6485' }}>{node.meta}</span>}
       </div>
-      {isSelected && canAdd && <div style={{ marginLeft: `${depth * 16 + 28}px`, marginTop: '2px' }}><AddButton node={node} onCreated={onRefresh} /></div>}
       {isExpanded && hasChildren && node.children!.map(child => <TreeRow key={child.id} node={child} depth={depth + 1} selected={selected} onSelect={onSelect} expanded={expanded} onToggle={onToggle} onRefresh={onRefresh} />)}
     </div>
   );
@@ -370,19 +368,92 @@ function AddProjectInline({ onCreated }: { onCreated: () => void }) {
   );
 }
 
+// 节点类型标签
+const TYPE_LABELS: Record<string, string> = {
+  province: '省份', city: '城市', project: '项目', floor: '楼层', room: '房间',
+  station: '冷站', device: '设备', meter: '表计',
+};
+const TYPE_COLORS: Record<string, string> = {
+  province: '#00d4ff', city: '#00ffcc', project: '#ffaa44', floor: '#00ff88',
+  room: '#ff4d6d', station: '#0088ff', device: '#ffcc00', meter: '#ff8800',
+};
+
 function NodeDetail({ node, onRefresh }: { node: TreeNode; onRefresh: () => void }) {
-  if (node.type === 'device') return <DeviceDetail node={node} onRefresh={onRefresh} />;
-  if (node.type === 'meter') return <MeterDetail node={node} onRefresh={onRefresh} />;
-  if (node.type === 'project') return <ProjectDetail node={node} onRefresh={onRefresh} />;
-  const childCount = node.children?.length || 0;
+  const typeLabel = TYPE_LABELS[node.type] || node.type;
+  const typeColor = TYPE_COLORS[node.type] || '#8aa5c4';
+
   return (
     <div>
-      <h2 style={{ fontSize: '16px', color: '#00d4ff', marginBottom: '12px' }}>{node.icon} {node.label}</h2>
-      <div style={{ fontSize: '13px', color: '#8aa5c4' }}>
-        <p>类型：{node.type} | 子节点：{childCount}</p>
+      {/* 顶部：图标 + 名称 + 类型标签 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+        <span style={{ fontSize: '20px' }}>{node.icon}</span>
+        <h2 style={{ fontSize: '16px', color: '#e8f4ff' }}>{node.label}</h2>
+        <span style={{
+          padding: '2px 10px', fontSize: '11px', fontWeight: 600,
+          background: `${typeColor}20`, color: typeColor,
+          border: `1px solid ${typeColor}40`, borderRadius: '12px',
+        }}>{typeLabel}</span>
+      </div>
+
+      {/* 右侧添加按钮 */}
+      <AddButtonBar node={node} onCreated={onRefresh} />
+
+      {/* 具体内容 */}
+      <div style={{ marginTop: '16px' }}>
+        {node.type === 'device' && <DeviceDetail node={node} onRefresh={onRefresh} />}
+        {node.type === 'meter' && <MeterDetail node={node} onRefresh={onRefresh} />}
+        {node.type === 'project' && <ProjectDetail node={node} onRefresh={onRefresh} />}
+        {['province', 'city', 'floor', 'room', 'station'].includes(node.type) && (
+          <div style={{ fontSize: '13px', color: '#8aa5c4' }}>
+            <p>子节点数量：{node.children?.length || 0}</p>
+            {node.children && node.children.length > 0 && (
+              <div style={{ marginTop: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#4a6485', marginBottom: '4px' }}>子节点：</div>
+                {node.children.map(c => (
+                  <span key={c.id} style={{ display: 'inline-block', margin: '2px 4px', padding: '2px 8px', fontSize: '11px', background: 'rgba(0,212,255,0.1)', borderRadius: '4px', color: '#8aa5c4' }}>
+                    {c.icon} {c.label} <span style={{ color: TYPE_COLORS[c.type] || '#4a6485' }}>({TYPE_LABELS[c.type] || c.type})</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+// 添加按钮栏（显示在右侧详情区）
+function AddButtonBar({ node, onCreated }: { node: TreeNode; onCreated: () => void }) {
+  const btn: React.CSSProperties = { ...btnPrimary, padding: '4px 10px', fontSize: '11px' };
+  const wrap: React.CSSProperties = { display: 'flex', gap: '6px', flexWrap: 'wrap' };
+
+  if (node.type === 'province' || node.type === 'city') {
+    return <div style={wrap}><button style={btn} onClick={async () => {
+      const name = prompt('输入项目名：');
+      if (name) { const province = node.type === 'province' ? '' : ''; await fetch('/api/admin/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ province: node.type === 'province' ? node.label : '', city: node.label, name }) }); onCreated(); }
+    }}>+ 添加项目</button></div>;
+  }
+  if (node.type === 'project') {
+    return <div style={wrap}>
+      <button style={btn} onClick={async () => { const n = prompt('冷站名：'); if (n) { await fetch('/api/admin/stations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project_id: node.dbId, name: n }) }); onCreated(); } }}>+ 冷站</button>
+      <button style={btn} onClick={async () => { const n = prompt('楼层名(如1F)：'); if (n) { await fetch('/api/admin/floors', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project_id: node.dbId, name: n }) }); onCreated(); } }}>+ 楼层</button>
+      <button style={btn} onClick={async () => { const n = prompt('表计名：'); if (n) { const l = prompt('级别(1/2/3)：', '1'); await fetch('/api/admin/meters', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project_id: node.dbId, meter_level: parseInt(l || '1'), name: n, code: n }) }); onCreated(); } }}>+ 表计</button>
+    </div>;
+  }
+  if (node.type === 'floor') {
+    return <div style={wrap}>
+      <button style={btn} onClick={async () => { const n = prompt('房间名：'); if (n) { await fetch('/api/admin/rooms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ floor_id: node.dbId, project_id: node.data?.project_id, name: n }) }); onCreated(); } }}>+ 房间</button>
+      <button style={btn} onClick={async () => { const n = prompt('设备名：'); if (n) { const c = prompt('编号：', n); const t = prompt('类型(chiller/frozen_pump/cooling_pump/cooling_tower/ahu)：', 'chiller'); await fetch('/api/admin/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project_id: node.data?.project_id, floor_id: node.dbId, device_type: t || 'chiller', name: n, code: c || n }) }); onCreated(); } }}>+ 设备</button>
+    </div>;
+  }
+  if (node.type === 'room') {
+    return <div style={wrap}><button style={btn} onClick={async () => { const n = prompt('设备名：'); if (n) { const c = prompt('编号：', n); const t = prompt('类型：', 'chiller'); await fetch('/api/admin/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project_id: node.data?.project_id, room_id: node.dbId, device_type: t || 'chiller', name: n, code: c || n }) }); onCreated(); } }}>+ 设备</button></div>;
+  }
+  if (node.type === 'station') {
+    return <div style={wrap}><button style={btn} onClick={async () => { const n = prompt('设备名：'); if (n) { const c = prompt('编号：', n); const t = prompt('类型：', 'chiller'); await fetch('/api/admin/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project_id: node.data?.project_id, station_id: node.dbId, device_type: t || 'chiller', name: n, code: c || n }) }); onCreated(); } }}>+ 设备</button></div>;
+  }
+  return null;
 }
 
 function DeviceDetail({ node, onRefresh }: { node: TreeNode; onRefresh: () => void }) {
@@ -410,8 +481,7 @@ function DeviceDetail({ node, onRefresh }: { node: TreeNode; onRefresh: () => vo
 
   return (
     <div>
-      <h2 style={{ fontSize: '16px', color: '#00d4ff', marginBottom: '8px' }}>{node.icon} {d?.name}</h2>
-      <div style={{ fontSize: '12px', color: '#8aa5c4', marginBottom: '12px' }}>类型：{typeLabel} | 编号：#{d?.code} | <span style={{ color: statusColor, fontWeight: 600 }}>{d?.is_offline ? '离线' : d?.is_fault ? '故障' : d?.running_status}</span></div>
+      <div style={{ fontSize: '12px', color: '#8aa5c4', marginBottom: '10px' }}>编号：#{d?.code} | 类型：{typeLabel} | <span style={{ color: statusColor, fontWeight: 600 }}>{d?.is_offline ? '离线' : d?.is_fault ? '故障' : d?.running_status}</span></div>
       <div style={{ display: 'flex', gap: '4px', marginBottom: '10px' }}>
         {[{ k: 'latest', l: '📊最新' }, { k: 'input', l: '📝录入' }, { k: 'history', l: '📜历史' }].map(t => (
           <button key={t.k} onClick={() => { setTab(t.k as any); if (t.k === 'latest') loadLatest(); if (t.k === 'history') loadHistory(); }} style={{ ...btnPrimary, padding: '4px 10px', fontSize: '11px', background: tab === t.k ? '#00d4ff' : 'rgba(0,212,255,0.15)', color: tab === t.k ? '#02070f' : '#00d4ff' }}>{t.l}</button>
@@ -427,7 +497,7 @@ function DeviceDetail({ node, onRefresh }: { node: TreeNode; onRefresh: () => vo
 
 function MeterDetail({ node, onRefresh }: { node: TreeNode; onRefresh: () => void }) {
   const m = node.data;
-  return <div><h2 style={{ fontSize: '16px', color: '#00d4ff', marginBottom: '8px' }}>⚡ {m?.name}</h2><div style={{ fontSize: '12px', color: '#8aa5c4' }}>{METER_LEVEL_LABELS[m?.meter_level]} | #{m?.code}</div><button style={{ ...btnDanger, marginTop: '10px', padding: '4px 10px', fontSize: '11px' }} onClick={async () => { if (confirm('删除？')) { await fetch(`/api/admin/meters?id=${m.id}`, { method: 'DELETE' }); onRefresh(); } }}>删除</button></div>;
+  return <div><div style={{ fontSize: '12px', color: '#8aa5c4', marginBottom: '8px' }}>{METER_LEVEL_LABELS[m?.meter_level]} | 编号: #{m?.code} | 位置: {m?.location || '未设置'}</div><button style={{ ...btnDanger, padding: '4px 10px', fontSize: '11px' }} onClick={async () => { if (confirm('删除？')) { await fetch(`/api/admin/meters?id=${m.id}`, { method: 'DELETE' }); onRefresh(); } }}>删除</button></div>;
 }
 
 function ProjectDetail({ node, onRefresh }: { node: TreeNode; onRefresh: () => void }) {
@@ -436,5 +506,5 @@ function ProjectDetail({ node, onRefresh }: { node: TreeNode; onRefresh: () => v
   const floorCount = node.children?.filter(c => c.type === 'floor').length || 0;
   const stationCount = node.children?.filter(c => c.type === 'station').length || 0;
   const meterCount = node.children?.filter(c => c.type === 'meter').length || 0;
-  return <div><h2 style={{ fontSize: '16px', color: '#00d4ff', marginBottom: '8px' }}>📁 {p?.name}</h2><div style={{ fontSize: '12px', color: '#8aa5c4', marginBottom: '12px' }}>{p?.province} › {p?.city}</div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px', marginBottom: '16px' }}>{[{ l: '冷站', c: stationCount }, { l: '楼层', c: floorCount }, { l: '表计', c: meterCount }, { l: '设备', c: deviceCount }].map(s => <div key={s.l} style={{ padding: '10px', borderRadius: '6px', background: 'rgba(0,212,255,0.08)', textAlign: 'center' }}><div style={{ fontSize: '20px', fontWeight: 700, color: '#00d4ff', fontFamily: 'Orbitron' }}>{s.c}</div><div style={{ fontSize: '10px', color: '#8aa5c4' }}>{s.l}</div></div>)}</div><button style={{ ...btnDanger, padding: '4px 10px', fontSize: '11px' }} onClick={async () => { if (confirm('删除项目及所有子数据？')) { await fetch(`/api/admin/projects?id=${p.id}`, { method: 'DELETE' }); onRefresh(); } }}>删除项目</button></div>;
+  return <div><div style={{ fontSize: '12px', color: '#8aa5c4', marginBottom: '12px' }}>{p?.province} › {p?.city}</div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px', marginBottom: '16px' }}>{[{ l: '冷站', c: stationCount }, { l: '楼层', c: floorCount }, { l: '表计', c: meterCount }, { l: '设备', c: deviceCount }].map(s => <div key={s.l} style={{ padding: '10px', borderRadius: '6px', background: 'rgba(0,212,255,0.08)', textAlign: 'center' }}><div style={{ fontSize: '20px', fontWeight: 700, color: '#00d4ff', fontFamily: 'Orbitron' }}>{s.c}</div><div style={{ fontSize: '10px', color: '#8aa5c4' }}>{s.l}</div></div>)}</div><button style={{ ...btnDanger, padding: '4px 10px', fontSize: '11px' }} onClick={async () => { if (confirm('删除项目及所有子数据？')) { await fetch(`/api/admin/projects?id=${p.id}`, { method: 'DELETE' }); onRefresh(); } }}>删除项目</button></div>;
 }
