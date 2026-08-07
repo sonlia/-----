@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import CockpitPanel from './CockpitPanel';
 import SolarPanel from './SolarPanel';
 import CarbonPanel from './CarbonPanel';
+import AirConditioningPanel from './AirConditioningPanel';
 import ChargingPanel from './ChargingPanel';
 import LoadManagementPanel from './LoadManagementPanel';
 import GridPanel from './GridPanel';
@@ -62,7 +63,7 @@ export default function BuildingScene() {
   const [temperature, setTemperature] = useState(24);
   const [autoRotate, setAutoRotate] = useState(false);
   const [showList, setShowList] = useState(true);
-  const [activeModule, setActiveModule] = useState<'overview' | 'overview2' | 'building' | 'solar' | 'charging' | 'carbon' | 'load' | 'grid'>('overview2');
+  const [activeModule, setActiveModule] = useState<'overview' | 'overview2' | 'building' | 'solar' | 'charging' | 'carbon' | 'load' | 'grid' | 'ac'>('overview2');
   const [activeFloor, setActiveFloor] = useState(0);
 
   const [deviceList, setDeviceList] = useState<DeviceListItem[]>([]);
@@ -1264,7 +1265,7 @@ export default function BuildingScene() {
   const floorBtnStyle = (active: boolean): React.CSSProperties => ({ padding: '6px 4px', fontSize: '11px', fontWeight: 600, border: '1px solid ' + (active ? 'var(--primary)' : 'var(--border-line)'), background: active ? 'var(--primary-bg)' : 'transparent', color: active ? 'var(--primary)' : 'var(--text-mid)', borderRadius: '3px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: active ? '0 0 8px rgba(0,212,255,0.3)' : 'none', textAlign: 'center' as const });
 
   // 模块切换
-  const onSwitchModule = (mod: 'overview' | 'overview2' | 'building' | 'solar' | 'charging' | 'carbon' | 'load' | 'grid') => {
+  const onSwitchModule = (mod: 'overview' | 'overview2' | 'building' | 'solar' | 'charging' | 'carbon' | 'load' | 'grid' | 'ac') => {
     setActiveModule(mod);
     // 切换模块时隐藏设备详情面板
     setSelectedDevice(null);
@@ -1593,6 +1594,7 @@ export default function BuildingScene() {
           { id: 'building', label: '节能管理', icon: '🏢' },
           { id: 'solar', label: '光伏发电', icon: '☀' },
           { id: 'charging', label: '充电桩', icon: '🔌' },
+          { id: 'ac', label: '空调节能', icon: '❄' },
           { id: 'load', label: '负荷管理', icon: '🎛' },
           { id: 'grid', label: '配网管理', icon: '⚡' },
           { id: 'carbon', label: '碳监测', icon: '🌱' },
@@ -1611,6 +1613,7 @@ export default function BuildingScene() {
       {activeModule === 'charging' && <ChargingPanel kpiPower={kpiPower} />}
       {activeModule === 'load' && <LoadManagementPanel kpiPower={kpiPower} />}
       {activeModule === 'grid' && <GridPanel kpiPower={kpiPower} />}
+      {activeModule === 'ac' && <AirConditioningPanel kpiPower={kpiPower} />}
 
       {/* 操作提示 - 仅楼宇模块显示 */}
       {activeModule === 'building' && (
